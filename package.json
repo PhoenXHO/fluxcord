@@ -1,0 +1,62 @@
+{
+	"name": "fluxcord",
+	"version": "0.1.0",
+	"description": "Session-based Components V2 UI framework for Discord bots: flows, screens, TSX views.",
+	"license": "MIT",
+	"author": "FeenX",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./discord": {
+			"development": "./src/discord/index.ts",
+			"types": "./dist/discord/index.d.ts",
+			"default": "./dist/discord/index.js"
+		},
+		"./jsx-runtime": {
+			"development": "./src/tree/jsx-runtime.ts",
+			"types": "./dist/tree/jsx-runtime.d.ts",
+			"default": "./dist/tree/jsx-runtime.js"
+		},
+		"./jsx-dev-runtime": {
+			"development": "./src/tree/jsx-runtime.ts",
+			"types": "./dist/tree/jsx-runtime.d.ts",
+			"default": "./dist/tree/jsx-runtime.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc -p .",
+		"test": "vitest",
+		"test:run": "vitest run",
+		"lint": "eslint ."
+	},
+	"dependencies": {
+		"discord-api-types": "^0.38.36"
+	},
+	"peerDependencies": {
+		"discord.js": "^14.25.1"
+	},
+	"devDependencies": {
+		"@eslint/eslintrc": "^3.3.0",
+		"@eslint/js": "^9.35.0",
+		"@types/node": "^24.3.0",
+		"@typescript-eslint/eslint-plugin": "^8.43.0",
+		"@typescript-eslint/parser": "^8.43.0",
+		"discord.js": "^14.25.1",
+		"eslint": "^9.35.0",
+		"globals": "^16.3.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.11"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}
