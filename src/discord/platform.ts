@@ -51,7 +51,7 @@ import type { BridgePort, IncomingEvent } from '../pipeline/types.js';
 import type { InteractionSender } from '../runtime/types.js';
 import type { MessageRef } from '../state/types.js';
 import type { V2MessagePayload, V2ModalPayload } from '../render/v2.js';
-import type { NewUiComponentInteraction } from './flatten.js';
+import type { UiComponentInteraction } from './flatten.js';
 import { flattenInteraction } from './flatten.js';
 
 /** What the bridge logs through: the host's logger, or silence. */
@@ -89,7 +89,7 @@ export interface UiBridge {
 	 * hand to the core. The runtime's dispatch fn is passed per call so the
 	 * bridge never imports the runtime (wiring stays in the composition root).
 	 */
-	readonly dispatch: (interaction: NewUiComponentInteraction, core: (incoming: IncomingEvent) => Promise<void>) => Promise<void>;
+	readonly dispatch: (interaction: UiComponentInteraction, core: (incoming: IncomingEvent) => Promise<void>) => Promise<void>;
 }
 
 /**
@@ -102,7 +102,7 @@ export interface UiBridge {
 export function createUiBridge(client: Client, options: BridgeOptions = {}): UiBridge {
 	const log = options.logger ?? SILENT;
 	// --- Interaction binding (see module doc, job 2) ---------------------------
-	let bound: NewUiComponentInteraction | null = null;
+	let bound: UiComponentInteraction | null = null;
 	/** True while the dispatch in flight answered with a modal (an ack would kill it). */
 	let modalOpen = false;
 	let chain: Promise<unknown> = Promise.resolve();
@@ -185,7 +185,7 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 	// --- Dispatch: flatten, bind, serialize -------------------------------------
 
 	async function dispatch(
-		interaction: NewUiComponentInteraction,
+		interaction: UiComponentInteraction,
 		core: (incoming: IncomingEvent) => Promise<void>,
 	): Promise<void> {
 		const run = chain.then(async () => {

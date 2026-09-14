@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { flattenInteraction } from '../flatten.js';
-import type { NewUiComponentInteraction } from '../flatten.js';
+import type { UiComponentInteraction } from '../flatten.js';
 import type { ButtonInteraction, ModalSubmitInteraction, StringSelectMenuInteraction } from 'discord.js';
 
 /** Minimal structural fake: only the fields flattenInteraction reads. */
@@ -27,7 +27,7 @@ function fakeButton(fields: Partial<{ customId: string; guildId?: string }> = {}
 
 describe('flattenInteraction', () => {
 	it('flattens a button click to a button event', () => {
-		const event = flattenInteraction(fakeButton() as NewUiComponentInteraction);
+		const event = flattenInteraction(fakeButton() as UiComponentInteraction);
 
 		expect(event).toEqual({
 			kind: 'button',
@@ -40,7 +40,7 @@ describe('flattenInteraction', () => {
 	});
 
 	it('keeps the guild id when the click came from a guild', () => {
-		const event = flattenInteraction(fakeButton({ guildId: 'g9' }) as NewUiComponentInteraction);
+		const event = flattenInteraction(fakeButton({ guildId: 'g9' }) as UiComponentInteraction);
 		expect(event?.guildId).toBe('g9');
 	});
 
@@ -48,7 +48,7 @@ describe('flattenInteraction', () => {
 		// Regression: extracting `keys` off the cache detached it from its
 		// receiver and crashed live ("Map.prototype.keys called on
 		// incompatible receiver"). A real Map here proves the binding survives.
-		const interaction = fakeButton({ guildId: 'g9' }) as NewUiComponentInteraction;
+		const interaction = fakeButton({ guildId: 'g9' }) as UiComponentInteraction;
 		(interaction as unknown as { member: unknown }).member = {
 			roles: { cache: new Map([['r-1', {}], ['r-2', {}]]) },
 		};
@@ -71,7 +71,7 @@ describe('flattenInteraction', () => {
 			values: ['a', 'b'],
 		} as unknown as StringSelectMenuInteraction;
 
-		const event = flattenInteraction(interaction as NewUiComponentInteraction);
+		const event = flattenInteraction(interaction as UiComponentInteraction);
 
 		expect(event).toMatchObject({ kind: 'select', values: ['a', 'b'] });
 	});
@@ -95,7 +95,7 @@ describe('flattenInteraction', () => {
 			},
 		} as unknown as ModalSubmitInteraction;
 
-		const event = flattenInteraction(interaction as NewUiComponentInteraction);
+		const event = flattenInteraction(interaction as UiComponentInteraction);
 
 		// Non-string field values are dropped, not coerced.
 		expect(event).toMatchObject({ kind: 'modal-submit', inputs: { amount: '10', note: 'hi' } });
@@ -113,6 +113,6 @@ describe('flattenInteraction', () => {
 			fields: { fields: new Map() },
 		} as unknown as ModalSubmitInteraction;
 
-		expect(flattenInteraction(interaction as NewUiComponentInteraction)).toBeUndefined();
+		expect(flattenInteraction(interaction as UiComponentInteraction)).toBeUndefined();
 	});
 });

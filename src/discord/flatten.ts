@@ -25,7 +25,7 @@ import { EventKind } from '../pipeline/types.js';
 import type { IncomingEvent } from '../pipeline/types.js';
 
 /** Every component interaction kind the framework understands. */
-export type NewUiComponentInteraction =
+export type UiComponentInteraction =
 	| ButtonInteraction
 	| StringSelectMenuInteraction
 	| RoleSelectMenuInteraction
@@ -51,7 +51,7 @@ function modalInputs(interaction: ModalSubmitInteraction): Record<string, string
  * facts only: which IDs mean admin/mod is the app's snapshot knowledge,
  * never the bridge's. Absent outside guilds or on partial member payloads.
  */
-function memberRoleIds(interaction: NewUiComponentInteraction): string[] | undefined {
+function memberRoleIds(interaction: UiComponentInteraction): string[] | undefined {
 	// The member may be absent, partial (API shape), or fully hydrated:
 	// read defensively so partial payloads and test fakes pass through.
 	const member = interaction.member as
@@ -70,7 +70,7 @@ function memberRoleIds(interaction: NewUiComponentInteraction): string[] | undef
  * Flattens one interaction. undefined = not addressable (no backing message);
  * the caller drops it.
  */
-export function flattenInteraction(interaction: NewUiComponentInteraction): IncomingEvent | undefined {
+export function flattenInteraction(interaction: UiComponentInteraction): IncomingEvent | undefined {
 	if (interaction.message === null) return undefined;
 	const base = {
 		actorId: interaction.user.id,

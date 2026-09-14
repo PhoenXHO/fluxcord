@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MessageFlags } from 'discord.js';
 import type { ChatInputCommandInteraction, Client } from 'discord.js';
 import { createUiBridge } from '../platform.js';
-import type { NewUiComponentInteraction } from '../flatten.js';
+import type { UiComponentInteraction } from '../flatten.js';
 import { EventKind } from '../../pipeline/types.js';
 import type { IncomingEvent } from '../../pipeline/types.js';
 
@@ -64,7 +64,7 @@ describe('binding - replyToActor', () => {
 		const button = fakeButton();
 		let seen: string | undefined;
 
-		await bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => {
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
 			await bridge.platform.replyToActor('nope');
 			seen = 'ran';
 		});
@@ -78,7 +78,7 @@ describe('binding - replyToActor', () => {
 		const bridge = createUiBridge(fakeClient());
 		const button = fakeButton({ replied: true });
 
-		await bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => {
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
 			await bridge.platform.replyToActor('nope');
 		});
 
@@ -90,7 +90,7 @@ describe('binding - replyToActor', () => {
 		const bridge = createUiBridge(fakeClient(), { ephemeralAsPublic: true });
 		const button = fakeButton();
 
-		await bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => {
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
 			await bridge.platform.replyToActor('nope');
 		});
 
@@ -109,7 +109,7 @@ describe('binding - showModal', () => {
 		const button = fakeButton();
 		const payload = { custom_id: 'ui2:s1:lotto/main#form', title: 'Form', components: [] };
 
-		await bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => {
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
 			await bridge.platform.showModal(payload as never);
 		});
 
@@ -122,7 +122,7 @@ describe('success ack', () => {
 		const bridge = createUiBridge(fakeClient());
 		const button = fakeButton();
 
-		await bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => undefined);
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => undefined);
 
 		expect(button.deferUpdate).toHaveBeenCalledTimes(1);
 	});
@@ -131,7 +131,7 @@ describe('success ack', () => {
 		const bridge = createUiBridge(fakeClient());
 		const button = fakeButton({ replied: true });
 
-		await bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => undefined);
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => undefined);
 
 		expect(button.deferUpdate).not.toHaveBeenCalled();
 	});
@@ -140,7 +140,7 @@ describe('success ack', () => {
 		const bridge = createUiBridge(fakeClient());
 		const button = fakeButton();
 
-		await bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => {
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
 			await bridge.platform.showModal({ title: 'Form', components: [] } as never);
 		});
 
@@ -152,7 +152,7 @@ describe('success ack', () => {
 		const bridge = createUiBridge(fakeClient());
 		const button = fakeButton();
 
-		await expect(bridge.dispatch(button as unknown as NewUiComponentInteraction, async () => {
+		await expect(bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
 			throw new Error('core bug');
 		})).rejects.toThrow('core bug');
 
@@ -170,12 +170,12 @@ describe('dispatch serialization', () => {
 		const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
 		const order: string[] = [];
 
-		const firstRun = bridge.dispatch(first as unknown as NewUiComponentInteraction, async () => {
+		const firstRun = bridge.dispatch(first as unknown as UiComponentInteraction, async () => {
 			order.push('first-start');
 			await firstGate;
 			order.push('first-end');
 		});
-		const secondRun = bridge.dispatch(second as unknown as NewUiComponentInteraction, async () => {
+		const secondRun = bridge.dispatch(second as unknown as UiComponentInteraction, async () => {
 			order.push('second-start');
 		});
 
@@ -194,11 +194,11 @@ describe('dispatch serialization', () => {
 		const bridge = createUiBridge(fakeClient());
 		const core = vi.fn(async (): Promise<void> => undefined);
 
-		await bridge.dispatch(fakeButton() as unknown as NewUiComponentInteraction, core);
+		await bridge.dispatch(fakeButton() as unknown as UiComponentInteraction, core);
 		expect(core).toHaveBeenCalledWith(STD_EVENT);
 
 		const orphan = fakeButton({ message: null });
-		await bridge.dispatch(orphan as unknown as NewUiComponentInteraction, core);
+		await bridge.dispatch(orphan as unknown as UiComponentInteraction, core);
 		expect(core).toHaveBeenCalledTimes(1);
 	});
 
@@ -208,8 +208,8 @@ describe('dispatch serialization', () => {
 		const after = fakeButton({ customId: 'ui2:s1:lotto/main#b' });
 		const afterCore = vi.fn(async (): Promise<void> => undefined);
 
-		await expect(bridge.dispatch(fakeButton() as unknown as NewUiComponentInteraction, failing)).rejects.toThrow('core bug');
-		await bridge.dispatch(after as unknown as NewUiComponentInteraction, afterCore);
+		await expect(bridge.dispatch(fakeButton() as unknown as UiComponentInteraction, failing)).rejects.toThrow('core bug');
+		await bridge.dispatch(after as unknown as UiComponentInteraction, afterCore);
 
 		expect(afterCore).toHaveBeenCalledTimes(1);
 	});
