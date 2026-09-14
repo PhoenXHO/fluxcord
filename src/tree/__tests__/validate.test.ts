@@ -165,6 +165,24 @@ describe('validateTree - value & bounds rules', () => {
 		})))).toContain(12);
 	});
 
+	it('rule 26: preselected options fit the selection cap', () => {
+		const three = [
+			{ label: 'A', value: 'a', default: true },
+			{ label: 'B', value: 'b', default: true },
+			{ label: 'C', value: 'c', default: true },
+		];
+		expect(rulesOf(withSelect(optionSelect({ onSelect: handler, options: three, maxSelected: 2 })))).toContain(26);
+		expect(rulesOf(withSelect(optionSelect({ onSelect: handler, options: three })))).toContain(26);
+		expect(rulesOf(withSelect(optionSelect({
+			onSelect: handler,
+			options: [
+				{ label: 'A', value: 'a', default: true },
+				{ label: 'B', value: 'b' },
+			],
+			maxSelected: 1,
+		})))).toEqual([]);
+	});
+
 	it('rule 13: input length bounds and ordering', () => {
 		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', minLength: -1 })))).toContain(13);
 		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', maxLength: 4001 })))).toContain(13);

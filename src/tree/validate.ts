@@ -281,7 +281,8 @@ function isHttpUrl(url: string): boolean {
  * split's runtime echo), its placeholder is at most 150 chars, its
  * `minSelected`/`maxSelected` sit in 0-25 with min not above max, and
  * a static options list holds at most 25 entries with unique non-empty
- * labels and values of at most 100 chars each.
+ * labels and values of at most 100 chars each. Preselected options
+ * (`default: true`) must fit the selection cap.
  */
 function validateSelect(node: SelectNode, path: string, violations: Violation[]): void {
 	const hasOptions = node.options !== undefined;
@@ -340,6 +341,17 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[])
 				path,
 				rule: 12,
 				message: `select maxSelected (${node.maxSelected}) exceeds option count (${options.length})`,
+			});
+		}
+		// Preselections must fit the selection cap: maxSelected when set, the
+		// platform default of 1 when not (the renderer omits max_values then).
+		const defaults = options.filter((option) => option.default === true).length;
+		const cap = node.maxSelected ?? 1;
+		if (defaults > cap) {
+			violations.push({
+				path,
+				rule: 26,
+				message: `select preselects ${defaults} options, more than the selection cap (${cap})`,
 			});
 		}
 		const seen = new Set<string>();
