@@ -5,7 +5,7 @@
  *
  * ```plaintext
  *   decode -> per-session line -> session lookup -> expiry -> revive-or-parting
- *   -> touch -> frame resolution -> AUTHORIZE -> deny = actor reply -> handler
+ *   -> touch -> frame resolution -> authorize -> deny = actor reply -> handler
  *   -> auto-redraw (if the session still lives)
  * ```
  *
@@ -70,9 +70,11 @@ export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Try again; if it kee
  * The shipped error-unit default: log everything; for handler failures only,
  * reply to the clicker, with the failing flow's chosen copy when it decided
  * on one, generic copy otherwise (a failed redraw after a successful
- * handler gets NO reply: 'try again' advice would rerun the action).
+ * handler gets no reply: 'try again' advice would rerun the action).
  * Replace wholesale via DispatchOptions.onError; compose by calling this
  * inside your own unit.
+ *
+ * @param report The failure to decide on and act on.
  */
 export function defaultOnError(report: ErrorReport): void {
 	console.error(`[fluxcord] ${report.source} failure:`, report.error);
@@ -184,6 +186,14 @@ function changedKeys(before: unknown, after: unknown): readonly string[] {
 	return changed;
 }
 
+/**
+ * Builds the dispatch function. Most hosts get one from `createUiRuntime`
+ * (which owns the wiring); `createDispatch` is the standalone form for
+ * custom assemblies.
+ *
+ * @param options The store, seams and ports the core runs through.
+ * @returns One call per incoming interaction.
+ */
 export function createDispatch(options: DispatchOptions): Dispatch {
 	const now = options.now ?? Date.now;
 	const queue = options.queue ?? createSessionQueue();

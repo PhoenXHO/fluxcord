@@ -24,7 +24,7 @@
  * Select) exist only as screen-kit members (tree/kit):
  * a view destructures them from its kit parameter and uses them as
  * components (e.g., `<Button/>`) so their handler slots stay typed against the
- * flow's data and screen keys. The draw-time kit IS this module's builders
+ * flow's data and screen keys. The draw-time kit is this module's builders
  * (runtimeKit), so kit elements produce the same trees intrinsics do.
  * Uppercase tags in general are components.
  *
@@ -172,11 +172,11 @@ function splitProps(props: unknown): { node: Record<string, unknown>; children: 
 // eslint-disable-next-line @typescript-eslint/no-namespace --- the compiler reads the JSX vocabulary from the runtime module's JSX namespace (the react-jsx convention)
 export namespace JSX {
 	/**
-	 * Any element expression.  
-	 * One flat type for all elements is TSX's ceiling (React's ReactNode is
-	 * flat the same way): props are compile-checked per tag, but child POSITIONS
-	 * are not. Nesting legality is `validateTree`'s job, running at every commit
-	 * and at boot (`coverageScan`).
+	 * Any element expression.
+	 * One flat type for all elements is TSX's ceiling (React's `ReactNode` is
+	 * flat the same way): props are compile-checked per tag, but child
+	 * positions are not. Nesting legality is `validateTree`'s job, running at
+	 * every commit and at boot (`coverageScan`).
 	 */
 	export type Element = ComponentResult;
 	export interface IntrinsicElements {

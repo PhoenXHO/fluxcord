@@ -1,15 +1,13 @@
 /**
- * The tree's fixed vocabulary.
- * 
- * This module defines the fixed vocabulary of node kinds and styles
- * used in the tree structure.
+ * The tree's fixed vocabulary: node kinds and the style unions (button
+ * styles, input styles, select entity sources).
  *
  * @module tree/vocab
  */
 
 /**
- * Tree node kinds. Each kind corresponds to a specific type of UI element.
- * String values are used for logging and debugging purposes.
+ * Tree node kinds: which UI element a node renders as. String-valued so
+ * logs and validation errors stay readable.
  */
 export enum NodeKind {
 	view = 'view',
@@ -23,6 +21,7 @@ export enum NodeKind {
 	input = 'input',
 }
 
+/** Button visual styles, mapped straight to Discord's. */
 export const ButtonStyle = {
 	Primary: 'primary',
 	Secondary: 'secondary',
@@ -31,12 +30,14 @@ export const ButtonStyle = {
 } as const;
 export type ButtonStyle = (typeof ButtonStyle)[keyof typeof ButtonStyle];
 
+/** Text input styles: one line or paragraph. */
 export const InputStyle = {
 	Short: 'short',
 	Paragraph: 'paragraph',
 } as const;
 export type InputStyle = (typeof InputStyle)[keyof typeof InputStyle];
 
+/** Entity sources a select can draw its options from. */
 export const SelectEntity = {
 	Users: 'users',
 	Roles: 'roles',

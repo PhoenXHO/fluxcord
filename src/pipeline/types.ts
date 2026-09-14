@@ -92,7 +92,7 @@ export interface UiToolkit<TKeys extends string = string> {
 
 /**
  * The author-facing event, delivered to action handlers. References only:
- * event.session IS the store's live record (mutating it is the point), ui
+ * `event.session` is the store's live record (mutating it is the point), `ui`
  * is bound to this interaction, values and inputs are fresh from the wire.
  */
 export interface ActionEvent<TData = unknown, TKeys extends string = string> {
@@ -171,7 +171,7 @@ export type ErrorHandler = (report: ErrorReport) => void;
 /**
  * The one permission question (framework to app), asked per delivered
  * event. No session data crosses the seam: resolvers needing domain
- * truth query their own database, like the ownerResolver does today.
+ * truth query their own database.
  */
 export interface PolicyRequest {
 	/** The clicker's Discord ID. */
@@ -341,8 +341,8 @@ export interface PlatformPort {
 /**
  * The host bridge's arm of the port: the three per-interaction seams the
  * runtime cannot supply itself. The commit phase implements the other two
- * (redraw, commitParting) and the runtime composes the full PlatformPort
- * from both, mirrors CommitOptions' Pick of the edit seam.
+ * (`redraw`, `commitParting`); the runtime composes the full `PlatformPort`
+ * from both.
  */
 export type BridgePort = Pick<PlatformPort, 'replyToActor' | 'editMessage' | 'showModal'>;
 
@@ -376,12 +376,12 @@ export interface FlowContext {
 	readonly wrap?: (tree: ViewNode, session: Session<unknown>) => ComponentResult;
 	/** Subflow namespace roots: root name to the screen id `ui.go(root)` opens. */
 	readonly roots?: Readonly<Record<string, string>>;
-	/** Death copy overrides consulted before the framework defaults. */
+	/** The flow's parting copy, consulted before the framework defaults. */
 	readonly parting?: PartingOptions;
 	/**
-	 * The mounting command's invocation path ('sync', 'lotto start'): the
-	 * default death-copy hint for a command-mounted flow. An explicit
-	 * parting.command always wins. Absent for job-mounted flows.
+	 * The mounting command's invocation path: the default parting hint for
+	 * a command-mounted flow. An explicit parting.command always wins.
+	 * Absent for job-mounted flows.
 	 */
 	readonly commandHint?: string;
 	/** Decides error copy per failure from its own screens; undefined = default copy. */

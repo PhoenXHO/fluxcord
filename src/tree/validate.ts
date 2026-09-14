@@ -1,18 +1,15 @@
 /**
- * Tree validation.
- * 
- * This module checks a tree for violations of the rules documented in
- * <TODO: replace with rules file path>. The rules are enforced at runtime because the
- * TypeScript type system cannot express all of them.
+ * Tree validation: the structural and value checks the type system
+ * cannot express.
  *
- * The type system already forbids illegal nesting (closed child unions) and
- * the two select builders already make options-XOR-entity unrepresentable.
- * `validateTree` is the echo for what can still arrive through casts or other
- * authoring front-ends, plus the value/bounds rules types can't express
- * (lengths, counts, ranges).
+ * Illegal nesting is already a compile error (closed child unions), and
+ * the two select builders make options-XOR-entity unrepresentable.
+ * `validateTree` is the echo for what can still arrive through casts or
+ * other authoring front-ends, plus the value and bounds rules (lengths,
+ * counts, ranges).
  *
- * Renderer-specific limits (embed caps, Components V2 message caps) are NOT
- * checked here. Renderers loud-reject what they cannot express.
+ * Renderer-specific limits (embed caps, Components V2 message caps) are
+ * not checked here. Renderers loud-reject what they cannot express.
  *
  * @module tree/validate
  */
@@ -53,9 +50,11 @@ function kindOf(node: object): string {
 }
 
 /**
- * Validates a whole tree.
- * Enforces: rule 1 (root must be view or modal); everything else is reached
- * by recursion from here.
+ * Validates a whole tree: the root must be a view or a modal, and every
+ * node below it passes its own kind's checks.
+ *
+ * @param root The tree to check.
+ * @returns One entry per violation; an empty array means the tree is clean.
  */
 export function validateTree(root: TreeRoot): Violation[] {
 	const violations: Violation[] = [];
@@ -72,8 +71,7 @@ export function validateTree(root: TreeRoot): Violation[] {
 }
 
 /**
- * Dispatches to the per-kind checks.
- * Enforces: rule 9 (unknown kind) via the exhaustive switch.
+ * Dispatches each node to its kind's checks; unknown kinds are reported.
  */
 function validateNode(node: TreeNode, path: string, violations: Violation[]): void {
 	switch (node.kind) {
@@ -100,10 +98,8 @@ function validateNode(node: TreeNode, path: string, violations: Violation[]): vo
 }
 
 /**
- * Enforces:
- *   - rule 2 (view needs a child),
- *   - rule 3 (children are text/row/container only),
- *   - rule 9 via the child loop.
+ * A view needs at least one child, and children are text, row or
+ * container only.
  */
 function validateView(node: ViewNode, path: string, violations: Violation[]): void {
 	if (node.children.length === 0) {
@@ -112,7 +108,7 @@ function validateView(node: ViewNode, path: string, violations: Violation[]): vo
 	node.children.forEach((child, index) => {
 		const childPath = `${path}/${kindOf(child)}[${index}]`;
 		if (!KNOWN_KINDS.has(child.kind)) {
-			// just in case
+			// Unknown kind: report it and move on.
 			violations.push({ path: childPath, rule: 9, message: `unknown node kind '${kindOf(child)}'` });
 		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.container) {
 			violations.push({
@@ -127,12 +123,9 @@ function validateView(node: ViewNode, path: string, violations: Violation[]): vo
 }
 
 /**
- * Enforces:
- *   - rule 24 (container needs a child),
- *   - rule 23 (children are text/row only; also bans nested
- *     containers, which the platform forbids),
- *   - rule 21 (color range),
- *   - rule 9 via the child loop.
+ * A container needs at least one child, its children are text or row
+ * only (nested containers are forbidden by the platform), and its
+ * color, when set, is an integer in `0x000000`-`0xFFFFFF`.
  */
 function validateContainer(node: ContainerNode, path: string, violations: Violation[]): void {
 	if (node.children.length === 0) {
@@ -162,12 +155,10 @@ function validateContainer(node: ContainerNode, path: string, violations: Violat
 }
 
 /**
- * Enforces:
- *   - rule 4 (children are controls only),
- *   - rule 5 (max 5 children),
- *   - rule 22 (a row with a select has exactly one child; the platform
- *     allows up to 5 buttons OR exactly one select, never a mix),
- *   - rule 9 via the child loop.
+ * A row holds at most 5 children, every child is a control (button,
+ * link or select), and a row containing a select must contain nothing
+ * else: the platform allows up to 5 buttons or exactly one select,
+ * never a mix.
  */
 function validateRow(node: RowNode, path: string, violations: Violation[]): void {
 	if (node.children.length > 5) {
@@ -201,12 +192,8 @@ function validateRow(node: RowNode, path: string, violations: Violation[]): void
 }
 
 /**
- * Enforces:
- *   - rule 19 (title length),
- *   - rule 7 (max 5 children),
- *   - rule 6 (children are input/text only),
- *   - rule 25 (input ids unique within the modal),
- *   - rule 9 via the child loop.
+ * A modal's title is 1-45 chars, it holds at most 5 children, children
+ * are inputs or text only, and input ids are unique within the modal.
  */
 function validateModal(node: ModalNode, path: string, violations: Violation[]): void {
 	if (node.title.length === 0 || node.title.length > 45) {
@@ -250,9 +237,7 @@ function validateModal(node: ModalNode, path: string, violations: Violation[]): 
 	});
 }
 
-/**
- * Enforces: rule 15 (label length).
- */
+/** A button's label is 1-80 chars. */
 function validateButton(node: ButtonNode, path: string, violations: Violation[]): void {
 	if (node.label.length === 0 || node.label.length > 80) {
 		violations.push({
@@ -263,11 +248,7 @@ function validateButton(node: ButtonNode, path: string, violations: Violation[])
 	}
 }
 
-/**
- * Enforces:
- *   - rule 15 (label length),
- *   - rule 20 (url must be http(s)).
- */
+/** A link's label is 1-80 chars and its url must be http(s). */
 function validateLink(node: LinkNode, path: string, violations: Violation[]): void {
 	if (node.label.length === 0 || node.label.length > 80) {
 		violations.push({
@@ -296,14 +277,11 @@ function isHttpUrl(url: string): boolean {
 }
 
 /**
- * Enforces:
- *   - rule 8 (exactly one of options/entity; the builders already
- *     prevent this at compile time; this is the runtime echo),
- *   - rule 10 (max 25 options),
- *   - rule 11 (non-empty unique option labels/values),
- *   - rule 12 (minSelected/maxSelected bounds),
- *   - rule 16 (option text lengths),
- *   - rule 17 (placeholder length).
+ * A select sets exactly one of options or entity (the compile-time
+ * split's runtime echo), its placeholder is at most 150 chars, its
+ * `minSelected`/`maxSelected` sit in 0-25 with min not above max, and
+ * a static options list holds at most 25 entries with unique non-empty
+ * labels and values of at most 100 chars each.
  */
 function validateSelect(node: SelectNode, path: string, violations: Violation[]): void {
 	const hasOptions = node.options !== undefined;
@@ -407,12 +385,10 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[])
 }
 
 /**
- * Enforces:
- *   - rule 25 (id length; it becomes the platform custom_id),
- *   - rule 18 (label length),
- *   - rule 13 (minLength/maxLength bounds),
- *   - rule 14 (prefill value length),
- *   - rule 17 (placeholder length).
+ * An input's id is 1-100 chars (it becomes the platform `custom_id`),
+ * its label 1-45 chars, its placeholder at most 100 chars, its
+ * `minLength`/`maxLength` sit in 0-4000 with min not above max, and
+ * a prefill value is at most 4000 chars.
  */
 function validateInput(node: InputNode, path: string, violations: Violation[]): void {
 	if (node.id.length === 0 || node.id.length > 100) {

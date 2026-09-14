@@ -32,10 +32,18 @@ import { normalizeViewRoot } from '../tree/normalize.js';
 import type { ComponentResult } from '../tree/types.js';
 import type { AuthorScreen, FlowDefinition, FlowOptions, SubflowPlug } from './types.js';
 
+// used in docs
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { uiFlow } from './token.js';
+/* eslint-enable */
+
 /** The typed authoring shape {@link subflow} receives; `TSub` rides on `use`. */
 export interface SubflowSpec<TSub> {
+	/** The subflow's definition (`flow.definition` for an authored flow). */
 	readonly use: FlowDefinition<TSub>;
+	/** The plug key: its screens land as `'<at>.<screen>'`, and `ui.go('<at>')` opens it. */
 	readonly at: string;
+	/** Runs when the subflow closes via its done button; receives the subflow's final state. */
 	readonly onDone?: (state: TSub, ui: UiToolkit) => void;
 }
 
@@ -52,6 +60,20 @@ function assertId(kind: string, id: string): void {
 	}
 }
 
+/**
+ * Builds a flow definition: validates screen ids, composes the wrap
+ * chain, namespaces subflow plugs. Pure; runs once at module load and
+ * returns a frozen definition.
+ *
+ * Most flows are declared with {@link uiFlow} (same options, plus the bare
+ * name and registration facts). `defineFlow` is the tool for definitions
+ * built outside a token: subflow libraries and the like.
+ *
+ * @param options Screens, `first`, `initialData`, and the optional pieces.
+ * @returns The frozen definition a token or subflow plug carries.
+ * @throws On an invalid screen id, a non-finite `ttlMs`, or a subflow key
+ *   collision.
+ */
 export function defineFlow<TData, const TScreens extends string = string>(
 	options: FlowOptions<TData, TScreens>,
 ): FlowDefinition<TData> {

@@ -67,42 +67,52 @@ function deepFreeze<T>(value: T): T {
 
 // --- Builders --------------------------------------------------------------------
 
+/** The message root: holds text, rows and containers. */
 export function view(props: ViewProps, ...children: readonly ViewChild[]): ViewNode {
 	return deepFreeze({ kind: NodeKind.view, ...props, children });
 }
 
+/** Markdown text content. */
 export function text(props: TextProps): TextNode {
 	return deepFreeze({ kind: NodeKind.text, ...props });
 }
 
+/** A control row: up to 5 buttons or links, or exactly one select. */
 export function row(props: RowProps, ...children: readonly ControlNode[]): RowNode {
 	return deepFreeze({ kind: NodeKind.row, ...props, children });
 }
 
+/** A boxed section: text and rows, optional accent color. */
 export function container(props: ContainerProps, ...children: readonly ContainerChild[]): ContainerNode {
 	return deepFreeze({ kind: NodeKind.container, ...props, children });
 }
 
+/** A clickable button bound to a handler. */
 export function button(props: ButtonProps): ButtonNode {
 	return deepFreeze({ kind: NodeKind.button, ...props });
 }
 
+/** A button-shaped link that opens a URL; no handler. */
 export function link(props: LinkProps): LinkNode {
 	return deepFreeze({ kind: NodeKind.link, ...props });
 }
 
+/** A select whose options are a static list. */
 export function optionSelect(props: OptionSelectProps): SelectNode {
 	return deepFreeze({ kind: NodeKind.select, ...props });
 }
 
+/** A select whose options come from a Discord entity source (users, roles, channels, mentionables). */
 export function entitySelect(props: EntitySelectProps): SelectNode {
 	return deepFreeze({ kind: NodeKind.select, ...props });
 }
 
+/** A modal root: inputs and text, opened from a handler via `ui.showModal`. */
 export function modal(props: ModalProps, ...children: readonly ModalChild[]): ModalNode {
 	return deepFreeze({ kind: NodeKind.modal, ...props, children });
 }
 
+/** A modal text input. */
 export function input(props: InputProps): InputNode {
 	return deepFreeze({ kind: NodeKind.input, ...props });
 }

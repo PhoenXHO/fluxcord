@@ -84,6 +84,7 @@ export interface FlowMeta<TData = unknown> {
 export interface FlowToken<TData = never> {
 	/** The flow's name within its module: the only id the author writes. */
 	readonly id: string;
+	/** The built definition: `screens`, `initialData`, ttl and the rest. */
 	readonly definition: FlowDefinition<TData>;
 	/** Registration facts declared on the flow; absent when it declares none. */
 	readonly meta?: FlowMeta<TData>;
@@ -104,7 +105,7 @@ export interface MountToken<TData = never> {
 	readonly meta?: FlowMeta;
 	/**
 	 * The mounting command's invocation path, when a uiCommand leaf
-	 * contributed this flow: the default death-copy hint. Absent for
+	 * contributed this flow: the default parting hint. Absent for
 	 * manifest-registered flows.
 	 */
 	readonly commandHint?: string;
@@ -112,7 +113,20 @@ export interface MountToken<TData = never> {
 
 const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-/** Declares a flow for registration and mounting. Pure; runs at module load. */
+/**
+ * Declares a flow: bare name, options, and optional registration facts.
+ * Pure; runs at module load.
+ *
+ * @param id The flow's bare kebab name within its module; the loader
+ *   assembles `'<module>/<name>'` from it.
+ * @param options Screens, `first`, `initialData`, and the optional pieces.
+ * @param meta Registration facts: the default policy gate and the
+ *   session lifecycle hooks.
+ * @returns The token to list in the module manifest's uiFlows, or mount
+ *   from a uiCommand leaf.
+ * @throws When the name is not a bare kebab name, or the options fail
+ *   {@link defineFlow}'s validation.
+ */
 export function uiFlow<TData, const TScreens extends string = string>(
 	id: string,
 	options: FlowOptions<TData, TScreens>,

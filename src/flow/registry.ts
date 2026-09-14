@@ -37,7 +37,7 @@ function flowContextOf(definition: FlowDefinition, commandHint?: string): FlowCo
  * Builds the registry entries for one flow: keys `'<moduleId>/<screenId>'`,
  * each screen carrying its slot path and the flow facts. The command hint
  * (the mounting command's invocation path) rides the same slice; it is
- * the flow's default death-copy hint.
+ * the flow's default parting hint.
  */
 export function screenEntries(moduleId: string, definition: FlowDefinition, commandHint?: string): Readonly<Record<string, Screen>> {
 	const flow = flowContextOf(definition, commandHint);

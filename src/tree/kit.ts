@@ -39,10 +39,13 @@ export type KitSelectProps<TData, TKeys extends string> = (Omit<OptionSelectProp
 	& { readonly onSelect: ActionHandler<TData, TKeys> };
 
 /**
- * The screen kit, the flow-typed controls bundle a view receives as its
- * second parameter. It's mainly used as a type-level bridge.
+ * The flow-typed controls a view receives as its second parameter:
+ * `Button`, `Select` and `handler`. Mainly a type-level bridge: the
+ * nodes it builds are the plain builders' output, only the handler
+ * slots are narrowed to the flow's data and screen keys.
  */
 export interface ScreenKit<TData = unknown, TKeys extends string = string> {
+	/** The flow-typed button builder. */
 	Button(props: KitButtonProps<TData, TKeys>): ButtonNode;
 	/** One select, two shapes: `options` (static list) or `entity` (Discord entity source). */
 	Select(props: KitSelectProps<TData, TKeys>): SelectNode;
