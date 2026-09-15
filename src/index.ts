@@ -19,6 +19,7 @@ export * from './flow/types.js'; // AuthorScreen, FlowOptions, FlowDefinition
 export * from './pipeline/action.js'; // action
 export * from './command/declare.js'; // uiCommand, mounts, CommandToken
 export * from './command/harvest.js'; // moduleFlowRegistrations, FlowSourceModule
+export * from './flow/expiry.js'; // expiryEpoch, Expiry
 
 // Host assembly: what the composition root writes.
 export * from './boot/build.js'; // buildFlowCatalog, FlowCatalog, FlowRegistration
