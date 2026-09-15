@@ -19,6 +19,7 @@ import type { ComponentResult, ViewNode } from '../tree/types.js';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { screen } from './screen.js';
 import { defineFlow, subflow } from './define.js';
+import { expiryEpoch } from './expiry.js';
 /* eslint-enable */
 
 /**
@@ -34,6 +35,31 @@ export type DeepReadonly<T> =
 			{ readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
 
 /**
+ * The session as a view may see it: read-only facts about the live
+ * panel, enough to draw session-aware pieces (a deadline via
+ * {@link expiryEpoch}, an owner line, history breadcrumbs) and nothing
+ * more. No data bag (the view's `data` slice is the bag's view), no
+ * pipeline internals: the frame, the modal state and the writable
+ * fields stay engine-side, and the type makes reaching them a compile
+ * error. The full session satisfies this structurally, so passing it
+ * costs nothing.
+ */
+export interface ViewSession {
+	/** Discord ID of the user who invoked the flow. */
+	readonly ownerId: string;
+	/** When the session was created (epoch ms). */
+	readonly createdAt: number;
+	/** The current screen (a view id). */
+	readonly screen: string;
+	/** The back trail: screens stacked by `push`, oldest first. */
+	readonly history: readonly string[];
+	/** The deadline trio, read at draw time by expiryEpoch. */
+	readonly lastActivityAt: number;
+	readonly ttlMs: number;
+	readonly expiresAt?: number;
+}
+
+/**
  * One screen as authored. The view is the whole screen: its controls bind
  * their handlers directly, and drawing the view registers those handlers.
  * There is no separate action declaration to keep in sync.
@@ -41,9 +67,10 @@ export type DeepReadonly<T> =
 export interface AuthorScreen<TData = unknown, TKeys extends string = string> {
 	/**
 	 * The screen's template: flow data in, view tree out. It receives a
-	 * readonly view of the bag (see {@link DeepReadonly}) and the typed
-	 * control builders (see {@link ScreenKit}); a view may ignore the kit
-	 * and build raw nodes instead.
+	 * readonly view of the bag (see {@link DeepReadonly}), the typed
+	 * control builders (see {@link ScreenKit}) and the session's read-only
+	 * facts (see {@link ViewSession}); a view may ignore the kit and the
+	 * session and build raw nodes from data alone.
 	 *
 	 * The return is the element union: builder views hand back a view node,
 	 * TSX views return a component, and the commit phase folds the root to
@@ -53,7 +80,11 @@ export interface AuthorScreen<TData = unknown, TKeys extends string = string> {
 	 * Build screens with {@link screen}: it types the kit's keys from the
 	 * flow's screens map, so inline handlers need no annotations.
 	 */
-	readonly view: (data: DeepReadonly<TData>, controls: ScreenKit<TData, TKeys>) => ComponentResult;
+	readonly view: (
+		data: DeepReadonly<TData>,
+		controls: ScreenKit<TData, TKeys>,
+		session: ViewSession,
+	) => ComponentResult;
 }
 
 /**

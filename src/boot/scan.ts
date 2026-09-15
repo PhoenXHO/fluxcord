@@ -9,6 +9,7 @@
  * @module boot/scan
  */
 
+import type { ViewSession } from '../flow/types.js';
 import { runtimeKit } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
 import type { FlowCatalog } from './build.js';
@@ -30,10 +31,20 @@ export function coverageScan(catalog: FlowCatalog): string[] {
 			try {
 				// A clone, so a misbehaving view cannot touch the declared bag;
 				// the cast is safe here (the scan renders declared data, not a
-				// live session). The element root is folded to a view node,
+				// live session). The session stub is zeroed: views reading the
+				// session (an expiry line) render their zero-state without
+				// crashing the scan. The element root is folded to a view node,
 				// same as commit: a dropped root (conditional at the top)
 				// fails the scan loudly.
-				const tree = normalizeViewRoot(screen.view(structuredClone(def.initialData) as never, runtimeKit));
+				const stub: ViewSession = {
+					ownerId: '',
+					createdAt: 0,
+					screen: screenId,
+					history: [],
+					lastActivityAt: 0,
+					ttlMs: def.ttlMs,
+				};
+				const tree = normalizeViewRoot(screen.view(structuredClone(def.initialData) as never, runtimeKit, stub));
 				void tree;
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);

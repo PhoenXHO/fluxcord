@@ -13,7 +13,7 @@
  * @module flow/expiry
  */
 
-import type { Session } from '../state/types.js';
+import type { ViewSession } from './types.js';
 import { text } from '../tree/builders.js';
 import type { TextNode } from '../tree/types.js';
 
@@ -22,11 +22,15 @@ import type { TextNode } from '../tree/types.js';
  * timestamp. The absolute `expiresAt` ceiling wins when the session has
  * one (an ephemeral line); otherwise the sliding window is computed at
  * call time, so a draw made after a click shows the moved deadline.
+ * Takes the deadline fields only: a view's {@link ViewSession} and the
+ * full engine session both satisfy it.
  *
- * @param session The live session being drawn.
+ * @param session The session being drawn (the view's third parameter).
  * @returns The death line as Unix seconds (floored).
  */
-export function expiryEpoch(session: Session<unknown>): number {
+export function expiryEpoch(
+	session: Pick<ViewSession, 'lastActivityAt' | 'ttlMs' | 'expiresAt'>,
+): number {
 	const ms = session.expiresAt ?? session.lastActivityAt + session.ttlMs;
 	return Math.floor(ms / 1000);
 }

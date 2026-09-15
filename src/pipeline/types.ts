@@ -11,6 +11,7 @@
  * @module pipeline/types
  */
 
+import type { ViewSession } from '../flow/types.js';
 import type { V2MessagePayload, V2ModalPayload } from '../render/v2.js';
 import type { MessageRef, Session } from '../state/types.js';
 import type { ScreenKit } from '../tree/kit.js';
@@ -392,12 +393,13 @@ export interface FlowContext {
 export interface Screen<TData = unknown> {
 	/**
 	 * Pure template: session data in, view tree out. The second parameter
-	 * is the erased screen kit; authored views receive it typed through
-	 * `screen()` factories (flow/screen.ts). The return is the element
-	 * union (TSX roots are flat); the commit phase folds it to a view node
-	 * at the one draw seam.
+	 * is the erased screen kit; the third is the session's read-only
+	 * facts (see {@link ViewSession}). Authored views receive all three
+	 * typed through `screen()` factories (flow/screen.ts). The return is
+	 * the element union (TSX roots are flat); the commit phase folds it
+	 * to a view node at the one draw seam.
 	 */
-	readonly view: (data: TData, controls: ScreenKit<unknown, string>) => ComponentResult;
+	readonly view: (data: TData, controls: ScreenKit<unknown, string>, session: ViewSession) => ComponentResult;
 	/** Subflow screens only: the bag path this screen's view is lensed to. Absent = parent bag. */
 	readonly slot?: readonly string[];
 	/** The owning flow's consultation slice. Absent on hand-built test screens; real registration always sets it. */

@@ -70,7 +70,7 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 	// Views return the element union (TSX roots type flat), folded to a
 	// view node here, one place; validateTree polices the walk next. Same
 	// for the composed wrap's result.
-	let tree = normalizeViewRoot(screen.view(data, runtimeKit));
+	let tree = normalizeViewRoot(screen.view(data, runtimeKit, session));
 	if (screen.flow?.wrap !== undefined) {
 		tree = normalizeViewRoot(screen.flow.wrap(tree, session));
 	}

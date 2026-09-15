@@ -20,7 +20,7 @@
 
 import type { ScreenKit } from '../tree/kit.js';
 import type { ComponentResult } from '../tree/types.js';
-import type { AuthorScreen, DeepReadonly } from './types.js';
+import type { AuthorScreen, DeepReadonly, ViewSession } from './types.js';
 
 /**
  * Curried screen factory. The first call declares the screen's data
@@ -29,11 +29,11 @@ import type { AuthorScreen, DeepReadonly } from './types.js';
  * flow it joins.
  */
 export function screen<TData>(): <TKeys extends string>(
-	view: (data: DeepReadonly<TData>, controls: ScreenKit<TData, NoInfer<TKeys>>) => ComponentResult,
+	view: (data: DeepReadonly<TData>, controls: ScreenKit<TData, NoInfer<TKeys>>, session: ViewSession) => ComponentResult,
 ) => AuthorScreen<TData, TKeys> {
 	return (view) => {
 		if (typeof view !== 'function') {
-			throw new Error("screen: 'view' must be a function: (data, controls) => tree");
+			throw new Error("screen: 'view' must be a function: (data, controls, session) => tree");
 		}
 		return Object.freeze({ view });
 	};
@@ -53,11 +53,11 @@ export function screen<TData>(): <TKeys extends string>(
  * not the helper.
  */
 export function subview<TData>(): (
-	view: (data: DeepReadonly<TData>, controls: ScreenKit<TData>) => ComponentResult,
-) => (data: DeepReadonly<TData>, controls: ScreenKit<TData>) => ComponentResult {
+	view: (data: DeepReadonly<TData>, controls: ScreenKit<TData>, session: ViewSession) => ComponentResult,
+) => (data: DeepReadonly<TData>, controls: ScreenKit<TData>, session: ViewSession) => ComponentResult {
 	return (view) => {
 		if (typeof view !== 'function') {
-			throw new Error("subview: 'view' must be a function: (data, controls) => tree");
+			throw new Error("subview: 'view' must be a function: (data, controls, session) => tree");
 		}
 		return view;
 	};

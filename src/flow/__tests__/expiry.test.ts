@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { Session } from '../../state/types.js';
 import { Expiry, expiryEpoch } from '../expiry.js';
+import type { ViewSession } from '../types.js';
 
 /** A minimal session: only the fields the deadline math reads. */
-function fakeSession(fields: Partial<Session<never>> = {}): Session<never> {
+function fakeSession(fields: Partial<Pick<ViewSession, 'lastActivityAt' | 'ttlMs' | 'expiresAt'>> = {}): Pick<ViewSession, 'lastActivityAt' | 'ttlMs' | 'expiresAt'> {
 	return {
 		lastActivityAt: 1_000_000,
 		ttlMs: 10 * 60_000,
 		...fields,
-	} as unknown as Session<never>;
+	};
 }
 
 describe('expiryEpoch', () => {

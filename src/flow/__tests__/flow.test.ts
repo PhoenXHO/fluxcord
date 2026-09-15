@@ -38,12 +38,13 @@ import type {
 	UiToolkit,
 } from '../../pipeline/types.js';
 import { defineFlow, subflow } from '../define.js';
+import { viewOf } from '../../commit/commit.js';
 import { screen, subview } from '../screen.js';
 import { runtimeKit } from '../../tree/kit.js';
 import { getPath, lensSession, setPath } from '../lens.js';
 import { asScreenRegistry, screenEntries } from '../registry.js';
 import { validateFlows } from '../validate.js';
-import type { AuthorScreen } from '../types.js';
+import type { AuthorScreen, ViewSession } from '../types.js';
 
 interface LottoData {
 	count: number;
@@ -203,6 +204,42 @@ describe('defineFlow - subflow plugs', () => {
 	});
 });
 
+describe('the drawn session', () => {
+	it('views receive the session as their third parameter', () => {
+		const seen: unknown[] = [];
+		const def = defineFlow<LottoData>({
+			screens: {
+				main: {
+					view: (_data, _kit, session) => {
+						seen.push(session);
+						return view({}, text({ body: `owner ${session.ownerId} on ${session.screen}` }));
+					},
+				},
+			},
+			first: 'main',
+			initialData: { count: 0, picker: { chosen: 'none' } },
+		});
+		const session = createSessionStore().create<LottoData>({
+			flowId: 'lotto',
+			moduleId: 'lotto',
+			ownerId: 'u1',
+			messageRef: { channelId: 'c1', messageId: 'm1' },
+			data: { count: 0, picker: { chosen: 'none' } },
+			screen: 'main',
+			ttlMs: DEFAULT_TTL_MS,
+			remount: 'coexist',
+		});
+
+		const tree = viewOf(session, asScreenRegistry(screenEntries('lotto', def)));
+
+		// The live session went in, the same object reached the view...
+		expect(seen[0]).toBe(session);
+		// ...and the view drew from its read-only facts.
+		const drawn = tree.children.find((child) => child.kind === 'text');
+		expect(drawn).toMatchObject({ body: 'owner u1 on main' });
+	});
+});
+
 describe('the subflow done handler', () => {
 	it('pops history through the lens and hands onDone the slot state', async () => {
 		const store = createSessionStore();
@@ -337,7 +374,8 @@ describe('subview', () => {
 
 	it('draws when the screen forwards its kit: helpers are plain calls', () => {
 		const helper = subview<LottoData>()((data) => view({}, text({ body: `count: ${data.count}` })));
-		const tree = helper({ count: 3, picker: { chosen: 'x' } }, runtimeKit);
+		const stub: ViewSession = { ownerId: '', createdAt: 0, screen: 'main', history: [], lastActivityAt: 0, ttlMs: 0 };
+		const tree = helper({ count: 3, picker: { chosen: 'x' } }, runtimeKit, stub);
 		expect(tree).toEqual(view({}, text({ body: 'count: 3' })));
 	});
 
