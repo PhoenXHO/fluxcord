@@ -23,6 +23,12 @@ import type { FlowToken } from '../flow/token.js';
 export interface InteractionSender {
 	/** Sends the payload as the interaction's reply and reports where it landed. */
 	send(payload: V2MessagePayload): Promise<MessageRef>;
+	/**
+	 * Replies from this target die at a wall: the session's absolute
+	 * ceiling, in ms from mount (an ephemeral line). Omitted: the reply
+	 * lives like any message, as long as its TTL says.
+	 */
+	readonly ceilingMs?: number;
 }
 
 /**

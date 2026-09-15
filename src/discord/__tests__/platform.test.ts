@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MessageFlags } from 'discord.js';
 import type { ChatInputCommandInteraction, Client } from 'discord.js';
-import { createUiBridge } from '../platform.js';
+import { createUiBridge, EPHEMERAL_CEILING_MS, INTERACTION_WALL_MS } from '../platform.js';
 import type { UiComponentInteraction } from '../flatten.js';
 import { EventKind } from '../../pipeline/types.js';
 import type { IncomingEvent } from '../../pipeline/types.js';
@@ -246,9 +246,9 @@ describe('delivery seams', () => {
 		expect(ref).toEqual({ channelId: 'c2', messageId: 'm9' });
 	});
 
-	it('replySender replies publicly with fetchReply and reports the message', async () => {
+	it('replySender replies publicly with withResponse and reports the message', async () => {
 		const interaction = {
-			reply: vi.fn(async () => ({ id: 'm5', channelId: 'c3' })),
+			reply: vi.fn(async () => ({ resource: { message: { id: 'm5', channelId: 'c3' } } })),
 		} as unknown as ChatInputCommandInteraction;
 		const bridge = createUiBridge(fakeClient());
 
@@ -256,6 +256,105 @@ describe('delivery seams', () => {
 
 		expect(ref).toEqual({ channelId: 'c3', messageId: 'm5' });
 		const options = interaction.reply as unknown as ReturnType<typeof vi.fn>;
-		expect(options.mock.calls[0][0]).toMatchObject({ fetchReply: true });
+		expect(options.mock.calls[0][0]).toMatchObject({ withResponse: true });
+	});
+});
+
+describe('ephemeral lines', () => {
+	/** A command-interaction fake whose reply lands in the interaction line. */
+	function fakeCommandInteraction(overrides: Record<string, unknown> = {}): ChatInputCommandInteraction {
+		let n = 0;
+		return {
+			createdTimestamp: Date.now(),
+			reply: vi.fn(async () => ({ resource: { message: { id: `mE${n++}`, channelId: 'cE' } } })),
+			editReply: vi.fn(async () => undefined),
+			...overrides,
+		} as unknown as ChatInputCommandInteraction;
+	}
+
+	it('ephemeral send merges the flag, reports the ceiling and registers the line', async () => {
+		const interaction = fakeCommandInteraction();
+		const bridge = createUiBridge(fakeClient());
+		const sender = bridge.replySender(interaction, { ephemeral: true });
+
+		expect(sender.ceilingMs).toBe(EPHEMERAL_CEILING_MS);
+
+		const ref = await sender.send({ flags: MessageFlags.IsComponentsV2, components: [] } as never);
+
+		expect(ref).toEqual({ channelId: 'cE', messageId: 'mE0' });
+		const options = interaction.reply as unknown as ReturnType<typeof vi.fn>;
+		expect(options.mock.calls[0][0]).toMatchObject({ withResponse: true, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+	});
+
+	it('editMessage routes a registered line to the interaction, not the channel', async () => {
+		const interaction = fakeCommandInteraction();
+		const channel = {
+			isSendable: (): boolean => true,
+			messages: { fetch: vi.fn(async () => ({ edit: vi.fn(async () => undefined) })) },
+		};
+		const bridge = createUiBridge(fakeClient({ cE: channel }));
+		await bridge.replySender(interaction, { ephemeral: true }).send({ flags: 0, components: [] } as never);
+
+		const payload = { flags: MessageFlags.IsComponentsV2, components: [] };
+		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, payload as never);
+
+		expect(interaction.editReply).toHaveBeenCalledWith(payload);
+		expect(channel.messages.fetch).not.toHaveBeenCalled();
+	});
+
+	it('a line past the wall throws typed and evicts (late edits fall back to the channel)', async () => {
+		const interaction = fakeCommandInteraction({ createdTimestamp: Date.now() - INTERACTION_WALL_MS - 5_000 });
+		const channel = {
+			isSendable: (): boolean => true,
+			messages: { fetch: vi.fn(async () => ({ edit: vi.fn(async () => undefined) })) },
+		};
+		const bridge = createUiBridge(fakeClient({ cE: channel }));
+		await bridge.replySender(interaction, { ephemeral: true }).send({ flags: 0, components: [] } as never);
+
+		await expect(bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, {} as never))
+			.rejects.toThrow('past the interaction wall');
+
+		// Evicted: the next edit takes the ordinary channel path.
+		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, {} as never);
+		expect(channel.messages.fetch).toHaveBeenCalledWith('mE0');
+	});
+
+	it('the host ephemeralAsPublic switch keeps ephemeral mounts public (no line, no ceiling)', async () => {
+		const interaction = fakeCommandInteraction();
+		const channel = {
+			isSendable: (): boolean => true,
+			messages: { fetch: vi.fn(async () => ({ edit: vi.fn(async () => undefined) })) },
+		};
+		const bridge = createUiBridge(fakeClient({ cE: channel }), { ephemeralAsPublic: true });
+		const sender = bridge.replySender(interaction, { ephemeral: true });
+
+		expect(sender.ceilingMs).toBeUndefined();
+
+		await sender.send({ flags: MessageFlags.IsComponentsV2, components: [] } as never);
+
+		const options = interaction.reply as unknown as ReturnType<typeof vi.fn>;
+		expect(options.mock.calls[0][0].flags).toBe(MessageFlags.IsComponentsV2);
+		// No line was registered: the edit takes the ordinary channel path.
+		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, {} as never);
+		expect(interaction.editReply).not.toHaveBeenCalled();
+		expect(channel.messages.fetch).toHaveBeenCalledWith('mE0');
+	});
+
+	it('caps live lines by evicting the oldest', async () => {
+		const interaction = fakeCommandInteraction();
+		const channel = {
+			isSendable: (): boolean => true,
+			messages: { fetch: vi.fn(async () => ({ edit: vi.fn(async () => undefined) })) },
+		};
+		const bridge = createUiBridge(fakeClient({ cE: channel }));
+		const sender = bridge.replySender(interaction, { ephemeral: true });
+		for (let i = 0; i < 501; i++) {
+			await sender.send({ flags: 0, components: [] } as never);
+		}
+
+		// 'mE0' was the first line in: past the cap it must be evicted, so
+		// its edit falls back to the channel path.
+		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, {} as never);
+		expect(channel.messages.fetch).toHaveBeenCalledWith('mE0');
 	});
 });

@@ -3,12 +3,12 @@
  *
  * Three jobs live here and nowhere else:
  *
- * 1. Delivery: editMessage / sendToChannel / replySender turn the renderer's
- *    raw V2 payloads into Discord API calls. Payloads are already
+ * 1. Delivery: `editMessage` / `sendToChannel` / `replySender` turn the
+ *    renderer's raw V2 payloads into Discord API calls. Payloads are already
  *    wire-shaped, so the casts say "trust the renderer", not "hope".
  *    Failures throw to the pipeline, whose error policy owns them.
  *
- * 2. Interaction binding: replyToActor and showModal need the live
+ * 2. Interaction binding: `replyToActor` and `showModal` need the live
  *    interaction object (a raw id cannot be replied to: the token lives on
  *    the object), but the runtime holds one singleton platform port. The
  *    bridge binds the interaction for the duration of one dispatch, which
@@ -21,7 +21,7 @@
  *    trades a little cross-session latency for correctness.
  *
  * 3. Success ack: a component click that was neither replied to (denial or
- *    error copy) nor deferred is deferUpdate()d when its dispatch
+ *    error copy) nor deferred is `deferUpdate()`d when its dispatch
  *    finishes. A message edit is not an acknowledgment: an unanswered
  *    interaction renders as a stuck spinner and, three seconds in, an "app
  *    didn't respond" failure painted onto whatever button now sits first in
@@ -29,11 +29,18 @@
  *    Discord's response window. A modal counts as the answer itself, so
  *    those dispatches skip the ack.
  *
- * Ephemeral panels are unsupported by design: the framework edits messages
- * by MessageRef, and ephemeral replies are unreachable after the interaction
- * expires. Mounts therefore reply publicly (fetchReply): denials and error
- * copy reach the actor via replyToActor, ephemeral unless the host's
- * ephemeralAsPublic option flips it public for dev observability.
+ * Ephemeral panels ride the interaction line: an ephemeral reply is
+ * unreachable through its channel, so the only way to edit it is the
+ * command interaction's webhook, which Discord kills 15 minutes after the
+ * command. The bridge keeps that line (`messageId` -> `interaction`):
+ * ephemeral mounts register here, and `editMessage` routes their edits to
+ * `interaction.editReply` while it lives. The line's sender reports
+ * `ceilingMs` (wall minus a parting margin) so the runtime can end the
+ * session before the wall and the parting edit still lands. After the
+ * wall the line throws a typed error and is evicted; the panel simply
+ * fades client-side. The host's `ephemeralAsPublic` option flips ephemeral
+ * mounts fully public instead (no line, no ceiling), same dev-observability
+ * switch as actor copy.
  *
  * @module discord/platform
  */
@@ -60,6 +67,18 @@ export interface BridgeLogger {
 	warn(message: string, ...details: unknown[]): void;
 }
 
+/** Discord's interaction-webhook lifetime: past it, edits through the line die. */
+export const INTERACTION_WALL_MS = 15 * 60_000;
+
+/**
+ * The ceiling an ephemeral mount's sender reports: the wall minus a parting
+ * margin, so the sweeper's final edit lands while the line still works.
+ */
+export const EPHEMERAL_CEILING_MS = INTERACTION_WALL_MS - 60_000;
+
+/** Live lines kept before the oldest is evicted (bound, not exact). */
+const EPHEMERAL_LINE_CAP = 500;
+
 const SILENT: BridgeLogger = Object.freeze({
 	debug: () => undefined,
 	warn: () => undefined,
@@ -78,12 +97,17 @@ export interface BridgeOptions {
 
 /** What createUiBridge hands the host app. */
 export interface UiBridge {
-	/** The bridge arm of the platform port (replyToActor, editMessage, showModal). */
+	/** The bridge arm of the platform port (`replyToActor`, `editMessage`, `showModal`). */
 	readonly platform: BridgePort;
-	/** The { channel } mount arm: sends a new message, reports where it landed. */
+	/** The `{ channel }` mount arm: sends a new message, reports where it landed. */
 	readonly sendToChannel: (channelId: string, payload: V2MessagePayload) => Promise<MessageRef>;
-	/** The { reply } mount arm for a live command interaction (public reply + fetchReply). */
-	readonly replySender: (interaction: ChatInputCommandInteraction) => InteractionSender;
+	/**
+	 * The `{ reply }` mount arm for a live command interaction. Public by
+	 * default; `{ ephemeral: true }` replies into the interaction line
+	 * instead and reports the wall ceiling (unless the host's
+	 * `ephemeralAsPublic` switch keeps everything public for dev).
+	 */
+	readonly replySender: (interaction: ChatInputCommandInteraction, as?: { ephemeral?: boolean }) => InteractionSender;
 	/**
 	 * One component interaction in, one dispatch out: flatten, bind, serialize,
 	 * hand to the core. The runtime's dispatch fn is passed per call so the
@@ -106,6 +130,13 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 	/** True while the dispatch in flight answered with a modal (an ack would kill it). */
 	let modalOpen = false;
 	let chain: Promise<unknown> = Promise.resolve();
+	/**
+	 * Ephemeral lines (see module doc): `messageId` -> the command
+	 * interaction whose webhook is the only door to that ephemeral reply.
+	 * Insertion order keeps the oldest evictable; the cap bounds memory,
+	 * not lifetime.
+	 */
+	const lines = new Map<string, ChatInputCommandInteraction>();
 
 	async function replyToActor(text: string): Promise<void> {
 		const interaction = bound;
@@ -152,6 +183,17 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 	// --- Delivery (see module doc, job 1) ----------------------------------------
 
 	async function editMessage(ref: MessageRef, payload: V2MessagePayload): Promise<void> {
+		// An ephemeral reply is only reachable through its line: route the
+		// edit through the command interaction's webhook while it lives.
+		const line = lines.get(ref.messageId);
+		if (line !== undefined) {
+			if (Date.now() - line.createdTimestamp > INTERACTION_WALL_MS) {
+				lines.delete(ref.messageId);
+				throw new Error(`bridge editMessage: ephemeral line '${ref.messageId}' is past the interaction wall`);
+			}
+			await line.editReply(payload as unknown as MessageEditOptions);
+			return;
+		}
 		const channel = await client.channels.fetch(ref.channelId);
 		if (channel === null || !channel.isSendable()) {
 			throw new Error(`bridge editMessage: channel ${ref.channelId} is not a message channel`);
@@ -169,14 +211,48 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 		return { channelId, messageId: sent.id };
 	}
 
-	function replySender(interaction: ChatInputCommandInteraction): InteractionSender {
+	function replySender(interaction: ChatInputCommandInteraction, as: { ephemeral?: boolean } = {}): InteractionSender {
+		// The host's dev switch wins: everything public, no line, no ceiling.
+		if (as.ephemeral === true && options.ephemeralAsPublic !== true) {
+			return {
+				ceilingMs: EPHEMERAL_CEILING_MS,
+				async send(payload: V2MessagePayload): Promise<MessageRef> {
+					// Ephemeral + withResponse: the response carries the
+					// ephemeral message even though its channel can never
+					// fetch it, and that id is the line's key.
+					const replyOptions = {
+						...payload,
+						flags: payload.flags | MessageFlags.Ephemeral,
+						withResponse: true,
+					} as unknown as InteractionReplyOptions & { withResponse: true };
+					const response = await interaction.reply(replyOptions);
+					const message = response.resource?.message;
+					if (message === undefined || message === null) {
+						throw new Error('bridge replySender: ephemeral reply returned no message resource');
+					}
+					lines.set(message.id, interaction);
+					if (lines.size > EPHEMERAL_LINE_CAP) {
+						// Bound, not exact: drop the oldest line past the cap.
+						const oldest = lines.keys().next();
+						if (oldest.done !== true) {
+							lines.delete(oldest.value);
+						}
+					}
+					return { channelId: message.channelId, messageId: message.id };
+				},
+			};
+		}
 		return {
 			async send(payload: V2MessagePayload): Promise<MessageRef> {
-				// Public + fetchReply: the session must own an editable message.
-				// The cast keeps the fetchReply literal so d.js picks the
-				// Message-returning overload.
-				const options = { ...payload, fetchReply: true } as unknown as InteractionReplyOptions & { fetchReply: true };
-				const message = await interaction.reply(options);
+				// Public + withResponse: the session must own an editable
+				// message. The cast keeps the withResponse literal so d.js
+				// picks the InteractionCallbackResponse overload.
+				const replyOptions = { ...payload, withResponse: true } as unknown as InteractionReplyOptions & { withResponse: true };
+				const response = await interaction.reply(replyOptions);
+				const message = response.resource?.message;
+				if (message === undefined || message === null) {
+					throw new Error('bridge replySender: reply returned no message resource');
+				}
 				return { channelId: message.channelId, messageId: message.id };
 			},
 		};
