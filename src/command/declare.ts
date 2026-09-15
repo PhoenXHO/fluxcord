@@ -8,15 +8,15 @@
  * flow's meta hooks. Flows stay command-free: they are id, structure,
  * policy and lifecycle, mountable by anything.
  *
- * uiCommand(name, description, spec) pairs with uiFlow: pure, runs at
+ * `command(name, description, spec)` pairs with `flow`: pure, runs at
  * module load, validates its own tree. The Discord-shaped BotCommand is
- * derived from the token by the binding (bridge/derive.ts); this module
+ * derived from the command by the binding (`discord/derive.ts`); this module
  * never touches the platform.
  *
  * @module command/declare
  */
 
-import type { FlowToken } from '../flow/token.js';
+import type { Flow } from '../flow/token.js';
 
 /** Command and subcommand names must be Discord-valid bare names. */
 const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -44,7 +44,7 @@ export interface MountSpec {
 
 /** The erased leaf mounts() returns; readers treat the leaf generically. */
 export interface MountLeaf {
-	readonly flow: FlowToken<never>;
+	readonly flow: Flow<never>;
 	readonly description?: string;
 	readonly ephemeral?: boolean;
 }
@@ -54,10 +54,10 @@ export interface MountLeaf {
  * exists for subcommand descriptions.
  */
 export function mounts<TData>(
-	flow: FlowToken<TData>,
+	flow: Flow<TData>,
 	spec: MountSpec = {},
 ): MountLeaf {
-	// The token is widened to the erased leaf shape here: the same
+	// The flow is widened to the erased leaf shape here: the same
 	// object, retyped for readers that treat leaves generically.
 	return Object.freeze({
 		flow,
@@ -66,7 +66,7 @@ export function mounts<TData>(
 	});
 }
 
-/** What uiCommand accepts, exactly one leaf home: `mount` (bare) or `subcommands` (grouped). */
+/** What `command` accepts, exactly one leaf home: `mount` (bare) or `subcommands` (grouped). */
 export interface CommandSpec {
 	/** Registers the command outside production only (dev tools). */
 	readonly devOnly?: boolean;
@@ -81,8 +81,8 @@ export interface CommandSpec {
 	readonly subcommands?: Readonly<Record<string, MountLeaf>>;
 }
 
-/** A command as authored: name, description, spec. Modules list these in their manifest's uiCommands field. */
-export interface CommandToken {
+/** A command as authored: name, description, spec. Modules list these in their manifest's `commands` field. */
+export interface Command {
 	readonly name: string;
 	readonly description: string;
 	readonly spec: CommandSpec;
@@ -90,32 +90,32 @@ export interface CommandToken {
 
 /**
  * Declares a slash command that mounts flows. Pure; runs at module load.
- * The loader derives the platform BotCommand from the token and harvests
+ * The loader derives the platform BotCommand from the command and harvests
  * each leaf's flow into the boot catalog.
  */
-export function uiCommand(name: string, description: string, spec: CommandSpec): CommandToken {
+export function command(name: string, description: string, spec: CommandSpec): Command {
 	if (!BARE_NAME.test(name)) {
-		throw new Error(`uiCommand: command name '${name}' must be a bare kebab name (no '/', ':', '#', '~' or '.')`);
+		throw new Error(`command: command name '${name}' must be a bare kebab name (no '/', ':', '#', '~' or '.')`);
 	}
 	if (description.length === 0) {
-		throw new Error(`uiCommand: command '${name}' must declare a description`);
+		throw new Error(`command: command '${name}' must declare a description`);
 	}
 	const hasMount = spec.mount !== undefined;
 	const hasSubcommands = spec.subcommands !== undefined;
 	if (hasMount === hasSubcommands) {
-		throw new Error(`uiCommand '${name}': exactly one of 'mount' or 'subcommands' is required`);
+		throw new Error(`command '${name}': exactly one of 'mount' or 'subcommands' is required`);
 	}
 	if (hasSubcommands) {
 		const keys = Object.keys(spec.subcommands);
 		if (keys.length === 0) {
-			throw new Error(`uiCommand '${name}': 'subcommands' is empty: declare at least one`);
+			throw new Error(`command '${name}': 'subcommands' is empty: declare at least one`);
 		}
 		for (const key of keys) {
 			if (!BARE_NAME.test(key)) {
-				throw new Error(`uiCommand '${name}': subcommand name '${key}' must be a bare kebab name`);
+				throw new Error(`command '${name}': subcommand name '${key}' must be a bare kebab name`);
 			}
 			if (spec.subcommands[key].description === undefined) {
-				throw new Error(`uiCommand '${name}': subcommand '${key}' requires a description`);
+				throw new Error(`command '${name}': subcommand '${key}' requires a description`);
 			}
 		}
 	}
@@ -134,7 +134,7 @@ export interface CommandLeaf {
 }
 
 /** A command's leaves in declaration order: one for a bare mount, one per subcommand. */
-export function commandLeaves(command: CommandToken): readonly CommandLeaf[] {
+export function commandLeaves(command: Command): readonly CommandLeaf[] {
 	if (command.spec.mount !== undefined) {
 		return [{ leaf: command.spec.mount, commandHint: command.name }];
 	}

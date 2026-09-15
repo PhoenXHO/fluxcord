@@ -11,7 +11,7 @@ Initial release.
 
 ### Added
 
-- Flow authoring: `uiFlow`, `screen`, `subview`, `action`, `uiCommand`,
+- Flow authoring: `flow`, `screen`, `subview`, `action`, `command`,
   `mounts`, and subflows via `defineFlow` + `subflow`.
 - TSX authoring: the JSX runtime (`fluxcord/jsx-runtime`) and the typed
   screen kit (`Button`, `Select`, navigation, modals), with plain builder
@@ -19,7 +19,7 @@ Initial release.
 - Session runtime: state store, per-session click queues, a commit phase
   with automatic re-renders and message edits, dispatch core, TTL sweeper
   with parting screens, and optional rehydration after restarts.
-- Discord binding (`fluxcord/discord`): `createUiBridge`, `deriveUiCommand`,
+- Discord binding (`fluxcord/discord`): `createUiBridge`, `deriveCommand`,
   and `setUiHost`, over discord.js v14 Components V2.
 - Boot layer: `buildFlowCatalog`, `moduleFlowRegistrations`, `coverageScan`.
 - Permission gates as declarations on flows and controls, decided per click

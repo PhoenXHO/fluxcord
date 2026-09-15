@@ -12,7 +12,7 @@ import type { V2MessagePayload } from '../render/v2.js';
 import type { MessageRef, RehydrateStore, Session } from '../state/types.js';
 import type { BridgePort, ErrorHandler, IncomingEvent, PolicyPort } from '../pipeline/types.js';
 import type { FlowCatalog } from '../boot/build.js';
-import type { FlowToken } from '../flow/token.js';
+import type { Flow } from '../flow/token.js';
 
 /**
  * The bridge's reply path for one live interaction: sends the first
@@ -101,9 +101,9 @@ export interface UiRuntime {
 	/**
 	 * Opens a session: renders the flow's first screen, sends it to the
 	 * target, creates the session. Rejects when the send fails (no session
-	 * was born) or the flow/token pairing is miswired.
+	 * was born) or the flow is not in the boot catalog.
 	 */
-	mount<TData>(token: FlowToken<TData>, options: MountOptions): Promise<MountHandle<TData>>;
+	mount<TData>(flow: Flow<TData>, options: MountOptions): Promise<MountHandle<TData>>;
 	/** The dispatch core: the bridge feeds it one IncomingEvent per interaction. */
 	dispatch(incoming: IncomingEvent): Promise<void>;
 	/**

@@ -1,15 +1,15 @@
 /**
- * Flow tokens: a flow's id and registration facts, attached to its
+ * Flows: a flow's id and registration facts, attached to its
  * declaration.
  *
- * `uiFlow('<name>', options, meta?)` authors the id bare, right where the
+ * `flow('<name>', options, meta?)` authors the id bare, right where the
  * flow lives: one declaration, at the thing it names. No registry entry,
  * no module prefix to keep honest. The loader owns module identity; it
  * assembles `'<module>/<name>'` into the runtime `MountToken` at boot,
  * so the prefix is derived, never hand-typed.
  *
  * The second argument is the plain `FlowOptions` shape (screens, first,
- * components, subflows). `uiFlow` runs it through {@link defineFlow} and
+ * components, subflows). `flow` runs it through {@link defineFlow} and
  * keeps the definition. `defineFlow` stays the subflow/library tool: a
  * flow reused as a subflow plugs in via `subflow({ use: flow.definition })`.
  *
@@ -46,7 +46,7 @@ export interface FlowMeta<TData = unknown> {
 	 * The flow's default gate, declared where the flow lives: the
 	 * same idea as a control's policy prop, one level up. A static
 	 * object only; a resolver needs request context a declaration
-	 * does not have. The module's `policies.ts` `uiFlows` map is the
+	 * does not have. The module's `policies.ts` `flows` map is the
 	 * other legal home, and declaring in both is a load-time error
 	 * (one home per gate).
 	 */
@@ -78,10 +78,10 @@ export interface FlowMeta<TData = unknown> {
 
 /**
  * A flow as authored: its bare name plus its definition. Modules export
- * these as constants and list them in their manifest's `uiFlows` field, or a
- * `uiCommand`'s leaf mounts one.
+ * these as constants and list them in their manifest's `flows` field, or a
+ * `command`'s leaf mounts one.
  */
-export interface FlowToken<TData = never> {
+export interface Flow<TData = never> {
 	/** The flow's name within its module: the only id the author writes. */
 	readonly id: string;
 	/** The built definition: `screens`, `initialData`, ttl and the rest. */
@@ -92,7 +92,7 @@ export interface FlowToken<TData = never> {
 
 /**
  * A flow as registered: the loader-assembled runtime twin of a
- * `FlowToken`. `flowId` is `'<moduleId>/<name>'`; sessions, wire ids and
+ * `Flow`. `flowId` is `'<moduleId>/<name>'`; sessions, wire ids and
  * the revive path key off it.
  */
 export interface MountToken<TData = never> {
@@ -104,7 +104,7 @@ export interface MountToken<TData = never> {
 	/** The flow's registration facts (policy, session hooks), carried as-is. */
 	readonly meta?: FlowMeta;
 	/**
-	 * The mounting command's invocation path, when a uiCommand leaf
+	 * The mounting command's invocation path, when a command leaf
 	 * contributed this flow: the default parting hint. Absent for
 	 * manifest-registered flows.
 	 */
@@ -122,18 +122,18 @@ const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  * @param options Screens, `first`, `initialData`, and the optional pieces.
  * @param meta Registration facts: the default policy gate and the
  *   session lifecycle hooks.
- * @returns The token to list in the module manifest's uiFlows, or mount
- *   from a uiCommand leaf.
+ * @returns The `Flow` to list in the module manifest's `flows`, or mount
+ *   from a command leaf.
  * @throws When the name is not a bare kebab name, or the options fail
  *   {@link defineFlow}'s validation.
  */
-export function uiFlow<TData, const TScreens extends string = string>(
+export function flow<TData, const TScreens extends string = string>(
 	id: string,
 	options: FlowOptions<TData, TScreens>,
 	meta?: FlowMeta<TData>,
-): FlowToken<TData> {
+): Flow<TData> {
 	if (!BARE_NAME.test(id)) {
-		throw new Error(`uiFlow: flow name '${id}' must be a bare kebab name (no '/', ':', '#', '~' or '.'); the loader assembles '<module>/<name>'`);
+		throw new Error(`flow: flow name '${id}' must be a bare kebab name (no '/', ':', '#', '~' or '.'); the loader assembles '<module>/<name>'`);
 	}
 	return Object.freeze({
 		id,

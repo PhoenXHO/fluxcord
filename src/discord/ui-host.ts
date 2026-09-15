@@ -12,13 +12,13 @@
  */
 
 import type { ChatInputCommandInteraction } from 'discord.js';
-import type { FlowToken } from '../flow/token.js';
+import type { Flow } from '../flow/token.js';
 import type { InteractionSender, MountHandle, MountOptions } from '../runtime/types.js';
 
 /** The two runtime abilities a command handler needs to open a flow. */
 export interface UiHost {
 	/** Mounts a flow's first screen; see UiRuntime.mount. */
-	mount<TData>(token: FlowToken<TData>, options: MountOptions): Promise<MountHandle<TData>>;
+	mount<TData>(flow: Flow<TData>, options: MountOptions): Promise<MountHandle<TData>>;
 	/** Builds the reply target for one live command interaction; `{ ephemeral: true }` rides the interaction line. */
 	replySender(interaction: ChatInputCommandInteraction, as?: { ephemeral?: boolean }): InteractionSender;
 }

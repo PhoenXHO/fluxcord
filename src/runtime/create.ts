@@ -19,7 +19,7 @@
  */
 
 import { asScreenRegistry } from '../flow/registry.js';
-import type { FlowToken } from '../flow/token.js';
+import type { Flow } from '../flow/token.js';
 import { viewOf } from '../commit/commit.js';
 import { createCommit } from '../commit/commit.js';
 import { createMakeUi } from '../commit/ui.js';
@@ -154,16 +154,16 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		...(options.now !== undefined ? { now: options.now } : {}),
 	});
 
-	async function mount<TData>(token: FlowToken<TData>, mountOptions: MountOptions): Promise<MountHandle<TData>> {
-		// The authored token resolves to its assembled twin; a flow the boot
+	async function mount<TData>(flow: Flow<TData>, mountOptions: MountOptions): Promise<MountHandle<TData>> {
+		// The authored flow resolves to its assembled twin; a flow the boot
 		// catalog doesn't know is a manifest gap, not a runtime state.
-		const registered = options.flows.byToken.get(token);
+		const registered = options.flows.byToken.get(flow);
 		if (registered === undefined) {
-			throw new Error(`mount: flow '${token.id}' is not in the boot catalog, list it in its module's manifest uiFlows`);
+			throw new Error(`mount: flow '${flow.id}' is not in the boot catalog, list it in its module's manifest flows`);
 		}
 		const flowId = registered.flowId;
 		const moduleId = registered.moduleId;
-		const def = token.definition;
+		const def = flow.definition;
 		// Rehydration pairing: loud in every miswired direction.
 		if (def.rehydrate !== undefined) {
 			if (options.rehydrate === undefined) {

@@ -2,7 +2,7 @@
  * fluxcord: the platform-free core.
  *
  * Everything a bot needs except the platform itself: the authoring
- * factories (uiFlow, screen, subview, action, uiCommand), the host
+ * factories (flow, screen, subview, action, command), the host
  * assembly API (buildFlowCatalog, createUiRuntime), and the seam
  * vocabulary (events, policies, payloads). The Discord binding lives
  * behind the 'fluxcord/discord' entry; TSX compiles against
@@ -13,11 +13,11 @@
 
 // Authoring: what flow and command authors write.
 export * from './flow/define.js'; // defineFlow, subflow
-export * from './flow/token.js'; // uiFlow, FlowToken, FlowMeta
+export * from './flow/token.js'; // flow, Flow, FlowMeta
 export * from './flow/screen.js'; // screen, subview
 export * from './flow/types.js'; // AuthorScreen, FlowOptions, FlowDefinition
 export * from './pipeline/action.js'; // action
-export * from './command/declare.js'; // uiCommand, mounts, CommandToken
+export * from './command/declare.js'; // command, mounts, Command
 export * from './command/harvest.js'; // moduleFlowRegistrations, FlowSourceModule
 export * from './flow/expiry.js'; // expiryEpoch, Expiry
 

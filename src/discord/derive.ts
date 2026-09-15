@@ -1,5 +1,5 @@
 /**
- * Command derivation: a CommandToken becomes the binding's own
+ * Command derivation: a `Command` becomes the binding's own
  * DerivedCommand.
  *
  * This is the binding's read of the ownership tree: the slash-command
@@ -18,19 +18,19 @@
 
 import { SlashCommandBuilder } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
-import type { CommandToken, MountLeaf } from '../command/declare.js';
-import type { FlowToken } from '../flow/token.js';
+import type { Command, MountLeaf } from '../command/declare.js';
+import type { Flow } from '../flow/token.js';
 import { uiHost } from './ui-host.js';
 
 /**
- * The binding's command product: what deriveUiCommand hands the host. The
+ * The binding's command product: what `deriveCommand` hands the host. The
  * host adapts this into its own registration machinery; nothing here knows
  * the host exists.
  */
 export interface DerivedCommand {
 	/** The slash-command builder (bare or grouped), registration-ready. */
 	readonly data: SlashCommandBuilder;
-	/** Dev-only registration hint, as authored on the uiCommand. */
+	/** Dev-only registration hint, as authored on the command. */
 	readonly devOnly: boolean;
 	/** The Discord permission members need to use the command, if authored. */
 	readonly requiresDiscordPermissions?: bigint;
@@ -41,12 +41,12 @@ export interface DerivedCommand {
 /** Mounts one leaf's flow onto the interaction's reply. */
 async function mountLeaf(leaf: MountLeaf, interaction: ChatInputCommandInteraction): Promise<void> {
 	const host = uiHost();
-	// The never-to-unknown cast of the leaf's token: the same object, widened
+	// The never-to-unknown cast of the leaf's flow: the same object, widened
 	// for mount's generic (the phantom __data channel makes them distinct
 	// to the checker). This file is the one place it happens. The bag comes
 	// from the flow's own initialData, and the invocation rides along as
 	// the mount context: the flow's onSessionStart hook receives it.
-	await host.mount(leaf.flow as FlowToken<unknown>, {
+	await host.mount(leaf.flow as Flow<unknown>, {
 		to: { reply: host.replySender(interaction, { ephemeral: leaf.ephemeral === true }) },
 		ownerId: interaction.user.id,
 		context: interaction,
@@ -55,16 +55,16 @@ async function mountLeaf(leaf: MountLeaf, interaction: ChatInputCommandInteracti
 
 /**
  * Derives the binding's registration-ready command from an authored
- * token. Pure; the host calls it once per command at registration time.
+ * command. Pure; the host calls it once per command at registration time.
  *
- * @param token The command as authored via uiCommand.
+ * @param command The command to derive.
  * @returns The builder, registration facts and execute arms.
  */
-export function deriveUiCommand(token: CommandToken): DerivedCommand {
-	const { spec } = token;
+export function deriveCommand(command: Command): DerivedCommand {
+	const { spec } = command;
 	const builder = new SlashCommandBuilder()
-		.setName(token.name)
-		.setDescription(token.description);
+		.setName(command.name)
+		.setDescription(command.description);
 	if (spec.memberPermissions !== undefined) {
 		builder.setDefaultMemberPermissions(spec.memberPermissions);
 	}
@@ -90,7 +90,7 @@ export function deriveUiCommand(token: CommandToken): DerivedCommand {
 	for (const [key, leaf] of Object.entries(leaves)) {
 		builder.addSubcommand((sub) => sub
 			.setName(key)
-			.setDescription(leaf.description ?? token.description));
+			.setDescription(leaf.description ?? command.description));
 	}
 	return {
 		data: builder,

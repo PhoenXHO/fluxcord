@@ -20,8 +20,8 @@ import type { IncomingEvent, PlatformPort, PolicyDecision, PolicyPort } from '..
 import { EndReason, RemountPolicy } from '../../state/types.js';
 import type { MessageRef, RehydrateRow, RehydrateStore } from '../../state/types.js';
 import { button, row, text, view } from '../../tree/builders.js';
-import { uiFlow } from '../../flow/token.js';
-import type { FlowMeta, FlowToken, SessionEnd } from '../../flow/token.js';
+import { flow } from '../../flow/token.js';
+import type { FlowMeta, Flow, SessionEnd } from '../../flow/token.js';
 import { buildFlowCatalog } from '../../boot/build.js';
 import { createUiRuntime, DEFAULT_SWEEP_INTERVAL_MS } from '../create.js';
 import type { MountHandle, MountTarget, UiRuntime } from '../types.js';
@@ -94,7 +94,7 @@ function world(options: {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
 
-	const flow: FlowToken<PanelData> = uiFlow<PanelData>('host', {
+	const panelFlow: Flow<PanelData> = flow<PanelData>('host', {
 		screens: {
 			main: {
 				view: (data) => view(
@@ -150,13 +150,13 @@ function world(options: {
 		platform,
 		sendToChannel,
 		policy,
-		flows: buildFlowCatalog([{ module: 'panel', token: flow }]),
+		flows: buildFlowCatalog([{ module: 'panel', flow: panelFlow }]),
 		...(options.noRehydrateStore === true ? {} : { rehydrate: rehydrateStore }),
 		now: () => clock.now,
 	});
 
 	async function mount(mountOptions: MountArgs = {}): Promise<MountHandle<PanelData>> {
-		return runtime.mount(flow, {
+		return runtime.mount(panelFlow, {
 			to: mountOptions.to ?? { reply: replySender },
 			ownerId: mountOptions.ownerId ?? OWNER_ID,
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrateRef: mountOptions.rehydrateRef } : {}),

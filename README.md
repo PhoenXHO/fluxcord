@@ -49,7 +49,7 @@ rebuilt for each page.
 The same counter in fluxcord:
 
 ```tsx
-import { action, ButtonStyle, screen, uiFlow } from 'fluxcord';
+import { action, ButtonStyle, screen, flow } from 'fluxcord';
 
 interface CounterData {
 	count: number;
@@ -77,7 +77,7 @@ const counterScreen = screen<CounterData>()((data, { Button }) => (
 	</view>
 ));
 
-export const counterFlow = uiFlow<CounterData>('counter', {
+export const counterFlow = flow<CounterData>('counter', {
 	screens: { main: counterScreen },
 	first: 'main',
 	initialData: { count: 0 },
@@ -120,7 +120,7 @@ ten rolls, with the gate and the slash command it hangs from.
 
 ```tsx
 // dice.tsx
-import { action, ButtonStyle, mounts, screen, uiCommand, uiFlow } from 'fluxcord';
+import { action, ButtonStyle, command, flow, mounts, screen } from 'fluxcord';
 
 interface DiceData {
 	rolls: number[];
@@ -170,7 +170,7 @@ const historyScreen = screen<DiceData>()((data, { Button }) => (
 	</view>
 ));
 
-export const diceFlow = uiFlow<DiceData>(
+export const diceFlow = flow<DiceData>(
 	'dice',
 	{
 		screens: { roll: rollScreen, history: historyScreen },
@@ -182,7 +182,7 @@ export const diceFlow = uiFlow<DiceData>(
 	},
 );
 
-export const diceCommand = uiCommand('dice', 'Open the dice panel', {
+export const diceCommand = command('dice', 'Open the dice panel', {
 	mount: mounts(diceFlow),
 });
 ```
@@ -193,7 +193,7 @@ The host side lives in one file and stays short:
 // index.ts
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { buildFlowCatalog, createUiRuntime, moduleFlowRegistrations } from 'fluxcord';
-import { createUiBridge, deriveUiCommand, setUiHost } from 'fluxcord/discord';
+import { createUiBridge, deriveCommand, setUiHost } from 'fluxcord/discord';
 import { diceCommand } from './dice';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -221,7 +221,7 @@ const runtime = createUiRuntime({
 setUiHost({ mount: runtime.mount, replySender: bridge.replySender });
 runtime.startSweeper(); // reaps idle sessions on an interval
 
-const commands = [deriveUiCommand(diceCommand)];
+const commands = [deriveCommand(diceCommand)];
 // Register commands.map((c) => c.data.toJSON()) with the REST API once at
 // deploy time; the details of command registration stay yours.
 
@@ -241,7 +241,7 @@ client.login(process.env.DISCORD_TOKEN);
 
 ## Concepts
 
-A flow is declared with `uiFlow(name, options, meta)`, where the options
+A flow is declared with `flow(name, options, meta)`, where the options
 carry the screens map, the screen to open first, and the initial state that
 every mount starts from a fresh copy of, while the meta carries the flow's
 permission gate and its `onSessionStart` / `onSessionEnd` hooks, which are
