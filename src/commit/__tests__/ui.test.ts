@@ -12,7 +12,7 @@ import { createMakeUi } from '../ui.js';
 import { createSessionStore } from '../../state/store.js';
 import { DEFAULT_TTL_MS } from '../../state/types.js';
 import { input, modal } from '../../tree/builders.js';
-import type { Screen, ScreenRegistry, PlatformPort, UiToolkit } from '../../pipeline/types.js';
+import type { RegisteredScreen, ScreenRegistry, PlatformPort, UiToolkit } from '../../pipeline/types.js';
 import type { Session } from '../../state/types.js';
 import type { ActionAddress } from '../../render/id-codec.js';
 
@@ -44,7 +44,7 @@ function onScreen(
 /** A registry that resolves exactly the given '<module>/<screen>' keys. */
 function registry(keys: readonly string[], roots: Record<string, string> = {}): ScreenRegistry {
 	return {
-		resolve: (key) => (keys.includes(key) ? { flow: { roots } } as unknown as Screen : undefined),
+		resolve: (key) => (keys.includes(key) ? { flow: { roots } } as unknown as RegisteredScreen : undefined),
 	};
 }
 
@@ -183,7 +183,7 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 
 	it('captures the opener record\'s policy next to the handler', async () => {
 		const w = onScreen('menu', [], SHOW);
-		const handler = (): void => {};
+		const handler = (): void => { };
 		const gate = { owner: { ownerOnly: false } };
 		w.session.frame = { h0: { handler, label: 'open', policy: gate } };
 
@@ -195,7 +195,7 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 
 	it('clears a previous capture when the opener declared no policy', async () => {
 		const w = onScreen('menu', [], SHOW);
-		const handler = (): void => {};
+		const handler = (): void => { };
 		w.session.frame = { h0: { handler, label: 'open' } };
 		w.session.modalPolicy = { owner: { ownerOnly: true } }; // a previous modal's gate
 

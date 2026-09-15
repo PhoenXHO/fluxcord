@@ -27,7 +27,7 @@ import type {
 	PlatformPort,
 	PolicyDecision,
 	PolicyPort,
-	Screen,
+	RegisteredScreen,
 	ScreenRegistry,
 } from '../../pipeline/types.js';
 import { createCommit } from '../commit.js';
@@ -45,7 +45,7 @@ const MESSAGE_ID = 'message-1';
 const OWNER_ID = 'user-1';
 
 /** Identity-bound fixture for the pure-transform tests below. */
-const noop = (): void => {};
+const noop = (): void => { };
 
 function confirmView(): ViewNode {
 	return view({}, text({ body: 'Are you sure?' }));
@@ -114,7 +114,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		);
 	};
 	const screens: ScreenRegistry = {
-		resolve: (viewKey: string): Screen | undefined => {
+		resolve: (viewKey: string): RegisteredScreen | undefined => {
 			if (viewKey === 'lotto/main') {
 				return { view: mainView };
 			}

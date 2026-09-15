@@ -390,7 +390,7 @@ export interface FlowContext {
 }
 
 /** One screen: its view template, keyed '<moduleId>/<screenId>'. */
-export interface Screen<TData = unknown> {
+export interface RegisteredScreen<TData = unknown> {
 	/**
 	 * Pure template: session data in, view tree out. The second parameter
 	 * is the erased screen kit; the third is the session's read-only
@@ -418,7 +418,7 @@ export interface ScreenRegistry {
 	 * @param viewKey `'<moduleId>/<screenId>'`, as stamped on the wire.
 	 * @returns The screen, or undefined when unregistered.
 	 */
-	resolve(viewKey: string): Screen | undefined;
+	resolve(viewKey: string): RegisteredScreen | undefined;
 }
 
 /**

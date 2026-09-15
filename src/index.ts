@@ -15,7 +15,7 @@
 export * from './flow/define.js'; // defineFlow, subflow
 export * from './flow/token.js'; // flow, Flow, FlowMeta
 export * from './flow/screen.js'; // screen, subview
-export * from './flow/types.js'; // AuthorScreen, FlowOptions, FlowDefinition
+export * from './flow/types.js'; // Screen, FlowOptions, FlowDefinition
 export * from './pipeline/action.js'; // action
 export * from './command/declare.js'; // command, mounts, Command
 export * from './command/harvest.js'; // moduleFlowRegistrations, FlowSourceModule

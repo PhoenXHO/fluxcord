@@ -34,7 +34,7 @@ import type {
 	PolicyDecision,
 	PolicyPort,
 	PolicyRequest,
-	Screen,
+	RegisteredScreen,
 	UiToolkit,
 } from '../../pipeline/types.js';
 import { defineFlow, subflow } from '../define.js';
@@ -44,7 +44,7 @@ import { runtimeKit } from '../../tree/kit.js';
 import { getPath, lensSession, setPath } from '../lens.js';
 import { asScreenRegistry, screenEntries } from '../registry.js';
 import { validateFlows } from '../validate.js';
-import type { AuthorScreen, ViewSession } from '../types.js';
+import type { Screen, ViewSession } from '../types.js';
 
 interface LottoData {
 	count: number;
@@ -63,7 +63,7 @@ const choose: ActionHandler<PickData> = (event) => {
 };
 
 /** Shared fixture: the one-screen picker subflow's screen. */
-function pickerScreen(): AuthorScreen<PickData> {
+function pickerScreen(): Screen<PickData> {
 	return screen<PickData>()((data) => view(
 		{},
 		text({ body: `picked: ${data.chosen}` }),
@@ -386,7 +386,7 @@ describe('subview', () => {
 
 describe('action', () => {
 	it('hands back the same arrow: the handler IS the product', () => {
-		const run = (): void => {};
+		const run = (): void => { };
 		expect(action<LottoData>()(run)).toBe(run);
 	});
 
@@ -400,7 +400,7 @@ interface World {
 	clock: { now: number; advance: (ms: number) => number };
 	store: SessionStore;
 	session: Session<LottoData>;
-	entries: Record<string, Screen>;
+	entries: Record<string, RegisteredScreen>;
 	policy: PolicyPort & { authorize: Mock };
 	platform: PlatformPort;
 	commit: CommitPhase;
@@ -485,7 +485,7 @@ function world(options: WorldOptions = {}): World {
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 	});
 
-	const entries: Record<string, Screen> = { ...screenEntries('lotto', flow) };
+	const entries: Record<string, RegisteredScreen> = { ...screenEntries('lotto', flow) };
 	const screens = asScreenRegistry(entries);
 	const platform: PlatformPort = {
 		replyToActor: vi.fn(async (textValue: string): Promise<void> => {
@@ -573,7 +573,7 @@ describe('dispatch - flow integration through the frame', () => {
 	it('a hash the frame does not carry is stale: one snap redraw, no error, no run', async () => {
 		const w = world();
 		await w.draw();
-		const stray = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(() => {}) });
+		const stray = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(() => { }) });
 
 		await w.click('bump', { customId: stray });
 
@@ -717,7 +717,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 	it('a dead click edits the message into the flow\'s parting bundle', async () => {
 		const w = world();
-		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/main', actionHash: actionHash(() => {}) });
+		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/main', actionHash: actionHash(() => { }) });
 
 		await w.click('bump', { customId: id });
 

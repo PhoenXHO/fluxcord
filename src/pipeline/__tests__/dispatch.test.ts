@@ -25,7 +25,7 @@ import type {
 	PlatformPort,
 	PolicyDecision,
 	PolicyPort,
-	Screen,
+	RegisteredScreen,
 	ScreenRegistry,
 } from '../types.js';
 
@@ -104,7 +104,7 @@ function world(options: { omitErrorHandler?: boolean } = {}): World {
 	const policy = fakePolicy();
 	const { platform, calls } = fakePlatform();
 	const screens: ScreenRegistry = {
-		resolve: (viewKey: string): Screen | undefined =>
+		resolve: (viewKey: string): RegisteredScreen | undefined =>
 			viewKey === 'lotto/main' ? { view: () => lottoView } : undefined,
 	};
 	// The frame a real commit phase would have written: the drawn message
@@ -202,7 +202,7 @@ describe('dispatch - allow path', () => {
 		w.session.modalHandler = w.handler;
 		// A ui.go() before showModal strands the old address; the submit
 		// still finds its handler because routing never read the hash.
-		const elsewhere = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/confirm', actionHash: actionHash(() => {}) });
+		const elsewhere = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/confirm', actionHash: actionHash(() => { }) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${elsewhere}~${w.session.modalNonce}`, inputs: { amount: '10' } });
 
 		expect(w.handler).toHaveBeenCalledTimes(1);

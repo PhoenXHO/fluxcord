@@ -31,8 +31,8 @@ import { expiryEpoch } from './expiry.js';
  */
 export type DeepReadonly<T> =
 	T extends (...args: never[]) => unknown ?
-		T : T extends object ?
-			{ readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
+	T : T extends object ?
+	{ readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
 
 /**
  * The session as a view may see it: read-only facts about the live
@@ -64,7 +64,7 @@ export interface ViewSession {
  * their handlers directly, and drawing the view registers those handlers.
  * There is no separate action declaration to keep in sync.
  */
-export interface AuthorScreen<TData = unknown, TKeys extends string = string> {
+export interface Screen<TData = unknown, TKeys extends string = string> {
 	/**
 	 * The screen's template: flow data in, view tree out. It receives a
 	 * readonly view of the bag (see {@link DeepReadonly}), the typed
@@ -100,7 +100,7 @@ export type FlowComponent<TData = unknown> = (
 
 /** What defineFlow accepts; TData is the flow's one shared bag type. */
 export interface FlowOptions<TData, TScreens extends string = string> {
-	readonly screens: Readonly<Record<TScreens, AuthorScreen<TData, TScreens>>>;
+	readonly screens: Readonly<Record<TScreens, Screen<TData, TScreens>>>;
 	/** Where the journey starts. */
 	readonly first: TScreens;
 	/**
@@ -180,7 +180,7 @@ export interface FlowDefinition<TData = never> {
 	/** Type-only; never present at runtime. Carries `TData` from `defineFlow` to `subflow()`'s inference. */
 	readonly __data?: (data: TData) => void;
 	/** Merged screen map: own screens plus namespaced subflow screens (`<at>.<screen>`). */
-	readonly screens: Readonly<Record<string, AuthorScreen<TData>>>;
+	readonly screens: Readonly<Record<string, Screen<TData>>>;
 	/** All screen keys, namespaced where a subflow supplied them. */
 	readonly screenIds: readonly string[];
 	/** The screen the flow opens at. */

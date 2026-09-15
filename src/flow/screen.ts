@@ -20,7 +20,7 @@
 
 import type { ScreenKit } from '../tree/kit.js';
 import type { ComponentResult } from '../tree/types.js';
-import type { AuthorScreen, DeepReadonly, ViewSession } from './types.js';
+import type { Screen, DeepReadonly, ViewSession } from './types.js';
 
 /**
  * Curried screen factory. The first call declares the screen's data
@@ -30,7 +30,7 @@ import type { AuthorScreen, DeepReadonly, ViewSession } from './types.js';
  */
 export function screen<TData>(): <TKeys extends string>(
 	view: (data: DeepReadonly<TData>, controls: ScreenKit<TData, NoInfer<TKeys>>, session: ViewSession) => ComponentResult,
-) => AuthorScreen<TData, TKeys> {
+) => Screen<TData, TKeys> {
 	return (view) => {
 		if (typeof view !== 'function') {
 			throw new Error("screen: 'view' must be a function: (data, controls, session) => tree");

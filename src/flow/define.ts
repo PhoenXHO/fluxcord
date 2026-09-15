@@ -30,7 +30,7 @@ import type { ActionHandler, UiToolkit } from '../pipeline/types.js';
 import { DEFAULT_TTL_MS } from '../state/types.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
 import type { ComponentResult } from '../tree/types.js';
-import type { AuthorScreen, FlowDefinition, FlowOptions, SubflowPlug } from './types.js';
+import type { Screen, FlowDefinition, FlowOptions, SubflowPlug } from './types.js';
 
 // used in docs
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -79,8 +79,8 @@ export function defineFlow<TData, const TScreens extends string = string>(
 ): FlowDefinition<TData> {
 	// Own screens: ids validated. Handlers live in the views, so there is
 	// no second declaration to keep in sync.
-	const screens: Record<string, AuthorScreen<TData>> = {};
-	for (const [id, screen] of Object.entries(options.screens as Record<string, AuthorScreen<TData>>)) {
+	const screens: Record<string, Screen<TData>> = {};
+	for (const [id, screen] of Object.entries(options.screens as Record<string, Screen<TData>>)) {
 		assertId('screen id', id);
 		screens[id] = screen;
 	}
@@ -120,7 +120,7 @@ export function defineFlow<TData, const TScreens extends string = string>(
 		for (const id of def.screenIds) {
 			const key = `${at}.${id}`;
 			if (key in screens) throw new Error(`defineFlow: namespaced screen '${key}' already exists`);
-			screens[key] = def.screens[id] as AuthorScreen<TData>;
+			screens[key] = def.screens[id] as Screen<TData>;
 			slots[key] = [at, ...def.slots[id]];
 		}
 	}

@@ -14,7 +14,7 @@
 import { screenEntries } from '../flow/registry.js';
 import { validateFlows } from '../flow/validate.js';
 import type { Flow, MountToken } from '../flow/token.js';
-import type { Screen } from '../pipeline/types.js';
+import type { RegisteredScreen } from '../pipeline/types.js';
 
 /** One module's contribution to the catalog: its name plus an authored flow. */
 export interface FlowRegistration {
@@ -33,7 +33,7 @@ export interface FlowRegistration {
 export interface FlowCatalog {
 	readonly tokens: readonly MountToken[];
 	/** Screen entries keyed `'<moduleId>/<screenId>'`: the dispatch/commit registry. */
-	readonly entries: Readonly<Record<string, Screen>>;
+	readonly entries: Readonly<Record<string, RegisteredScreen>>;
 	/** Keyed by `flowId`; mount's revive path resolves rows through this. */
 	readonly byFlowId: ReadonlyMap<string, MountToken>;
 	/** Authored flow -> its runtime twin; mount resolves the flow a command holds through this. */
@@ -68,7 +68,7 @@ export function buildFlowCatalog(registrations: readonly FlowRegistration[]): Fl
 	})));
 	const byFlowId = new Map<string, MountToken>();
 	const byToken = new Map<object, MountToken>();
-	const entries: Record<string, Screen> = {};
+	const entries: Record<string, RegisteredScreen> = {};
 	for (let i = 0; i < tokens.length; i += 1) {
 		const token = tokens[i];
 		if (byFlowId.has(token.flowId)) {

@@ -1,13 +1,14 @@
 /**
- * Registry population: turns `FlowDefinitions` into `Screen` entries.
+ * Registry population: turns `FlowDefinitions` into `RegisteredScreen`
+ * entries.
  *
  * `defineFlow` erases author types at the definition boundary using
  * never-parameterized shapes (any author TData fits), while the
- * pipeline's `Screen` and `FlowContext` speak unknown-parameterized
- * shapes. The two forms are the same runtime objects but are not
- * statically comparable in both directions, so this module is the one
- * place the never -> unknown cast happens. Every cast below is that
- * single boundary.
+ * pipeline's `RegisteredScreen` and `FlowContext` speak
+ * unknown-parameterized shapes. The two forms are the same runtime
+ * objects but are not statically comparable in both directions, so
+ * this module is the one place the never -> unknown cast happens.
+ * Every cast below is that single boundary.
  *
  * Entries carry only what the pipeline consults per screen: the view,
  * the subflow slot, and the flow's `wrap`/`roots`/`parting`/`onError`.
@@ -19,7 +20,7 @@
  * @module flow/registry
  */
 
-import type { FlowContext, Screen, ScreenRegistry } from '../pipeline/types.js';
+import type { FlowContext, RegisteredScreen, ScreenRegistry } from '../pipeline/types.js';
 import type { FlowDefinition } from './types.js';
 
 /** The flow-level facts every screen of this flow carries. */
@@ -39,13 +40,13 @@ function flowContextOf(definition: FlowDefinition, commandHint?: string): FlowCo
  * (the mounting command's invocation path) rides the same slice; it is
  * the flow's default parting hint.
  */
-export function screenEntries(moduleId: string, definition: FlowDefinition, commandHint?: string): Readonly<Record<string, Screen>> {
+export function screenEntries(moduleId: string, definition: FlowDefinition, commandHint?: string): Readonly<Record<string, RegisteredScreen>> {
 	const flow = flowContextOf(definition, commandHint);
-	const entries: Record<string, Screen> = {};
+	const entries: Record<string, RegisteredScreen> = {};
 	for (const id of definition.screenIds) {
 		const slot = definition.slots[id];
 		entries[`${moduleId}/${id}`] = {
-			view: definition.screens[id].view as Screen['view'],
+			view: definition.screens[id].view as RegisteredScreen['view'],
 			...(slot.length > 0 ? { slot } : {}),
 			flow,
 		};
@@ -54,9 +55,9 @@ export function screenEntries(moduleId: string, definition: FlowDefinition, comm
 }
 
 /** Wraps entry maps into the ScreenRegistry the pipeline expects. */
-export function asScreenRegistry(entries: Readonly<Record<string, Screen>>): ScreenRegistry {
+export function asScreenRegistry(entries: Readonly<Record<string, RegisteredScreen>>): ScreenRegistry {
 	return {
-		resolve(viewKey: string): Screen | undefined {
+		resolve(viewKey: string): RegisteredScreen | undefined {
 			return entries[viewKey];
 		},
 	};
