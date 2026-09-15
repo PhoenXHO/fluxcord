@@ -175,6 +175,13 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		} else if (mountOptions.rehydrateRef !== undefined) {
 			throw new Error(`mount: got rehydrateRef but flow '${flowId}' declares no rehydrate callback`);
 		}
+		// A wall-limited surface (an ephemeral line) cannot rehydrate: the
+		// row would point at a message no late click can revive. Resume
+		// means rerunning the command, which is the flow's business.
+		const ceiling = 'reply' in mountOptions.to ? mountOptions.to.reply.ceilingMs : undefined;
+		if (ceiling !== undefined && (def.rehydrate !== undefined || mountOptions.rehydrateRef !== undefined)) {
+			throw new Error(`mount: flow '${flowId}' cannot rehydrate on an ephemeral mount (rerun the command to resume)`);
+		}
 
 		// The bag: the flow's own initialData, cloned per mount. Two sessions
 		// must never share mutable bag state (an in-place push on a nested
@@ -199,6 +206,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			messageRef: { channelId: 'pending', messageId: 'pending' },
 			createdAt: at,
 			ttlMs: def.ttlMs,
+			...(ceiling !== undefined ? { expiresAt: at + ceiling } : {}),
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrate: { ref: mountOptions.rehydrateRef } } : {}),
 			lastActivityAt: at,
 			data,
@@ -222,6 +230,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			data,
 			screen: def.first,
 			ttlMs: def.ttlMs,
+			...(ceiling !== undefined ? { expiresAt: at + ceiling } : {}),
 			remount: def.remount,
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrate: { ref: mountOptions.rehydrateRef } } : {}),
 		});

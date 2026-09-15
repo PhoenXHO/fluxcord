@@ -347,3 +347,38 @@ describe('defaults', () => {
 		expect(DEFAULT_TTL_MS).toBe(30 * 60 * 1000);
 	});
 });
+
+describe('absolute ceiling', () => {
+	it('expiresAt kills the session even while the sliding TTL is fresh', () => {
+		const t = clock();
+		const store = createSessionStore({ now: t.now });
+		const session = store.create(input({ ttlMs: 30 * MINUTE, expiresAt: t.now() + 5 * MINUTE }));
+
+		t.advance(4 * MINUTE);
+		store.touch(session.id);
+		expect(isExpired(store.get(session.id)!, t.now())).toBe(false);
+
+		t.advance(1 * MINUTE + 1);
+		expect(isExpired(store.get(session.id)!, t.now())).toBe(true);
+	});
+
+	it('sweep reaps a past-ceiling session with the expire reason', () => {
+		const t = clock();
+		const ends: string[] = [];
+		const store = createSessionStore({ now: t.now, onEnd: (s, r) => ends.push(`${s.id}:${r}`) });
+		const session = store.create(input({ expiresAt: t.now() + MINUTE }));
+
+		t.advance(MINUTE + 1);
+		expect(store.sweep()).toBe(1);
+		expect(ends).toEqual([`${session.id}:expire`]);
+	});
+
+	it('sessions without a ceiling expire by the sliding TTL alone', () => {
+		const t = clock();
+		const store = createSessionStore({ now: t.now });
+		const session = store.create(input({}));
+
+		t.advance(MINUTE);
+		expect(isExpired(store.get(session.id)!, t.now())).toBe(false);
+	});
+});

@@ -2,9 +2,11 @@
  * The session store: create, get, touch, close and sweep over the live
  * sessions, all in memory.
  *
- * Expiry is sliding and derived, never stored: a session is expired when
+ * Expiry is sliding and derived: a session is expired when
  * `now > lastActivityAt + ttlMs`, and every accepted event bumps
- * `lastActivityAt`, reviving the session for a full further window. An
+ * `lastActivityAt`, reviving the session for a full further window. A
+ * session may also carry an absolute `expiresAt` ceiling (a wall-limited
+ * surface such as an ephemeral line); that one never slides. An
  * expired-but-unswept session stays readable through `get`, because a
  * late revive can still claim it; deletion belongs to the sweeper alone.
  *
@@ -39,9 +41,9 @@ export function generateId(): string {
 	return id;
 }
 
-/** The one expiry rule, as a comparison; never a stored date. */
+/** The one expiry rule, as a comparison: the sliding TTL, or an absolute `expiresAt` ceiling when the surface has one. */
 export function isExpired(session: Session<unknown>, now: number): boolean {
-	return now > session.lastActivityAt + session.ttlMs;
+	return now > session.lastActivityAt + session.ttlMs || (session.expiresAt !== undefined && now > session.expiresAt);
 }
 
 // --- The store -------------------------------------------------------------------
@@ -183,6 +185,7 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 				messageRef: input.messageRef,
 				createdAt: at,
 				ttlMs: input.ttlMs,
+				...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
 				rehydrate: input.rehydrate,
 				lastActivityAt: at,
 				data: input.data,

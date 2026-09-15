@@ -77,6 +77,13 @@ export interface Session<TData> {
 	/** The sliding TTL window. Expiry is derived on demand as `lastActivityAt + ttlMs`, never stored as a date. */
 	readonly ttlMs: number;
 	/**
+	 * Optional absolute death line (epoch ms), set when the surface itself
+	 * has a wall (an ephemeral line). Unlike the sliding TTL it never
+	 * moves: an actively used panel still dies here, so its final edits
+	 * land before the wall. Omitted on ordinary surfaces.
+	 */
+	readonly expiresAt?: number;
+	/**
 	 * Present when the flow opted into rehydration. `ref` is the flow's own
 	 * pointer into its database (same meaning as in {@link RehydrateRow});
 	 * at revive, the flow's rehydrate function turns it back into fresh
@@ -143,6 +150,8 @@ export interface CreateSessionInput<TData> {
 	readonly screen: string;
 	/** Sliding TTL in ms: a flow override, or `DEFAULT_TTL_MS`. Finite and positive; the store throws otherwise. */
 	readonly ttlMs: number;
+	/** Optional absolute death line (epoch ms). @see {@link Session.expiresAt}. */
+	readonly expiresAt?: number;
 	/** The flow's remount policy ({@link RemountPolicy}). */
 	readonly remount: RemountPolicy;
 	/** Present when the flow opted into rehydration. */

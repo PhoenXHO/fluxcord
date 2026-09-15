@@ -221,6 +221,45 @@ describe('mount - the three target arms', () => {
 	});
 });
 
+describe('mount - wall ceilings', () => {
+	/** A reply sender standing in for an ephemeral line: fixed message, declared ceiling. */
+	function ceilingSender(): { ceilingMs: number; send: (payload: V2MessagePayload) => Promise<MessageRef> } {
+		return {
+			ceilingMs: 10 * MINUTE,
+			send: async (): Promise<MessageRef> => ({ channelId: 'ch-reply', messageId: 'replied-wall' }),
+		};
+	}
+
+	it('the absolute ceiling does not slide: activity cannot push the wall out', async () => {
+		const w = world();
+		const handle = await w.mount({ to: { reply: ceilingSender() } });
+
+		w.clock.advance(5 * MINUTE);
+		await w.click(handle.sessionId, handle.messageId); // fresh sliding window from here
+		w.clock.advance(5 * MINUTE + 1); // past the ceiling; sliding TTL (30 min) nowhere near out
+
+		expect(await handle.redraw()).toBe(false);
+	});
+
+	it('an ordinary sender leaves no ceiling: life is the sliding TTL alone', async () => {
+		const w = world();
+		const handle = await w.mount();
+
+		w.clock.advance(10 * MINUTE + 1);
+		await w.click(handle.sessionId, handle.messageId);
+		w.clock.advance(10 * MINUTE + 1);
+
+		expect(await handle.redraw()).toBe(true);
+	});
+
+	it('an ephemeral mount cannot rehydrate (resume means rerun)', async () => {
+		const w = world({ rehydratable: true });
+
+		await expect(w.mount({ to: { reply: ceilingSender() }, rehydrateRef: 'cfg:1' }))
+			.rejects.toThrow('cannot rehydrate on an ephemeral mount');
+	});
+});
+
 describe('mount - the flow-owned bag', () => {
 	it('clones the initialData per mount - two sessions never share bag state', async () => {
 		// Coexist so both panels stay live (replace would close the first).
