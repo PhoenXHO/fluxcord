@@ -32,12 +32,21 @@ export interface MountSpec {
 	 * subcommand leaves; a bare leaf inherits the command's description.
 	 */
 	readonly description?: string;
+	/**
+	 * Opens the flow on an ephemeral reply (the interaction line): every
+	 * edit rides the command's webhook and the panel dies at the platform
+	 * wall. Omitted: the reply is a public message living the flow's own
+	 * sliding TTL. The door decides, not the flow: the same flow can be
+	 * mounted both ways.
+	 */
+	readonly ephemeral?: boolean;
 }
 
 /** The erased leaf mounts() returns; readers treat the leaf generically. */
 export interface MountLeaf {
 	readonly flow: FlowToken<never>;
 	readonly description?: string;
+	readonly ephemeral?: boolean;
 }
 
 /**
@@ -53,6 +62,7 @@ export function mounts<TData>(
 	return Object.freeze({
 		flow,
 		...(spec.description !== undefined ? { description: spec.description } : {}),
+		...(spec.ephemeral !== undefined ? { ephemeral: spec.ephemeral } : {}),
 	});
 }
 

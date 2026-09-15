@@ -47,7 +47,7 @@ async function mountLeaf(leaf: MountLeaf, interaction: ChatInputCommandInteracti
 	// from the flow's own initialData, and the invocation rides along as
 	// the mount context: the flow's onSessionStart hook receives it.
 	await host.mount(leaf.flow as FlowToken<unknown>, {
-		to: { reply: host.replySender(interaction) },
+		to: { reply: host.replySender(interaction, { ephemeral: leaf.ephemeral === true }) },
 		ownerId: interaction.user.id,
 		context: interaction,
 	});
