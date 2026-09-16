@@ -127,9 +127,9 @@ describe('defineFlow - validations', () => {
 
 		const fakeSession = {} as Session<LottoData>;
 		const base = view({}, text({ body: 'base' }));
-		const result = def.wrap?.(base, fakeSession);
+		const result = def.wrap?.(base, fakeSession, runtimeKit);
 
-		expect(second).toHaveBeenCalledWith(marker, fakeSession);
+		expect(second).toHaveBeenCalledWith(marker, fakeSession, runtimeKit);
 		expect(result).toBe(marker);
 	});
 

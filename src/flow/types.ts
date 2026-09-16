@@ -89,13 +89,16 @@ export interface Screen<TData = unknown, TKeys extends string = string> {
 
 /**
  * A plug-and-play flow component: a bare function that draws around every
- * screen. It receives the normalized view tree and returns the element
+ * screen. It receives the normalized view tree, the session's live
+ * record, and the same typed kit views get (so chrome drawn in a wrap
+ * uses the identical controls a screen would), and returns the element
  * union (folded back to a view node between links). Components are
  * library material, never machinery.
  */
 export type FlowComponent<TData = unknown> = (
 	tree: ViewNode,
 	session: Session<TData>,
+	kit: ScreenKit<TData, string>,
 ) => ComponentResult;
 
 /** What defineFlow accepts; TData is the flow's one shared bag type. */
@@ -192,7 +195,7 @@ export interface FlowDefinition<TData = never> {
 	 */
 	readonly initialData: unknown;
 	/** The composed component chain; absent when the flow declares no components. */
-	readonly wrap?: (tree: ViewNode, session: Session<TData>) => ComponentResult;
+	readonly wrap?: (tree: ViewNode, session: Session<TData>, kit: ScreenKit<TData, string>) => ComponentResult;
 	/** Full screen key to bag path: the slice of the bag each screen works in. Own screens map to `[]`. */
 	readonly slots: Readonly<Record<string, readonly string[]>>;
 	/** Namespace root to the screen id `ui.go(root)` opens. */

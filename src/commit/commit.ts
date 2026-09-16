@@ -72,7 +72,7 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 	// for the composed wrap's result.
 	let tree = normalizeViewRoot(screen.view(data, runtimeKit, session));
 	if (screen.flow?.wrap !== undefined) {
-		tree = normalizeViewRoot(screen.flow.wrap(tree, session));
+		tree = normalizeViewRoot(screen.flow.wrap(tree, session, runtimeKit));
 	}
 	return tree;
 }

@@ -374,7 +374,7 @@ export interface PartingOptions {
  */
 export interface FlowContext {
 	/** Draws around every screen's content (components compose into this). */
-	readonly wrap?: (tree: ViewNode, session: Session<unknown>) => ComponentResult;
+	readonly wrap?: (tree: ViewNode, session: Session<unknown>, kit: ScreenKit<unknown, string>) => ComponentResult;
 	/** Subflow namespace roots: root name to the screen id `ui.go(root)` opens. */
 	readonly roots?: Readonly<Record<string, string>>;
 	/** The flow's parting copy, consulted before the framework defaults. */

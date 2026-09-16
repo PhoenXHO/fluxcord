@@ -95,7 +95,8 @@ export function defineFlow<TData, const TScreens extends string = string>(
 		const previous = wrap;
 		wrap = previous === undefined
 			? component
-			: (tree, session): ComponentResult => component(normalizeViewRoot(previous(tree, session)), session);
+			: (tree, session, kit): ComponentResult =>
+				component(normalizeViewRoot(previous(tree, session, kit)), session, kit);
 	}
 
 	const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
