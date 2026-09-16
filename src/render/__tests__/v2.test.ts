@@ -143,6 +143,23 @@ describe('renderV2Message - select', () => {
 		}
 	});
 
+	it('renders entity defaultIds as default_values', () => {
+		const select = entitySelect({ onSelect: go, entity: SelectEntity.Roles, defaultIds: ['r1', 'r2'] });
+		expect(render(view({}, row({}, select))).components).toEqual([{
+			type: 1,
+			components: [{
+				type: 6,
+				custom_id: CUSTOM_ID,
+				default_values: [{ id: 'r1', type: 'role' }, { id: 'r2', type: 'role' }],
+			}],
+		}]);
+	});
+
+	it('loudly rejects defaultIds on a mentionable select', () => {
+		const select = entitySelect({ onSelect: go, entity: SelectEntity.Mentionable, defaultIds: ['m1'] });
+		expect(() => render(view({}, row({}, select)))).toThrow(/mentionable/);
+	});
+
 	it('loudly rejects a select that slipped through rule 8', () => {
 		const neither = force<ControlNode>({ kind: 'select', onSelect: go });
 		expect(() => render(view({}, row({}, neither)))).toThrow(RenderError);

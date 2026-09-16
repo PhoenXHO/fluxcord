@@ -24,3 +24,5 @@ Initial release.
 - Boot layer: `buildFlowCatalog`, `moduleFlowRegistrations`, `coverageScan`.
 - Permission gates as declarations on flows and controls, decided per click
   by a policy port the host implements.
+- Entity selects render preselected ids (`defaultIds`) through the platform's
+  `default_values`, so redrawn panels show the current selection highlighted.

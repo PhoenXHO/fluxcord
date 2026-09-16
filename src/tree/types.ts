@@ -118,6 +118,12 @@ export interface SelectNode {
 	 * Cannot be used with the `options` property.
 	 */
 	readonly entity?: SelectEntity;
+	/**
+	 * Entity ids preselected when the select first renders. Entity selects
+	 * only: a static options list preselects through `SelectOption.default`.
+	 * Must fit the selection cap (`maxSelected`, platform default 1).
+	 */
+	readonly defaultIds?: readonly string[];
 
 	readonly placeholder?: string;
 	/**

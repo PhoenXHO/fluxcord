@@ -282,7 +282,8 @@ function isHttpUrl(url: string): boolean {
  * `minSelected`/`maxSelected` sit in 0-25 with min not above max, and
  * a static options list holds at most 25 entries with unique non-empty
  * labels and values of at most 100 chars each. Preselected options
- * (`default: true`) must fit the selection cap.
+ * (`default: true`) and entity preselections (`defaultIds`) must fit
+ * the selection cap; `defaultIds` belongs to entity selects only.
  */
 function validateSelect(node: SelectNode, path: string, violations: Violation[]): void {
 	const hasOptions = node.options !== undefined;
@@ -319,6 +320,25 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[])
 			rule: 12,
 			message: `select minSelected (${node.minSelected}) must not exceed maxSelected (${node.maxSelected})`,
 		});
+	}
+	if (node.defaultIds !== undefined) {
+		if (node.options !== undefined && node.entity === undefined) {
+			violations.push({
+				path,
+				rule: 8,
+				message: 'select defaultIds belongs to an entity select, not a static options list',
+			});
+		}
+		// Same cap as option preselections: maxSelected when set, the platform
+		// default of 1 when not (the renderer omits max_values then).
+		const cap = node.maxSelected ?? 1;
+		if (node.defaultIds.length > cap) {
+			violations.push({
+				path,
+				rule: 26,
+				message: `select preselects ${node.defaultIds.length} entities, more than the selection cap (${cap})`,
+			});
+		}
 	}
 	if (node.options) {
 		const options = node.options;

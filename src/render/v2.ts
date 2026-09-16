@@ -19,6 +19,7 @@ import {
 	ButtonStyle,
 	ComponentType,
 	MessageFlags,
+	SelectMenuDefaultValueType,
 	TextInputStyle,
 } from 'discord-api-types/v10';
 import type {
@@ -106,11 +107,23 @@ const INPUT_STYLES: Record<TreeInputStyle, TextInputStyle> = {
 	[TreeInputStyle.Paragraph]: TextInputStyle.Paragraph,
 };
 
-/** Select entity source -> wire shape. Each entity kind is its own component type on the platform, so the table pairs every source with a builder taking the `custom_id`. */
-const ENTITY_SELECTS: Record<SelectEntity, (customId: string) => APISelectMenuComponent> = {
-	[SelectEntity.Users]: (customId) => ({ type: ComponentType.UserSelect, custom_id: customId }),
-	[SelectEntity.Roles]: (customId) => ({ type: ComponentType.RoleSelect, custom_id: customId }),
-	[SelectEntity.Channels]: (customId) => ({ type: ComponentType.ChannelSelect, custom_id: customId }),
+/** Select entity source -> wire shape. Each entity kind is its own component type on the platform, so the table pairs every source with a builder taking the `custom_id` and optional preselected ids (`default_values`; mentionable ignores them — its defaults mix users and roles, and an id alone cannot say which is which). */
+const ENTITY_SELECTS: Record<SelectEntity, (customId: string, defaultIds?: readonly string[]) => APISelectMenuComponent> = {
+	[SelectEntity.Users]: (customId, defaultIds) => ({
+		type: ComponentType.UserSelect,
+		custom_id: customId,
+		...(defaultIds?.length ? { default_values: defaultIds.map((id) => ({ id, type: SelectMenuDefaultValueType.User })) } : {}),
+	}),
+	[SelectEntity.Roles]: (customId, defaultIds) => ({
+		type: ComponentType.RoleSelect,
+		custom_id: customId,
+		...(defaultIds?.length ? { default_values: defaultIds.map((id) => ({ id, type: SelectMenuDefaultValueType.Role })) } : {}),
+	}),
+	[SelectEntity.Channels]: (customId, defaultIds) => ({
+		type: ComponentType.ChannelSelect,
+		custom_id: customId,
+		...(defaultIds?.length ? { default_values: defaultIds.map((id) => ({ id, type: SelectMenuDefaultValueType.Channel })) } : {}),
+	}),
 	[SelectEntity.Mentionable]: (customId) => ({ type: ComponentType.MentionableSelect, custom_id: customId }),
 };
 
@@ -160,6 +173,13 @@ function selectBase(node: SelectNode, path: string, customId: string): APISelect
 		};
 	}
 	if (node.entity !== undefined) {
+		const defaultIds = node.defaultIds;
+		if (defaultIds !== undefined && defaultIds.length > 0) {
+			if (node.entity === SelectEntity.Mentionable) {
+				throw new RenderError(path, 'select defaultIds is not supported on mentionable selects');
+			}
+			return ENTITY_SELECTS[node.entity](customId, defaultIds);
+		}
 		return ENTITY_SELECTS[node.entity](customId);
 	}
 	// rule 8 has slipped through

@@ -183,6 +183,32 @@ describe('validateTree - value & bounds rules', () => {
 		})))).toEqual([]);
 	});
 
+	it('rule 26: entity defaultIds fit the selection cap', () => {
+		expect(rulesOf(withSelect(entitySelect({
+			onSelect: handler,
+			entity: SelectEntity.Roles,
+			defaultIds: ['1', '2', '3'],
+			maxSelected: 2,
+		})))).toContain(26);
+		expect(rulesOf(withSelect(entitySelect({
+			onSelect: handler,
+			entity: SelectEntity.Roles,
+			defaultIds: ['1', '2'],
+		})))).toContain(26);
+		expect(rulesOf(withSelect(entitySelect({
+			onSelect: handler,
+			entity: SelectEntity.Roles,
+			defaultIds: ['1'],
+			maxSelected: 3,
+		})))).toEqual([]);
+	});
+
+	it('rule 8: defaultIds rejected on a static options select (cast arrivals)', () => {
+		const sneaky = optionSelect({ onSelect: handler, options: [{ label: 'A', value: 'a' }] });
+		const node = { ...sneaky, defaultIds: ['1'] } as unknown as SelectNode;
+		expect(rulesOf(withSelect(node))).toContain(8);
+	});
+
 	it('rule 13: input length bounds and ordering', () => {
 		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', minLength: -1 })))).toContain(13);
 		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', maxLength: 4001 })))).toContain(13);

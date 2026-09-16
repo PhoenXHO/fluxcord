@@ -35,7 +35,9 @@ import type {
 // OptionSelectProps and EntitySelectProps are split so a select can never be
 // built with both options and entity: each props type is missing the other
 // field, which makes passing both a compile error. The tree validator still
-// checks the rule at runtime for trees that arrive through casts.
+// checks the rule at runtime for trees that arrive through casts. defaultIds
+// rides the entity side only; a static options list preselects through each
+// option's `default` flag.
 
 export type ViewProps = Omit<ViewNode, 'kind' | 'children'>;
 export type TextProps = Omit<TextNode, 'kind'>;
@@ -43,7 +45,7 @@ export type RowProps = Omit<RowNode, 'kind' | 'children'>;
 export type ContainerProps = Omit<ContainerNode, 'kind' | 'children'>;
 export type ButtonProps = Omit<ButtonNode, 'kind'>;
 export type LinkProps = Omit<LinkNode, 'kind'>;
-export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity'> & { readonly options: readonly SelectOption[] };
+export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity' | 'defaultIds'> & { readonly options: readonly SelectOption[] };
 export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options'> & { readonly entity: SelectEntity };
 export type ModalProps = Omit<ModalNode, 'kind' | 'children'>;
 export type InputProps = Omit<InputNode, 'kind'>;
