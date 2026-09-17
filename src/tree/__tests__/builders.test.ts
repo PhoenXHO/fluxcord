@@ -18,7 +18,8 @@ import {
 	view,
 	warning,
 } from '../builders.js';
-import { ButtonStyle, InputStyle, NodeKind, SelectEntity, SeparatorSpacing } from '../vocab.js';
+import { NodeKind, SelectEntity, SeparatorSpacing } from '../vocab.js';
+import type { ButtonProps } from '../builders.js';
 import type { TextChild } from '../types.js';
 
 /** Identity-bound fixture: the handler object itself is the binding. */
@@ -46,16 +47,16 @@ describe('builders', () => {
 		const node = button({
 			onClick: go,
 			label: 'Go',
-			style: ButtonStyle.Primary,
+			danger: true,
 			disabled: true,
 		});
 		expect(node.label).toBe('Go');
-		expect(node.style).toBe(ButtonStyle.Primary);
+		expect(node.style).toBe('danger');
 		expect(node.disabled).toBe(true);
 		expect(node.onClick).toBe(go);
 
-		const field = input({ id: 'notes', label: 'Notes', style: InputStyle.Paragraph, value: 'prefilled' });
-		expect(field.style).toBe(InputStyle.Paragraph);
+		const field = input({ id: 'notes', label: 'Notes', paragraph: true, value: 'prefilled' });
+		expect(field.style).toBe('paragraph');
 		expect(field.value).toBe('prefilled');
 
 		const panel = container({ color: 0x5865f2 }, text('x'));
@@ -148,6 +149,42 @@ describe('text content', () => {
 	it('code and codeblock output is frozen', () => {
 		expect(Object.isFrozen(code('x'))).toBe(true);
 		expect(Object.isFrozen(codeblock('x'))).toBe(true);
+	});
+});
+
+describe('control labels & style flags', () => {
+	it('no flag means primary, and primary resolves explicitly', () => {
+		expect(button({ onClick: go, label: 'Go' }).style).toBeUndefined();
+		expect(button({ onClick: go, label: 'Go', primary: true }).style).toBe('primary');
+	});
+
+	it('each style flag resolves to its style value', () => {
+		expect(button({ onClick: go, label: 'Go', secondary: true }).style).toBe('secondary');
+		expect(button({ onClick: go, label: 'Go', success: true }).style).toBe('success');
+		expect(button({ onClick: go, label: 'Go', danger: true }).style).toBe('danger');
+	});
+
+	it('two style flags, or a valued flag, throw at the build site', () => {
+		expect(() => button({ onClick: go, label: 'Go', danger: true, success: true })).toThrow(/one style flag/);
+		expect(() => button(force<ButtonProps>({ onClick: go, danger: false }))).toThrow(/takes no value/);
+	});
+
+	it('the label rides the children or the prop, never both, never neither', () => {
+		expect(button({ onClick: go }, 'Go ', 3).label).toBe('Go 3');
+		expect(() => button({ onClick: go, label: 'Go' }, 'Also')).toThrow(/never both/);
+		expect(() => button({ onClick: go })).toThrow(/needs a label/);
+	});
+
+	it('link takes children as its label too', () => {
+		expect(link({ url: 'https://torn.com' }, 'Site').label).toBe('Site');
+		expect(() => link({ url: 'https://torn.com', label: 'Site' }, 'Also')).toThrow(/never both/);
+	});
+
+	it('input style flags resolve; both throw', () => {
+		expect(input({ id: 'f', label: 'L' }).style).toBeUndefined();
+		expect(input({ id: 'f', label: 'L', short: true }).style).toBe('short');
+		expect(input({ id: 'f', label: 'L', paragraph: true }).style).toBe('paragraph');
+		expect(() => input({ id: 'f', label: 'L', short: true, paragraph: true })).toThrow(/one style flag/);
 	});
 });
 

@@ -16,9 +16,8 @@
  *    the whole job (handler included) finishes, so `await core(incoming)`
  *    covers every reply/modal the handler triggers. Concurrent interactions
  *    would race the singleton binding, so dispatches serialize on a chain
- *    (mutex). The per-session FIFO still governs WITHIN a session; the mutex
- *    The per-session FIFO still governs within a session; the mutex
- *    trades a little cross-session latency for correctness.
+ *    (mutex). The per-session FIFO still governs within a session; the
+ *    mutex trades a little cross-session latency for correctness.
  *
  * 3. Success ack: a component click that was neither replied to (denial or
  *    error copy) nor deferred is `deferUpdate()`d when its dispatch

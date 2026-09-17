@@ -11,7 +11,7 @@
  */
 
 import { NodeKind } from './vocab.js';
-import type { SelectEntity } from './vocab.js';
+import type { ButtonStyle, InputStyle, SelectEntity } from './vocab.js';
 import type {
 	ButtonNode,
 	ContainerChild,
@@ -47,12 +47,34 @@ export type TextProps = { readonly title?: string };
 export type RowProps = Omit<RowNode, 'kind' | 'children'>;
 export type ContainerProps = Omit<ContainerNode, 'kind' | 'children'>;
 export type HrProps = Omit<HrNode, 'kind'>;
-export type ButtonProps = Omit<ButtonNode, 'kind'>;
-export type LinkProps = Omit<LinkNode, 'kind'>;
+/**
+ * The button's style flags: the authoring spelling of its visual style.
+ * At most one may be set and each takes no value; no flag means primary.
+ * The node itself carries only the resolved style union.
+ */
+export type ButtonStyleFlags = {
+	readonly primary?: true;
+	readonly secondary?: true;
+	readonly success?: true;
+	readonly danger?: true;
+};
+/** Button props: the label rides the `label` prop or the children, the style rides the flags. */
+export type ButtonProps = Omit<ButtonNode, 'kind' | 'style' | 'label'> & ButtonStyleFlags & { readonly label?: string };
+/** Link props: the label rides the `label` prop or the children. */
+export type LinkProps = Omit<LinkNode, 'kind' | 'label'> & { readonly label?: string };
 export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity' | 'defaultIds'> & { readonly options: readonly SelectOption[] };
 export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options'> & { readonly entity: SelectEntity };
 export type ModalProps = Omit<ModalNode, 'kind' | 'children'>;
-export type InputProps = Omit<InputNode, 'kind'>;
+/**
+ * The input's style flags: `short` (the default) or `paragraph`. At most
+ * one may be set; the node carries the resolved union.
+ */
+export type InputStyleFlags = {
+	readonly short?: true;
+	readonly paragraph?: true;
+};
+/** Input props: the label is a plain prop, the style rides the flags. */
+export type InputProps = Omit<InputNode, 'kind' | 'style'> & InputStyleFlags;
 
 // --- Freeze ----------------------------------------------------------------------
 
@@ -232,14 +254,86 @@ export function hr(props: HrProps = {}): HrNode {
 	return deepFreeze({ kind: NodeKind.hr, ...props });
 }
 
-/** A clickable button bound to a handler. */
-export function button(props: ButtonProps): ButtonNode {
-	return deepFreeze({ kind: NodeKind.button, ...props });
+// --- Control labels & style flags -------------------------------------------------
+
+/**
+ * Resolves a control's label: the `label` prop XOR the folded children.
+ * Both or neither is an author mistake, thrown here at the build site.
+ */
+function controlLabel(kind: 'button' | 'link', props: { readonly label?: string }, children: readonly TextChild[]): string {
+	if (props.label !== undefined && children.length > 0) {
+		throw new Error(`${kind} takes a label prop or children, never both`);
+	}
+	if (props.label !== undefined) return props.label;
+	const folded = flattenTextContent(children);
+	if (folded.length === 0) {
+		throw new Error(`${kind} needs a label: the label prop or the children carry it`);
+	}
+	return folded;
 }
 
-/** A button-shaped link that opens a URL; no handler. */
-export function link(props: LinkProps): LinkNode {
-	return deepFreeze({ kind: NodeKind.link, ...props });
+/** Style-flag vocabularies: flag name -> the node's style value. */
+const BUTTON_FLAG_STYLES: Record<string, ButtonStyle> = {
+	primary: 'primary',
+	secondary: 'secondary',
+	success: 'success',
+	danger: 'danger',
+};
+const INPUT_FLAG_STYLES: Record<string, InputStyle> = {
+	short: 'short',
+	paragraph: 'paragraph',
+};
+
+/**
+ * Reads the style flags off raw props: at most one may be set (two is an
+ * author mistake) and a set flag must arrive bare (`true`). Returns the
+ * node's style value, or undefined when no flag was set, which leaves the
+ * style off the node so the renderer's default applies.
+ */
+function styleFlag<S extends string>(map: Record<string, S>, props: Record<string, unknown>): S | undefined {
+	let style: S | undefined;
+	for (const [key, mapped] of Object.entries(map)) {
+		const value = props[key];
+		if (value === undefined) continue;
+		if (value !== true) {
+			throw new Error(`style flag '${key}' takes no value`);
+		}
+		if (style !== undefined) {
+			throw new Error('a control takes at most one style flag');
+		}
+		style = mapped;
+	}
+	return style;
+}
+
+/**
+ * A clickable button bound to a handler. The label comes from the `label`
+ * prop or from the children, never both; the style comes from one flag
+ * (`danger: true`), and no flag means primary.
+ */
+export function button(props: ButtonProps, ...children: readonly TextChild[]): ButtonNode {
+	const style = styleFlag(BUTTON_FLAG_STYLES, props);
+	return deepFreeze({
+		kind: NodeKind.button,
+		onClick: props.onClick,
+		label: controlLabel('button', props, children),
+		...(style !== undefined ? { style } : {}),
+		...(props.disabled !== undefined ? { disabled: props.disabled } : {}),
+		...(props.policy !== undefined ? { policy: props.policy } : {}),
+	});
+}
+
+/**
+ * A button-shaped link that opens a URL; no handler. The label comes from
+ * the `label` prop or the children, like {@link button}.
+ */
+export function link(props: LinkProps, ...children: readonly TextChild[]): LinkNode {
+	return deepFreeze({
+		kind: NodeKind.link,
+		url: props.url,
+		label: controlLabel('link', props, children),
+		...(props.disabled !== undefined ? { disabled: props.disabled } : {}),
+	});
 }
 
 /** A select whose options are a static list. */
@@ -257,7 +351,21 @@ export function modal(props: ModalProps, ...children: readonly ModalChild[]): Mo
 	return deepFreeze({ kind: NodeKind.modal, ...props, children });
 }
 
-/** A modal text input. */
+/**
+ * A modal text input. The style rides the flags (`paragraph: true`);
+ * absent means short. The label is a plain prop.
+ */
 export function input(props: InputProps): InputNode {
-	return deepFreeze({ kind: NodeKind.input, ...props });
+	const style = styleFlag(INPUT_FLAG_STYLES, props);
+	return deepFreeze({
+		kind: NodeKind.input,
+		id: props.id,
+		label: props.label,
+		...(style !== undefined ? { style } : {}),
+		...(props.required !== undefined ? { required: props.required } : {}),
+		...(props.placeholder !== undefined ? { placeholder: props.placeholder } : {}),
+		...(props.value !== undefined ? { value: props.value } : {}),
+		...(props.minLength !== undefined ? { minLength: props.minLength } : {}),
+		...(props.maxLength !== undefined ? { maxLength: props.maxLength } : {}),
+	});
 }

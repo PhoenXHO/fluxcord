@@ -11,10 +11,10 @@ import { describe, expect, it } from 'vitest';
 // Aliased: the compiler auto-imports jsx/Fragment from the runtime for tags;
 // these bindings exist for the direct factory calls below.
 import { jsx as factory, Fragment as FragmentTag } from '../jsx-runtime.js';
-import { button, entitySelect, optionSelect, text, view } from '../builders.js';
+import { button, entitySelect, input, link, optionSelect, text, view } from '../builders.js';
 import { runtimeKit } from '../kit.js';
 import { validateTree } from '../validate.js';
-import { ButtonStyle, SelectEntity } from '../vocab.js';
+import { SelectEntity } from '../vocab.js';
 import type { ComponentResult } from '../jsx-runtime.js';
 import type { TextNode, TreeNode, ViewNode } from '../types.js';
 
@@ -39,8 +39,8 @@ describe('jsx elements', () => {
 	});
 
 	it('kit control attributes ride props straight into the builder - handlers included', () => {
-		const viaTsx = <runtimeKit.Button label="Go" style={ButtonStyle.Success} onClick={onClick} />;
-		const viaBuilders = button({ label: 'Go', style: ButtonStyle.Success, onClick });
+		const viaTsx = <runtimeKit.Button label="Go" success onClick={onClick} />;
+		const viaBuilders = button({ label: 'Go', success: true, onClick });
 
 		expect(viaTsx).toEqual(viaBuilders);
 		expect((viaTsx as { onClick: unknown }).onClick).toBe(onClick);
@@ -114,6 +114,39 @@ describe('kit controls', () => {
 	it('Select with both options and entity throws at construction', () => {
 		const options = [{ label: '1h', value: '1h' }];
 		expect(() => <runtimeKit.Select options={options} entity={SelectEntity.Users} onSelect={onClick} />).toThrow(/never both/);
+	});
+
+	it('Select takes no children - options ride the options prop', () => {
+		const options = [{ label: '1h', value: '1h' }];
+		const raw = factory as unknown as (type: unknown, props: unknown) => TreeNode;
+		expect(() => raw(runtimeKit.Select, { options, onSelect: onClick, children: text('junk') })).toThrow(/no children/);
+	});
+
+	it('Button folds its JSX children into the label', () => {
+		const viaTsx = <runtimeKit.Button onClick={onClick}>Go {2}</runtimeKit.Button>;
+		expect(viaTsx).toEqual(button({ onClick, label: 'Go 2' }));
+	});
+
+	it('Button label prop and children together throw', () => {
+		expect(() => <runtimeKit.Button label="Go" onClick={onClick}>Also</runtimeKit.Button>).toThrow(/never both/);
+	});
+});
+
+// --- Control intrinsics -----------------------------------------------------------------
+
+describe('jsx control surfaces', () => {
+	it('a link folds its children into the label', () => {
+		expect(<link url="https://torn.com">Site {1}</link>).toEqual(link({ url: 'https://torn.com' }, 'Site 1'));
+	});
+
+	it('an input resolves its style flags into the node', () => {
+		expect(<input id="f" label="L" />).toEqual(input({ id: 'f', label: 'L' }));
+		expect(<input id="f" label="L" paragraph />).toEqual({ kind: 'input', id: 'f', label: 'L', style: 'paragraph' });
+	});
+
+	it('an input takes no children', () => {
+		const raw = factory as unknown as (type: string, props: unknown) => TreeNode;
+		expect(() => raw('input', { id: 'f', label: 'L', children: [text('junk')] })).toThrow(/no children/);
 	});
 });
 

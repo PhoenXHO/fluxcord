@@ -38,7 +38,7 @@ export * from './render/v2.js'; // V2MessagePayload, V2ModalPayload, RenderError
 export * from './render/id-codec.js'; // isActionId, encodeActionId, decodeActionId
 
 // Tree vocabulary: node types, builders, kit, validation.
-export * from './tree/vocab.js'; // NodeKind, ButtonStyle, InputStyle, SelectEntity
+export * from './tree/vocab.js'; // NodeKind, ButtonStyle & InputStyle unions, SelectEntity
 export * from './tree/types.js'; // ViewNode, ButtonNode, ...
 export * from './tree/builders.js'; // view, text, row, button, ...
 export * from './tree/kit.js'; // ScreenKit, runtimeKit

@@ -14,7 +14,7 @@ import {
 } from '../builders.js';
 import { NodeKind, SelectEntity } from '../vocab.js';
 import { validateTree } from '../validate.js';
-import type { ContainerChild, ControlNode, ModalChild, SelectNode, TreeRoot, ViewChild } from '../types.js';
+import type { ButtonNode, ContainerChild, ControlNode, InputNode, ModalChild, SelectNode, TreeRoot, ViewChild } from '../types.js';
 
 /** Identity-bound fixture: the handler object itself is the binding. */
 const handler = (): void => {};
@@ -291,5 +291,19 @@ describe('validateTree - hr', () => {
 
 	it('rule 27: hr spacing must be small or large', () => {
 		expect(rulesOf(view({}, force<ViewChild>(hr({ spacing: 'huge' as never }))))).toContain(27);
+	});
+});
+
+describe('validateTree - control styles', () => {
+	it('rule 28: button style must be a known vocabulary value', () => {
+		const junk = force<ButtonNode>({ ...go(), style: 'neon' });
+		expect(rulesOf(view({}, row({}, junk)))).toContain(28);
+		expect(rulesOf(view({}, row({}, go())))).toEqual([]);
+	});
+
+	it('rule 29: input style must be short or paragraph', () => {
+		const junk = force<InputNode>({ ...note(), style: 'wide' });
+		expect(rulesOf(modal({ title: 'T' }, junk))).toContain(29);
+		expect(rulesOf(modal({ title: 'T' }, note()))).toEqual([]);
 	});
 });

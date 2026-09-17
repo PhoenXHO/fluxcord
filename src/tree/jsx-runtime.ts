@@ -145,7 +145,7 @@ export function jsx(tag: 'code', props: { readonly children?: unknown } | null):
 export function jsx(tag: 'codeblock', props: { readonly lang?: string; readonly children?: unknown } | null): TextNode;
 export function jsx(tag: 'row', props: RowProps & { readonly children?: unknown } | null): RowNode;
 export function jsx(tag: 'container', props: ContainerProps & { readonly children?: unknown } | null): ContainerNode;
-export function jsx(tag: 'link', props: LinkProps | null): LinkNode;
+export function jsx(tag: 'link', props: LinkProps & { readonly children?: unknown } | null): LinkNode;
 export function jsx(tag: 'modal', props: ModalProps & { readonly children?: unknown } | null): ModalNode;
 export function jsx(tag: 'input', props: InputProps | null): InputNode;
 export function jsx(tag: 'hr', props: HrTagProps | null): HrNode;
@@ -171,6 +171,12 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 		const body = flattenTextContent(children);
 		return type === 'code' ? code(body) : codeblock(body, (node as { readonly lang?: string }).lang);
 	}
+	if (type === 'link') {
+		// A link's label folds like the text-like tags': strings and numbers
+		// in children position are content, not nodes.
+		const { node, children } = splitRawChildren(props);
+		return link(node as LinkProps, ...(children as readonly TextChild[]));
+	}
 	const { node, children } = splitProps(props);
 	if (type === Fragment) {
 		return children;
@@ -182,11 +188,12 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 			return row(node as RowProps, ...children as readonly ControlNode[]);
 		case 'container':
 			return container(node as ContainerProps, ...children as readonly ContainerChild[]);
-		case 'link':
-			return link(node as LinkProps);
 		case 'modal':
 			return modal(node as ModalProps, ...children as readonly ModalChild[]);
 		case 'input':
+			if (children.length > 0) {
+				throw new Error('input takes no children; the label is a prop');
+			}
 			return input(node as InputProps);
 		case 'hr':
 			return hr(hrProps(node));
@@ -280,7 +287,7 @@ export namespace JSX {
 		info: { readonly children?: unknown };
 		row: RowProps & { readonly children?: unknown };
 		container: ContainerProps & { readonly children?: unknown };
-		link: LinkProps;
+		link: LinkProps & { readonly children?: unknown };
 		modal: ModalProps & { readonly children?: unknown };
 		input: InputProps;
 		hr: HrTagProps;

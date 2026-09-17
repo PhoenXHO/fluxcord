@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { button, container, entitySelect, hr, input, link, modal, optionSelect, row, text, view } from '../../tree/builders.js';
-import { ButtonStyle, InputStyle, SelectEntity } from '../../tree/vocab.js';
+import { SelectEntity } from '../../tree/vocab.js';
 import { actionHash } from '../action-hash.js';
 import { renderV2Message, renderV2Modal, RenderError } from '../v2.js';
 import type { V2MessagePayload, V2ModalPayload } from '../v2.js';
 import { materializeTree } from '../../commit/frame.js';
-import type { ControlNode, ModalNode, ViewNode } from '../../tree/types.js';
+import type { ButtonNode, ControlNode, InputNode, ModalNode, ViewNode } from '../../tree/types.js';
 
 /** Identity-bound fixture: the handler object itself is the binding. */
 const go = (): void => {};
@@ -62,16 +62,21 @@ describe('renderV2Message - button & link', () => {
 	});
 
 	it('maps every tree button style', () => {
-		for (const [style, wire] of [
-			[ButtonStyle.Primary, 1],
-			[ButtonStyle.Secondary, 2],
-			[ButtonStyle.Success, 3],
-			[ButtonStyle.Danger, 4],
+		for (const [flag, wire] of [
+			[{ primary: true }, 1],
+			[{ secondary: true }, 2],
+			[{ success: true }, 3],
+			[{ danger: true }, 4],
 		] as const) {
-			const payload = render(view({}, row({}, button({ onClick: go, label: 'Go', style }))));
+			const payload = render(view({}, row({}, button({ onClick: go, label: 'Go', ...flag }))));
 			expect(payload.components)
 				.toEqual([{ type: 1, components: [{ type: 2, style: wire, label: 'Go', custom_id: CUSTOM_ID }] }]);
 		}
+	});
+
+	it('loudly rejects a button style outside the vocabulary', () => {
+		const styled = force<ButtonNode>({ ...button({ onClick: go, label: 'Go' }), style: 'neon' });
+		expect(() => render(view({}, row({}, styled)))).toThrow(/unknown button style/);
 	});
 
 	it('marks a disabled button', () => {
@@ -169,6 +174,14 @@ describe('renderV2Message - select', () => {
 		const both = force<ControlNode>({ kind: 'select', onSelect: go, options: [{ label: 'A', value: 'a' }], entity: SelectEntity.Users });
 		expect(() => render(view({}, row({}, both)))).toThrow(RenderError);
 	});
+
+	it('marks a disabled select', () => {
+		const select = optionSelect({ onSelect: go, options: [{ label: 'A', value: 'a' }], disabled: true });
+		expect(render(view({}, row({}, select))).components).toEqual([{
+			type: 1,
+			components: [{ type: 3, custom_id: CUSTOM_ID, options: [{ label: 'A', value: 'a' }], disabled: true }],
+		}]);
+	});
 });
 
 describe('renderV2Message - container', () => {
@@ -239,11 +252,13 @@ describe('renderV2Modal', () => {
 		expect(payload.components[0]).toHaveProperty('component.required', true);
 	});
 
-	it('maps every tree input style', () => {
-		for (const [style, wire] of [[InputStyle.Short, 1], [InputStyle.Paragraph, 2]] as const) {
-			const payload = renderModal(modal({ title: 'T' }, input({ id: 'f', label: 'L', style })));
-			expect(payload.components[0]).toHaveProperty('component.style', wire);
-		}
+	it('maps every tree input style and rejects a bogus one', () => {
+		expect(renderModal(modal({ title: 'T' }, input({ id: 'f', label: 'L' }))).components[0])
+			.toHaveProperty('component.style', 1);
+		expect(renderModal(modal({ title: 'T' }, input({ id: 'f', label: 'L', paragraph: true }))).components[0])
+			.toHaveProperty('component.style', 2);
+		const junk = force<InputNode>({ ...input({ id: 'f', label: 'L' }), style: 'wide' });
+		expect(() => renderModal(modal({ title: 'T' }, junk))).toThrow(/unknown input style/);
 	});
 
 	it('spreads placeholder, prefill and length bounds onto the wire', () => {

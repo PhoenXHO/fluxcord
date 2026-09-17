@@ -158,6 +158,9 @@ export interface SelectNode {
 	 */
 	readonly maxSelected?: number;
 
+	/** Whether the select is greyed out and unclickable. */
+	readonly disabled?: boolean;
+
 	/** This control's own identity gate: same contract as ButtonNode.policy. */
 	readonly policy?: PermissionPolicy;
 }

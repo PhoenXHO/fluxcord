@@ -35,14 +35,12 @@ import type {
 	APISeparatorComponent,
 	APITextDisplayComponent,
 } from 'discord-api-types/v10';
-import {
+import { NodeKind, SelectEntity, SeparatorSpacing } from '../tree/vocab.js';
+import type {
 	ButtonStyle as TreeButtonStyle,
 	InputStyle as TreeInputStyle,
-	NodeKind,
-	SelectEntity,
-	SeparatorSpacing,
+	SeparatorSpacing as TreeSeparatorSpacing,
 } from '../tree/vocab.js';
-import type { SeparatorSpacing as TreeSeparatorSpacing } from '../tree/vocab.js';
 import type {
 	ButtonNode,
 	ContainerNode,
@@ -96,20 +94,21 @@ const MAX_COMPONENTS = 40;
 /** The platform caps one text display at 4000 characters. */
 const MAX_TEXT_CHARS = 4000;
 
+/** The platform button styles the vocabulary maps to (Link and Premium excluded, see below). */
+type WireButtonStyle = ButtonStyle.Primary | ButtonStyle.Secondary | ButtonStyle.Success | ButtonStyle.Danger;
+
 /** Tree button style -> platform button style number. Link and Premium are missing on purpose: a link is its own node (`LinkNode`, it carries a url instead of a handler), and premium buttons are not part of the vocabulary. */
-const BUTTON_STYLES: Record<TreeButtonStyle,
-	ButtonStyle.Primary | ButtonStyle.Secondary | ButtonStyle.Success | ButtonStyle.Danger
-> = {
-	[TreeButtonStyle.Primary]: ButtonStyle.Primary,
-	[TreeButtonStyle.Secondary]: ButtonStyle.Secondary,
-	[TreeButtonStyle.Success]: ButtonStyle.Success,
-	[TreeButtonStyle.Danger]: ButtonStyle.Danger,
+const BUTTON_STYLES: Record<TreeButtonStyle, WireButtonStyle> = {
+	primary: ButtonStyle.Primary,
+	secondary: ButtonStyle.Secondary,
+	success: ButtonStyle.Success,
+	danger: ButtonStyle.Danger,
 };
 
 /** Tree input style -> platform text input style number. */
 const INPUT_STYLES: Record<TreeInputStyle, TextInputStyle> = {
-	[TreeInputStyle.Short]: TextInputStyle.Short,
-	[TreeInputStyle.Paragraph]: TextInputStyle.Paragraph,
+	short: TextInputStyle.Short,
+	paragraph: TextInputStyle.Paragraph,
 };
 
 /** Tree hr spacing -> platform separator padding size. */
@@ -174,6 +173,28 @@ function stampedCustomId(control: ButtonNode | SelectNode, sessionId: string, sc
 	return encodeActionId({ sessionId, screenKey, actionHash: stampOf(control) });
 }
 
+/**
+ * Resolves a button node's wire style. A style outside the vocabulary
+ * means a cast slipped past validation, so this throws instead of
+ * shipping `style: undefined`.
+ */
+function buttonStyle(node: ButtonNode, path: string): WireButtonStyle {
+	const style = BUTTON_STYLES[node.style ?? 'primary'];
+	if (style === undefined) {
+		throw new RenderError(path, `unknown button style '${String(node.style)}'`);
+	}
+	return style;
+}
+
+/** The same gate for an input's style. */
+function inputStyle(node: InputNode, path: string): TextInputStyle {
+	const style = INPUT_STYLES[node.style ?? 'short'];
+	if (style === undefined) {
+		throw new RenderError(path, `unknown input style '${String(node.style)}'`);
+	}
+	return style;
+}
+
 /** Builds a select's core wire shape: options become a `StringSelect`, an entity becomes its platform select type. A select with neither, or with both, means validation rule 8 was dodged somewhere, so this throws rather than guess. */
 function selectBase(node: SelectNode, path: string, customId: string): APISelectMenuComponent {
 	if (node.options !== undefined && node.entity !== undefined) {
@@ -212,7 +233,7 @@ function renderControl(node: ControlNode, path: string, sessionId: string, scree
 		case NodeKind.button:
 			return {
 				type: ComponentType.Button,
-				style: BUTTON_STYLES[node.style ?? TreeButtonStyle.Primary],
+				style: buttonStyle(node, path),
 				label: node.label,
 				custom_id: stampedCustomId(node, sessionId, screenKey, stampOf),
 				...(node.disabled === true ? { disabled: true } : {}),
@@ -232,6 +253,7 @@ function renderControl(node: ControlNode, path: string, sessionId: string, scree
 				...(node.placeholder !== undefined ? { placeholder: node.placeholder } : {}),
 				...(node.minSelected !== undefined ? { min_values: node.minSelected } : {}),
 				...(node.maxSelected !== undefined ? { max_values: node.maxSelected } : {}),
+				...(node.disabled === true ? { disabled: true } : {}),
 			};
 		}
 		default:
@@ -337,13 +359,13 @@ export interface V2ModalPayload {
  * `false`: the platform's default is `true`, so staying silent would quietly
  * flip our optional default.
  */
-function renderInput(node: InputNode): APILabelComponent {
+function renderInput(node: InputNode, path: string): APILabelComponent {
 	return {
 		type: ComponentType.Label,
 		label: node.label,
 		component: {
 			type: ComponentType.TextInput,
-			style: INPUT_STYLES[node.style ?? TreeInputStyle.Short],
+			style: inputStyle(node, path),
 			custom_id: node.id,
 			required: node.required === true,
 			...(node.placeholder !== undefined ? { placeholder: node.placeholder } : {}),
@@ -372,7 +394,7 @@ export function renderV2Modal(root: ModalNode, customId: string): V2ModalPayload
 			const childPath = `modal/${kindOf(child)}[${index}]`;
 			switch (child.kind) {
 				case NodeKind.text: return renderText(child, childPath);
-				case NodeKind.input: return renderInput(child);
+				case NodeKind.input: return renderInput(child, childPath);
 				default: throw new RenderError(childPath, `modal child must be text or input, got '${kindOf(child)}'`);
 			}
 		}),

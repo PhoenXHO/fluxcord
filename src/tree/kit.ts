@@ -22,12 +22,16 @@
 
 import type { ActionHandler } from '../pipeline/types.js';
 import { button, entitySelect, optionSelect } from './builders.js';
-import type { ButtonNode, SelectNode } from './types.js';
+import type { ButtonNode, SelectNode, TextChild } from './types.js';
 import type { ButtonProps, EntitySelectProps, OptionSelectProps } from './builders.js';
 
-/** Button props with the handler slot narrowed to the flow's types. */
+/**
+ * Button props with the handler slot narrowed to the flow's types. The
+ * label rides the `label` prop or the JSX children (`<Button>Go</Button>`),
+ * exactly like the underlying builder.
+ */
 export type KitButtonProps<TData, TKeys extends string> = Omit<ButtonProps, 'onClick'>
-	& { readonly onClick: ActionHandler<TData, TKeys> };
+	& { readonly onClick: ActionHandler<TData, TKeys>; readonly children?: unknown };
 
 /**
  * Union of select props with the handler slot narrowed to the flow's types:
@@ -63,18 +67,32 @@ export interface ScreenKit<TData = unknown, TKeys extends string = string> {
 // into a compile error.
 
 /**
- * The erased kit the pipeline passes at draw time.
+ * The erased kit the pipeline passes at draw time. `Button` and `Select`
+ * are thin adapters over the global builders: components receive their
+ * JSX children inside the props object, so `Button` lifts them out into
+ * the builder's rest args before delegating.
  */
 export const runtimeKit: ScreenKit = {
-	Button: button,
+	Button: (props) => {
+		const { children, ...rest } = props as { readonly children?: unknown };
+		// JSX hands a single child through bare and multiple children as an
+		// array; either way the builder's rest args want a flat list.
+		const kids: readonly unknown[] = children === undefined || children === null
+			? []
+			: Array.isArray(children) ? children : [children];
+		return button(rest as ButtonProps, ...(kids as readonly TextChild[]));
+	},
 	Select: (props) => {
 		// The props union lets an author pass both `options` and `entity`:
 		// when an object literal is checked against a union, a property
 		// known to any member is accepted. The mistake is caught here, at
 		// construction, instead of waiting for validation at draw time.
-		const { options, entity } = props as { readonly options?: unknown; readonly entity?: unknown };
+		const { options, entity, children } = props as { readonly options?: unknown; readonly entity?: unknown; readonly children?: unknown };
 		if (options !== undefined && entity !== undefined) {
 			throw new Error('a select takes either options or entity, never both');
+		}
+		if (children !== undefined && children !== null) {
+			throw new Error('a select takes no children; options ride the options prop');
 		}
 		return entity !== undefined
 			? entitySelect(props as EntitySelectProps)

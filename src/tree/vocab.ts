@@ -22,21 +22,19 @@ export enum NodeKind {
 	hr = 'hr',
 }
 
-/** Button visual styles, mapped straight to Discord's. */
-export const ButtonStyle = {
-	Primary: 'primary',
-	Secondary: 'secondary',
-	Success: 'success',
-	Danger: 'danger',
-} as const;
-export type ButtonStyle = (typeof ButtonStyle)[keyof typeof ButtonStyle];
+/**
+ * Button visual styles, mapped straight to Discord's. Authors spell them
+ * through the builder's style flags (`<Button danger />`, absent =
+ * primary); this union is the vocabulary the nodes, validator and
+ * renderer share.
+ */
+export type ButtonStyle = 'primary' | 'secondary' | 'success' | 'danger';
 
-/** Text input styles: one line or paragraph. */
-export const InputStyle = {
-	Short: 'short',
-	Paragraph: 'paragraph',
-} as const;
-export type InputStyle = (typeof InputStyle)[keyof typeof InputStyle];
+/**
+ * Text input styles: one line or paragraph. Spelled through the input
+ * builder's style flags (`short` / `paragraph`, absent = short).
+ */
+export type InputStyle = 'short' | 'paragraph';
 
 /** Entity sources a select can draw its options from. */
 export const SelectEntity = {

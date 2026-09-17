@@ -41,6 +41,10 @@ export interface Violation {
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set(Object.values(NodeKind));
 
+/** Vocabulary echoes for the style fields a cast can corrupt (rules 28/29). */
+const KNOWN_BUTTON_STYLES: ReadonlySet<string> = new Set(['primary', 'secondary', 'success', 'danger']);
+const KNOWN_INPUT_STYLES: ReadonlySet<string> = new Set(['short', 'paragraph']);
+
 /**
  * Escape-hatch read of a node's kind for violation messages. Well-typed
  * trees never need this. It exists because the impossible branches
@@ -239,13 +243,20 @@ function validateModal(node: ModalNode, path: string, violations: Violation[]): 
 	});
 }
 
-/** A button's label is 1-80 chars. */
+/** A button's label is 1-80 chars and its style, when set, is a known vocabulary value. */
 function validateButton(node: ButtonNode, path: string, violations: Violation[]): void {
 	if (node.label.length === 0 || node.label.length > 80) {
 		violations.push({
 			path,
 			rule: 15,
 			message: `button label must be 1-80 chars, got ${node.label.length}`,
+		});
+	}
+	if (node.style !== undefined && !KNOWN_BUTTON_STYLES.has(node.style)) {
+		violations.push({
+			path,
+			rule: 28,
+			message: `button style must be 'primary', 'secondary', 'success' or 'danger', got '${node.style}'`,
 		});
 	}
 }
@@ -458,6 +469,13 @@ function validateInput(node: InputNode, path: string, violations: Violation[]): 
 			path,
 			rule: 17,
 			message: `input placeholder max 100 chars, got ${node.placeholder.length}`,
+		});
+	}
+	if (node.style !== undefined && !KNOWN_INPUT_STYLES.has(node.style)) {
+		violations.push({
+			path,
+			rule: 29,
+			message: `input style must be 'short' or 'paragraph', got '${node.style}'`,
 		});
 	}
 	for (const bound of ['minLength', 'maxLength'] as const) {
