@@ -66,7 +66,9 @@ export function materializeTree(tree: ViewNode): MaterializedTree {
 		for (const control of row.children) {
 			if (control.kind === NodeKind.button) {
 				stamp(control.onClick, control, control.label);
-			} else if (control.kind === NodeKind.select) {
+			} else if (control.kind === NodeKind.select && control.onSelect !== undefined) {
+				// onSelect is optional on the node for the modal context; rule 31
+				// (and the renderer's own loud gate) rejects it in messages.
 				stamp(control.onSelect, control, control.placeholder ?? 'select');
 			}
 		}

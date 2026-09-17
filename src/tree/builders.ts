@@ -14,6 +14,8 @@ import { NodeKind } from './vocab.js';
 import type { ButtonStyle, InputStyle, SelectEntity } from './vocab.js';
 import type {
 	ButtonNode,
+	CheckboxGroupNode,
+	CheckboxNode,
 	ContainerChild,
 	ContainerNode,
 	ControlNode,
@@ -22,6 +24,7 @@ import type {
 	LinkNode,
 	ModalChild,
 	ModalNode,
+	RadioGroupNode,
 	RowNode,
 	SelectNode,
 	SelectOption,
@@ -64,6 +67,14 @@ export type ButtonProps = Omit<ButtonNode, 'kind' | 'style' | 'label'> & ButtonS
 export type LinkProps = Omit<LinkNode, 'kind' | 'label'> & { readonly label?: string };
 export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity' | 'defaultIds'> & { readonly options: readonly SelectOption[] };
 export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options'> & { readonly entity: SelectEntity };
+/**
+ * The modal-select tag's props: a select as a modal form field, handler
+ * off the surface. Options XOR entity is a runtime throw here (the flat
+ * type cannot spell the exclusion).
+ */
+export type ModalSelectProps = Omit<SelectNode, 'kind' | 'onSelect'>;
+/** Option props: the label rides the `label` prop or the children. */
+export type OptionProps = Omit<SelectOption, 'label'> & { readonly label?: string };
 export type ModalProps = Omit<ModalNode, 'kind' | 'children'>;
 /**
  * The input's style flags: `short` (the default) or `paragraph`. At most
@@ -75,6 +86,9 @@ export type InputStyleFlags = {
 };
 /** Input props: the label is a plain prop, the style rides the flags. */
 export type InputProps = Omit<InputNode, 'kind' | 'style'> & InputStyleFlags;
+export type CheckboxProps = Omit<CheckboxNode, 'kind'>;
+export type CheckboxGroupProps = Omit<CheckboxGroupNode, 'kind'>;
+export type RadioGroupProps = Omit<RadioGroupNode, 'kind'>;
 
 // --- Freeze ----------------------------------------------------------------------
 
@@ -260,7 +274,7 @@ export function hr(props: HrProps = {}): HrNode {
  * Resolves a control's label: the `label` prop XOR the folded children.
  * Both or neither is an author mistake, thrown here at the build site.
  */
-function controlLabel(kind: 'button' | 'link', props: { readonly label?: string }, children: readonly TextChild[]): string {
+function controlLabel(kind: 'button' | 'link' | 'option', props: { readonly label?: string }, children: readonly TextChild[]): string {
 	if (props.label !== undefined && children.length > 0) {
 		throw new Error(`${kind} takes a label prop or children, never both`);
 	}
@@ -363,9 +377,44 @@ export function input(props: InputProps): InputNode {
 		label: props.label,
 		...(style !== undefined ? { style } : {}),
 		...(props.required !== undefined ? { required: props.required } : {}),
+		...(props.description !== undefined ? { description: props.description } : {}),
 		...(props.placeholder !== undefined ? { placeholder: props.placeholder } : {}),
 		...(props.value !== undefined ? { value: props.value } : {}),
 		...(props.minLength !== undefined ? { minLength: props.minLength } : {}),
 		...(props.maxLength !== undefined ? { maxLength: props.maxLength } : {}),
+	});
+}
+
+/**
+ * A modal checkbox: one yes/no box. `required` renders as a one-option
+ * checkbox group on the wire, because the platform cannot require a bare
+ * checkbox; the author surface stays one tag either way.
+ */
+export function checkbox(props: CheckboxProps): CheckboxNode {
+	return deepFreeze({ kind: NodeKind.checkbox, ...props });
+}
+
+/** A modal multi-pick checkbox group; one to ten options. */
+export function checkboxGroup(props: CheckboxGroupProps): CheckboxGroupNode {
+	return deepFreeze({ kind: NodeKind.checkboxGroup, ...props });
+}
+
+/** A modal single-choice radio group; two to ten options. */
+export function radioGroup(props: RadioGroupProps): RadioGroupNode {
+	return deepFreeze({ kind: NodeKind.radioGroup, ...props });
+}
+
+/**
+ * One option of a select or a modal checkbox/radio group. The label comes
+ * from the `label` prop or the children, never both; `value` identifies
+ * the pick, and `description` and `default` ride props. The tag form is
+ * `<option value="1h">1 hour</option>`.
+ */
+export function option(props: OptionProps, ...children: readonly TextChild[]): SelectOption {
+	return deepFreeze({
+		value: props.value,
+		label: controlLabel('option', props, children),
+		...(props.description !== undefined ? { description: props.description } : {}),
+		...(props.default !== undefined ? { default: props.default } : {}),
 	});
 }

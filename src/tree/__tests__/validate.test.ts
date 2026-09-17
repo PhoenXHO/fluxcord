@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	button,
+	checkbox,
+	checkboxGroup,
 	container,
 	entitySelect,
 	hr,
@@ -8,6 +10,7 @@ import {
 	link,
 	modal,
 	optionSelect,
+	radioGroup,
 	row,
 	text,
 	view,
@@ -305,5 +308,135 @@ describe('validateTree - control styles', () => {
 		const junk = force<InputNode>({ ...note(), style: 'wide' });
 		expect(rulesOf(modal({ title: 'T' }, junk))).toContain(29);
 		expect(rulesOf(modal({ title: 'T' }, note()))).toEqual([]);
+	});
+});
+
+describe('validateTree - modal form controls', () => {
+	const modalSelect = (): ReturnType<typeof optionSelect> =>
+		optionSelect({ id: 'p', label: 'Pick', options: [{ label: 'A', value: 'a' }] });
+
+	it('rule 30: a modal select needs an id', () => {
+		const tree = modal({ title: 'T' }, optionSelect({ label: 'Pick', options: [{ label: 'A', value: 'a' }] }));
+		expect(rulesOf(tree)).toEqual([30]);
+	});
+
+	it('rule 30: a modal select needs a label', () => {
+		const tree = modal({ title: 'T' }, optionSelect({ id: 'p', options: [{ label: 'A', value: 'a' }] }));
+		expect(rulesOf(tree)).toEqual([30]);
+	});
+
+	it('rule 30: modal select id and label bounds', () => {
+		expect(rulesOf(modal({ title: 'T' }, optionSelect({
+			id: 'x'.repeat(101),
+			label: 'Pick',
+			options: [{ label: 'A', value: 'a' }],
+		})))).toEqual([30]);
+		expect(rulesOf(modal({ title: 'T' }, optionSelect({
+			id: 'p',
+			label: 'x'.repeat(46),
+			options: [{ label: 'A', value: 'a' }],
+		})))).toEqual([30]);
+	});
+
+	it('rule 30: a modal select cannot be disabled', () => {
+		const tree = modal({ title: 'T' }, optionSelect({
+			id: 'p',
+			label: 'Pick',
+			options: [{ label: 'A', value: 'a' }],
+			disabled: false,
+		}));
+		expect(rulesOf(tree)).toEqual([30]);
+	});
+
+	it('rule 30: a required modal select needs minSelected >= 1', () => {
+		const tree = modal({ title: 'T' }, optionSelect({
+			id: 'p',
+			label: 'Pick',
+			options: [{ label: 'A', value: 'a' }],
+			minSelected: 0,
+		}));
+		expect(rulesOf(tree)).toEqual([30]);
+	});
+
+	it('rule 30: a fully legal modal select is clean', () => {
+		expect(rulesOf(modal({ title: 'T' }, modalSelect()))).toEqual([]);
+	});
+
+	it('rule 31: a message select needs a handler', () => {
+		const tree = view({}, row({}, optionSelect({ options: [{ label: 'A', value: 'a' }] })));
+		expect(rulesOf(tree)).toEqual([31]);
+	});
+
+	it('rule 31: modal-only fields on a message select', () => {
+		const labeled = { ...modalSelect(), onSelect: handler };
+		expect(rulesOf(view({}, row({}, labeled)))).toEqual([31]);
+	});
+
+	it('rule 31: a handled message select stays clean', () => {
+		expect(rulesOf(view({}, row({}, pick())))).toEqual([]);
+	});
+
+	it('rule 32: input and checkbox descriptions max 100 chars', () => {
+		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', description: 'x'.repeat(101) })))).toContain(32);
+		expect(rulesOf(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T', description: 'x'.repeat(101) })))).toContain(32);
+	});
+
+	it('rule 33: checkbox label 1-45 chars and id 1-100 chars', () => {
+		expect(rulesOf(modal({ title: 'T' }, checkbox({ id: 'c', label: 'x'.repeat(46) })))).toEqual([33]);
+		expect(rulesOf(modal({ title: 'T' }, checkbox({ id: '', label: 'T' })))).toEqual([33]);
+	});
+
+	it('rule 34: checkbox group option count and bounds', () => {
+		const options = Array.from({ length: 11 }, (_, i) => ({ label: `O${i}`, value: `${i}` }));
+		expect(rulesOf(modal({ title: 'T' }, checkboxGroup({ id: 'g', label: 'G', options })))).toEqual([34]);
+		expect(rulesOf(modal({ title: 'T' }, checkboxGroup({
+			id: 'g',
+			label: 'G',
+			options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }, { label: 'C', value: 'c' }],
+			minSelected: 2,
+			maxSelected: 1,
+		})))).toEqual([34]);
+	});
+
+	it('rule 35: radio group takes 2-10 options, at most one preselected', () => {
+		expect(rulesOf(modal({ title: 'T' }, radioGroup({ id: 'r', label: 'R', options: [{ label: 'A', value: 'a' }] })))).toEqual([35]);
+		expect(rulesOf(modal({ title: 'T' }, radioGroup({
+			id: 'r',
+			label: 'R',
+			options: [
+				{ label: 'A', value: 'a', default: true },
+				{ label: 'B', value: 'b', default: true },
+			],
+		})))).toEqual([35]);
+		expect(rulesOf(modal({ title: 'T' }, radioGroup({
+			id: 'r',
+			label: 'R',
+			options: [
+				{ label: 'A', value: 'a', default: true },
+				{ label: 'B', value: 'b' },
+			],
+		})))).toEqual([]);
+	});
+
+	it('rule 6: select and checkbox are legal modal children; a button is not', () => {
+		expect(rulesOf(modal({ title: 'T' }, note(), modalSelect(), checkbox({ id: 'c', label: 'T' })))).toEqual([]);
+		expect(rulesOf(modal({ title: 'T' }, force<ModalChild>(go())))).toEqual([6]);
+	});
+
+	it('rule 25: field ids are unique across kinds within the modal', () => {
+		const dup = modal({ title: 'T' }, input({ id: 'same', label: 'A' }), checkbox({ id: 'same', label: 'B' }));
+		expect(rulesOf(dup).filter((r) => r === 25)).toHaveLength(1);
+	});
+
+	it('a modal of every field kind validates clean', () => {
+		expect(rulesOf(modal(
+			{ title: 'T' },
+			note(),
+			modalSelect(),
+			checkbox({ id: 'c', label: 'T' }),
+			checkboxGroup({ id: 'g', label: 'G', options: [{ label: 'A', value: 'a' }] }),
+			radioGroup({ id: 'r', label: 'R', options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }] }),
+		))).toEqual([]);
+		expect(rulesOf(modal({ title: 'T' }, text('terms...')))).toEqual([]);
 	});
 });

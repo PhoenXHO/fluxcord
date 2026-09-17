@@ -17,13 +17,17 @@
 import { NodeKind, SeparatorSpacing } from './vocab.js';
 import type {
 	ButtonNode,
+	CheckboxGroupNode,
+	CheckboxNode,
 	ContainerNode,
 	HrNode,
 	InputNode,
 	LinkNode,
 	ModalNode,
+	RadioGroupNode,
 	RowNode,
 	SelectNode,
+	SelectOption,
 	TreeNode,
 	TreeRoot,
 	ViewNode,
@@ -78,7 +82,7 @@ export function validateTree(root: TreeRoot): Violation[] {
 /**
  * Dispatches each node to its kind's checks; unknown kinds are reported.
  */
-function validateNode(node: TreeNode, path: string, violations: Violation[]): void {
+function validateNode(node: TreeNode, path: string, violations: Violation[], inModal = false): void {
 	switch (node.kind) {
 		case NodeKind.view: validateView(node, path, violations); break;
 		case NodeKind.text: break; // no value rules of its own; text caps are renderer limits
@@ -86,9 +90,12 @@ function validateNode(node: TreeNode, path: string, violations: Violation[]): vo
 		case NodeKind.container: validateContainer(node, path, violations); break;
 		case NodeKind.button: validateButton(node, path, violations); break;
 		case NodeKind.link: validateLink(node, path, violations); break;
-		case NodeKind.select: validateSelect(node, path, violations); break;
+		case NodeKind.select: validateSelect(node, path, violations, inModal); break;
 		case NodeKind.modal: validateModal(node, path, violations); break;
 		case NodeKind.input: validateInput(node, path, violations); break;
+		case NodeKind.checkbox: validateCheckbox(node, path, violations); break;
+		case NodeKind.checkboxGroup: validateCheckboxGroup(node, path, violations); break;
+		case NodeKind.radioGroup: validateRadioGroup(node, path, violations); break;
 		case NodeKind.hr: validateHr(node, path, violations); break;
 		default: {
 			// Exhaustive check: adding a kind to NodeKind without a case here
@@ -199,7 +206,8 @@ function validateRow(node: RowNode, path: string, violations: Violation[]): void
 
 /**
  * A modal's title is 1-45 chars, it holds at most 5 children, children
- * are inputs or text only, and input ids are unique within the modal.
+ * are form fields (input, select, checkbox, checkbox-group, radio-group)
+ * or text only, and field ids are unique within the modal.
  */
 function validateModal(node: ModalNode, path: string, violations: Violation[]): void {
 	if (node.title.length === 0 || node.title.length > 45) {
@@ -216,29 +224,33 @@ function validateModal(node: ModalNode, path: string, violations: Violation[]): 
 			message: `modal allows at most 5 children, got ${node.children.length}`,
 		});
 	}
-	const seenInputIds = new Set<string>();
+	const seenFieldIds = new Set<string>();
+	const FIELD_KINDS: ReadonlySet<NodeKind> = new Set([NodeKind.input, NodeKind.select, NodeKind.checkbox, NodeKind.checkboxGroup, NodeKind.radioGroup]);
 	node.children.forEach((child, index) => {
 		const childPath = `${path}/${kindOf(child)}[${index}]`;
 		if (!KNOWN_KINDS.has(child.kind)) {
 			violations.push({ path: childPath, rule: 9, message: `unknown node kind '${kindOf(child)}'` });
-		} else if (child.kind !== NodeKind.input && child.kind !== NodeKind.text) {
+		} else if (!FIELD_KINDS.has(child.kind) && child.kind !== NodeKind.text) {
 			violations.push({
 				path: childPath,
 				rule: 6,
-				message: `modal child must be input or text, got '${kindOf(child)}'`,
+				message: `modal child must be a field (input, select, checkbox, checkbox-group, radio-group) or text, got '${kindOf(child)}'`,
 			});
 		} else {
-			if (child.kind === NodeKind.input) {
-				if (seenInputIds.has(child.id)) {
-					violations.push({
-						path: childPath,
-						rule: 25,
-						message: `duplicate input id '${child.id}'`,
-					});
+			if (FIELD_KINDS.has(child.kind)) {
+				const id = (child as unknown as { id?: string }).id;
+				if (id !== undefined) {
+					if (seenFieldIds.has(id)) {
+						violations.push({
+							path: childPath,
+							rule: 25,
+							message: `duplicate field id '${id}'`,
+						});
+					}
+					seenFieldIds.add(id);
 				}
-				seenInputIds.add(child.id);
 			}
-			validateNode(child, childPath, violations);
+			validateNode(child, childPath, violations, true);
 		}
 	});
 }
@@ -311,8 +323,13 @@ function validateHr(node: HrNode, path: string, violations: Violation[]): void {
  * labels and values of at most 100 chars each. Preselected options
  * (`default: true`) and entity preselections (`defaultIds`) must fit
  * the selection cap; `defaultIds` belongs to entity selects only.
+ *
+ * The context rules split the two lives of the node: in a modal it is a
+ * form field and needs its `id` and `label` (rule 30); in a message it
+ * is a control and needs its handler, with the modal-only fields absent
+ * (rule 31).
  */
-function validateSelect(node: SelectNode, path: string, violations: Violation[]): void {
+function validateSelect(node: SelectNode, path: string, violations: Violation[], inModal: boolean): void {
 	const hasOptions = node.options !== undefined;
 	const hasEntity = node.entity !== undefined;
 	if (hasOptions === hasEntity) {
@@ -323,6 +340,43 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[])
 				? 'select must not set both options and entity'
 				: 'select must set exactly one of options or entity',
 		});
+	}
+	if (inModal) {
+		// Rule 30: a modal select is a form field. The Label needs its
+		// heading, the submission reads its value under the id, and the
+		// wire has no disabled state there.
+		if (node.id === undefined) {
+			violations.push({ path, rule: 30, message: 'modal select needs an id' });
+		} else if (node.id.length === 0 || node.id.length > 100) {
+			violations.push({ path, rule: 30, message: `modal select id must be 1-100 chars, got ${node.id.length}` });
+		}
+		if (node.label === undefined) {
+			violations.push({ path, rule: 30, message: 'modal select needs a label' });
+		} else if (node.label.length === 0 || node.label.length > 45) {
+			violations.push({ path, rule: 30, message: `modal select label must be 1-45 chars, got ${node.label.length}` });
+		}
+		if (node.disabled !== undefined) {
+			violations.push({ path, rule: 30, message: 'a modal select cannot be disabled' });
+		}
+		if (node.required !== false && node.minSelected === 0) {
+			violations.push({ path, rule: 30, message: 'a required modal select needs minSelected >= 1' });
+		}
+	} else {
+		// Rule 31: a message select routes through its handler, and the
+		// Label-bound fields only exist in modals.
+		if (node.onSelect === undefined) {
+			violations.push({ path, rule: 31, message: 'a message select needs a handler' });
+		}
+		const modalOnly: string[] = [];
+		if (node.label !== undefined) modalOnly.push('label');
+		if (node.id !== undefined) modalOnly.push('id');
+		if (modalOnly.length > 0) {
+			violations.push({
+				path,
+				rule: 31,
+				message: `modal-only field '${modalOnly.join("', '")}' on a message select`,
+			});
+		}
 	}
 	if (node.placeholder !== undefined && node.placeholder.length > 150) {
 		violations.push({
@@ -401,53 +455,62 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[])
 				message: `select preselects ${defaults} options, more than the selection cap (${cap})`,
 			});
 		}
-		const seen = new Set<string>();
-		options.forEach((option, index) => {
-			const optionPath = `${path}/option[${index}]`;
-			if (option.label.length === 0) {
-				violations.push({ path: optionPath, rule: 11, message: 'option label must not be empty' });
-			}
-			if (option.value.length === 0) {
-				violations.push({ path: optionPath, rule: 11, message: 'option value must not be empty' });
-			}
-			if (seen.has(option.value)) {
-				violations.push({
-					path: optionPath,
-					rule: 11,
-					message: `duplicate option value '${option.value}'`,
-				});
-			}
-			seen.add(option.value);
-			if (option.label.length > 100) {
-				violations.push({
-					path: optionPath,
-					rule: 16,
-					message: `option label max 100 chars, got ${option.label.length}`,
-				});
-			}
-			if (option.value.length > 100) {
-				violations.push({
-					path: optionPath,
-					rule: 16,
-					message: `option value max 100 chars, got ${option.value.length}`,
-				});
-			}
-			if (option.description !== undefined && option.description.length > 100) {
-				violations.push({
-					path: optionPath,
-					rule: 16,
-					message: `option description max 100 chars, got ${option.description.length}`,
-				});
-			}
-		});
+		checkOptionEntries(options, path, violations);
 	}
 }
 
 /**
+ * The per-option checks shared by selects and the modal groups: labels
+ * and values are non-empty (rule 11), values unique (rule 11), and every
+ * string within the platform's 100-char caps (rule 16).
+ */
+function checkOptionEntries(options: readonly SelectOption[], path: string, violations: Violation[]): void {
+	const seen = new Set<string>();
+	options.forEach((option, index) => {
+		const optionPath = `${path}/option[${index}]`;
+		if (option.label.length === 0) {
+			violations.push({ path: optionPath, rule: 11, message: 'option label must not be empty' });
+		}
+		if (option.value.length === 0) {
+			violations.push({ path: optionPath, rule: 11, message: 'option value must not be empty' });
+		}
+		if (seen.has(option.value)) {
+			violations.push({
+				path: optionPath,
+				rule: 11,
+				message: `duplicate option value '${option.value}'`,
+			});
+		}
+		seen.add(option.value);
+		if (option.label.length > 100) {
+			violations.push({
+				path: optionPath,
+				rule: 16,
+				message: `option label max 100 chars, got ${option.label.length}`,
+			});
+		}
+		if (option.value.length > 100) {
+			violations.push({
+				path: optionPath,
+				rule: 16,
+				message: `option value max 100 chars, got ${option.value.length}`,
+			});
+		}
+		if (option.description !== undefined && option.description.length > 100) {
+			violations.push({
+				path: optionPath,
+				rule: 16,
+				message: `option description max 100 chars, got ${option.description.length}`,
+			});
+		}
+	});
+}
+
+/**
  * An input's id is 1-100 chars (it becomes the platform `custom_id`),
- * its label 1-45 chars, its placeholder at most 100 chars, its
- * `minLength`/`maxLength` sit in 0-4000 with min not above max, and
- * a prefill value is at most 4000 chars.
+ * its label 1-45 chars, its placeholder and description at most 100
+ * chars, its `minLength`/`maxLength` sit in 0-4000 with min not above
+ * max, and a prefill value is at most 4000 chars.
  */
 function validateInput(node: InputNode, path: string, violations: Violation[]): void {
 	if (node.id.length === 0 || node.id.length > 100) {
@@ -462,6 +525,13 @@ function validateInput(node: InputNode, path: string, violations: Violation[]): 
 			path,
 			rule: 18,
 			message: `input label must be 1-45 chars, got ${node.label.length}`,
+		});
+	}
+	if (node.description !== undefined && node.description.length > 100) {
+		violations.push({
+			path,
+			rule: 32,
+			message: `input description max 100 chars, got ${node.description.length}`,
 		});
 	}
 	if (node.placeholder !== undefined && node.placeholder.length > 100) {
@@ -501,5 +571,106 @@ function validateInput(node: InputNode, path: string, violations: Violation[]): 
 			rule: 14,
 			message: `input value (prefill) max 4000 chars, got ${node.value.length}`,
 		});
+	}
+}
+
+/**
+ * A checkbox's label is 1-45 chars (the wrapping Label's heading), its
+ * id 1-100 chars (the wire `custom_id`), and its description at most
+ * 100 chars.
+ */
+function validateCheckbox(node: CheckboxNode, path: string, violations: Violation[]): void {
+	if (node.label.length === 0 || node.label.length > 45) {
+		violations.push({ path, rule: 33, message: `checkbox label must be 1-45 chars, got ${node.label.length}` });
+	}
+	if (node.id.length === 0 || node.id.length > 100) {
+		violations.push({ path, rule: 33, message: `checkbox id must be 1-100 chars, got ${node.id.length}` });
+	}
+	if (node.description !== undefined && node.description.length > 100) {
+		violations.push({ path, rule: 32, message: `checkbox description max 100 chars, got ${node.description.length}` });
+	}
+}
+
+/**
+ * A checkbox group shares the checkbox's string bounds (rules 33/32),
+ * takes one to ten options with `minSelected` in 0-10 and `maxSelected`
+ * in 1-10, neither above the other nor above the option count (rule 34),
+ * and reuses the select's per-option checks.
+ */
+function validateCheckboxGroup(node: CheckboxGroupNode, path: string, violations: Violation[]): void {
+	if (node.label.length === 0 || node.label.length > 45) {
+		violations.push({ path, rule: 33, message: `checkbox group label must be 1-45 chars, got ${node.label.length}` });
+	}
+	if (node.id.length === 0 || node.id.length > 100) {
+		violations.push({ path, rule: 33, message: `checkbox group id must be 1-100 chars, got ${node.id.length}` });
+	}
+	if (node.description !== undefined && node.description.length > 100) {
+		violations.push({ path, rule: 32, message: `checkbox group description max 100 chars, got ${node.description.length}` });
+	}
+	const count = node.options?.length ?? 0;
+	if (count < 1 || count > 10) {
+		violations.push({ path, rule: 34, message: `checkbox group allows 1-10 options, got ${count}` });
+	}
+	if (node.minSelected !== undefined && (node.minSelected < 0 || node.minSelected > 10)) {
+		violations.push({ path, rule: 34, message: `checkbox group minSelected must be in 0-10, got ${node.minSelected}` });
+	}
+	if (node.maxSelected !== undefined && (node.maxSelected < 1 || node.maxSelected > 10)) {
+		violations.push({ path, rule: 34, message: `checkbox group maxSelected must be in 1-10, got ${node.maxSelected}` });
+	}
+	if (node.minSelected !== undefined && node.maxSelected !== undefined && node.minSelected > node.maxSelected) {
+		violations.push({
+			path,
+			rule: 34,
+			message: `checkbox group minSelected (${node.minSelected}) must not exceed maxSelected (${node.maxSelected})`,
+		});
+	}
+	if (node.options) {
+		if (node.minSelected !== undefined && node.minSelected > node.options.length) {
+			violations.push({
+				path,
+				rule: 34,
+				message: `checkbox group minSelected (${node.minSelected}) exceeds option count (${node.options.length})`,
+			});
+		}
+		if (node.maxSelected !== undefined && node.maxSelected > node.options.length) {
+			violations.push({
+				path,
+				rule: 34,
+				message: `checkbox group maxSelected (${node.maxSelected}) exceeds option count (${node.options.length})`,
+			});
+		}
+		checkOptionEntries(node.options, path, violations);
+	}
+}
+
+/**
+ * A radio group shares the checkbox's string bounds (rules 33/32), takes
+ * two to ten options (rule 35), at most one of them preselected (rule 35),
+ * and reuses the select's per-option checks.
+ */
+function validateRadioGroup(node: RadioGroupNode, path: string, violations: Violation[]): void {
+	if (node.label.length === 0 || node.label.length > 45) {
+		violations.push({ path, rule: 33, message: `radio group label must be 1-45 chars, got ${node.label.length}` });
+	}
+	if (node.id.length === 0 || node.id.length > 100) {
+		violations.push({ path, rule: 33, message: `radio group id must be 1-100 chars, got ${node.id.length}` });
+	}
+	if (node.description !== undefined && node.description.length > 100) {
+		violations.push({ path, rule: 32, message: `radio group description max 100 chars, got ${node.description.length}` });
+	}
+	const count = node.options?.length ?? 0;
+	if (count < 2 || count > 10) {
+		violations.push({ path, rule: 35, message: `radio group allows 2-10 options, got ${count}` });
+	}
+	if (node.options) {
+		const defaults = node.options.filter((option) => option.default === true).length;
+		if (defaults > 1) {
+			violations.push({
+				path,
+				rule: 35,
+				message: `radio group allows at most one preselected option, got ${defaults}`,
+			});
+		}
+		checkOptionEntries(node.options, path, violations);
 	}
 }

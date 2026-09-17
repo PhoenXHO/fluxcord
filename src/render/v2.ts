@@ -26,12 +26,15 @@ import {
 import type {
 	APIActionRowComponent,
 	APIButtonComponent,
+	APICheckboxComponent,
+	APIComponentInLabel,
 	APIComponentInMessageActionRow,
 	APIContainerComponent,
 	APILabelComponent,
 	APIMessageTopLevelComponent,
 	APIModalInteractionResponseCallbackComponent,
 	APISelectMenuComponent,
+	APISelectMenuOption,
 	APISeparatorComponent,
 	APITextDisplayComponent,
 } from 'discord-api-types/v10';
@@ -43,13 +46,17 @@ import type {
 } from '../tree/vocab.js';
 import type {
 	ButtonNode,
+	CheckboxGroupNode,
+	CheckboxNode,
 	ContainerNode,
 	ControlNode,
 	HrNode,
 	InputNode,
 	ModalNode,
+	RadioGroupNode,
 	RowNode,
 	SelectNode,
+	SelectOption,
 	TextNode,
 	ViewNode,
 } from '../tree/types.js';
@@ -195,6 +202,16 @@ function inputStyle(node: InputNode, path: string): TextInputStyle {
 	return style;
 }
 
+/** One option's wire shape, shared by string selects, checkbox groups and radio groups: label, value, optional description and preselection. */
+function wireOption(option: SelectOption): APISelectMenuOption {
+	return {
+		label: option.label,
+		value: option.value,
+		...(option.description !== undefined ? { description: option.description } : {}),
+		...(option.default === true ? { default: true } : {}),
+	};
+}
+
 /** Builds a select's core wire shape: options become a `StringSelect`, an entity becomes its platform select type. A select with neither, or with both, means validation rule 8 was dodged somewhere, so this throws rather than guess. */
 function selectBase(node: SelectNode, path: string, customId: string): APISelectMenuComponent {
 	if (node.options !== undefined && node.entity !== undefined) {
@@ -205,12 +222,7 @@ function selectBase(node: SelectNode, path: string, customId: string): APISelect
 		return {
 			type: ComponentType.StringSelect,
 			custom_id: customId,
-			options: node.options.map((option) => ({
-				label: option.label,
-				value: option.value,
-				...(option.description !== undefined ? { description: option.description } : {}),
-				...(option.default === true ? { default: true } : {}),
-			})),
+			options: node.options.map(wireOption),
 		};
 	}
 	if (node.entity !== undefined) {
@@ -247,6 +259,10 @@ function renderControl(node: ControlNode, path: string, sessionId: string, scree
 				...(node.disabled === true ? { disabled: true } : {}),
 			} satisfies APIButtonComponent;
 		case NodeKind.select: {
+			if (node.onSelect === undefined) {
+				// rule 31 has slipped through; the stamp needs a handler to hash
+				throw new RenderError(path, 'a message select needs a handler');
+			}
 			const select = selectBase(node, path, stampedCustomId(node, sessionId, screenKey, stampOf));
 			return {
 				...select,
@@ -363,6 +379,7 @@ function renderInput(node: InputNode, path: string): APILabelComponent {
 	return {
 		type: ComponentType.Label,
 		label: node.label,
+		...(node.description !== undefined ? { description: node.description } : {}),
 		component: {
 			type: ComponentType.TextInput,
 			style: inputStyle(node, path),
@@ -372,6 +389,96 @@ function renderInput(node: InputNode, path: string): APILabelComponent {
 			...(node.value !== undefined ? { value: node.value } : {}),
 			...(node.minLength !== undefined ? { min_length: node.minLength } : {}),
 			...(node.maxLength !== undefined ? { max_length: node.maxLength } : {}),
+		},
+	};
+}
+
+/**
+ * Renders a modal select as a Label wrapping its select payload. The
+ * ActionRow wrapper, the disabled state and the handler are message-context
+ * ideas: a modal select is a form field read from the submission, so
+ * `required` rides along always-explicit instead (the platform default is
+ * true).
+ */
+function renderModalSelect(node: SelectNode, path: string): APILabelComponent {
+	if (node.label === undefined || node.id === undefined) {
+		// rule 30 has slipped through; the Label and the custom_id have nowhere to come from
+		throw new RenderError(path, 'a modal select needs a label and an id');
+	}
+	const select: APISelectMenuComponent = {
+		...selectBase(node, path, node.id),
+		...(node.placeholder !== undefined ? { placeholder: node.placeholder } : {}),
+		...(node.minSelected !== undefined ? { min_values: node.minSelected } : {}),
+		...(node.maxSelected !== undefined ? { max_values: node.maxSelected } : {}),
+		required: node.required ?? true,
+	};
+	return {
+		type: ComponentType.Label,
+		label: node.label,
+		...(node.description !== undefined ? { description: node.description } : {}),
+		component: select,
+	};
+}
+
+/**
+ * Renders a checkbox inside its Label. A required checkbox rides the wire
+ * as a one-option checkbox group: the platform cannot require a bare
+ * checkbox, so the requirement becomes "pick the one option". Either way
+ * `required` is sent explicitly, like the input's.
+ */
+function renderModalCheckbox(node: CheckboxNode): APILabelComponent {
+	const component: APIComponentInLabel = node.required === true
+		? {
+			type: ComponentType.CheckboxGroup,
+			custom_id: node.id,
+			required: true,
+			min_values: 1,
+			max_values: 1,
+			options: [{ label: node.label, value: 'on' }],
+		}
+		: {
+			type: ComponentType.Checkbox,
+			custom_id: node.id,
+			...(node.checked !== undefined ? { default: node.checked } : {}),
+			// The typings omit the bare checkbox's `required` field; the wire takes it.
+			required: false,
+		} as APICheckboxComponent;
+	return {
+		type: ComponentType.Label,
+		label: node.label,
+		...(node.description !== undefined ? { description: node.description } : {}),
+		component,
+	};
+}
+
+/** Renders a checkbox group inside its Label; the bounds ride only when set, and `required` is always explicit. */
+function renderModalCheckboxGroup(node: CheckboxGroupNode): APILabelComponent {
+	return {
+		type: ComponentType.Label,
+		label: node.label,
+		...(node.description !== undefined ? { description: node.description } : {}),
+		component: {
+			type: ComponentType.CheckboxGroup,
+			custom_id: node.id,
+			options: node.options.map(wireOption),
+			...(node.minSelected !== undefined ? { min_values: node.minSelected } : {}),
+			...(node.maxSelected !== undefined ? { max_values: node.maxSelected } : {}),
+			required: node.required ?? true,
+		},
+	};
+}
+
+/** Renders a radio group inside its Label; single choice, so no bounds, and `required` is always explicit. */
+function renderModalRadioGroup(node: RadioGroupNode): APILabelComponent {
+	return {
+		type: ComponentType.Label,
+		label: node.label,
+		...(node.description !== undefined ? { description: node.description } : {}),
+		component: {
+			type: ComponentType.RadioGroup,
+			custom_id: node.id,
+			options: node.options.map(wireOption),
+			required: node.required ?? true,
 		},
 	};
 }
@@ -395,7 +502,11 @@ export function renderV2Modal(root: ModalNode, customId: string): V2ModalPayload
 			switch (child.kind) {
 				case NodeKind.text: return renderText(child, childPath);
 				case NodeKind.input: return renderInput(child, childPath);
-				default: throw new RenderError(childPath, `modal child must be text or input, got '${kindOf(child)}'`);
+				case NodeKind.select: return renderModalSelect(child, childPath);
+				case NodeKind.checkbox: return renderModalCheckbox(child);
+				case NodeKind.checkboxGroup: return renderModalCheckboxGroup(child);
+				case NodeKind.radioGroup: return renderModalRadioGroup(child);
+				default: throw new RenderError(childPath, `modal child must be text, input or a form field, got '${kindOf(child)}'`);
 			}
 		}),
 	};

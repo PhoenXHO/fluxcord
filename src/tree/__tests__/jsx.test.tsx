@@ -16,7 +16,7 @@ import { runtimeKit } from '../kit.js';
 import { validateTree } from '../validate.js';
 import { SelectEntity } from '../vocab.js';
 import type { ComponentResult } from '../jsx-runtime.js';
-import type { TextNode, TreeNode, ViewNode } from '../types.js';
+import type { CheckboxGroupNode, TextNode, TreeNode, ViewNode } from '../types.js';
 
 const onClick = (): void => {};
 
@@ -147,6 +147,57 @@ describe('jsx control surfaces', () => {
 	it('an input takes no children', () => {
 		const raw = factory as unknown as (type: string, props: unknown) => TreeNode;
 		expect(() => raw('input', { id: 'f', label: 'L', children: [text('junk')] })).toThrow(/no children/);
+	});
+});
+
+// --- Modal form controls ---------------------------------------------------------------
+
+describe('jsx modal form controls', () => {
+	it('a modal-select with an entity is the entitySelect builder - same node', () => {
+		const viaTsx = <modal-select id="c" label="Channel" entity={SelectEntity.Channels} required />;
+		expect(viaTsx).toEqual(entitySelect({ id: 'c', label: 'Channel', entity: SelectEntity.Channels, required: true }));
+	});
+
+	it('a modal-select lifts option children into the options list', () => {
+		const viaTsx = (
+			<modal-select id="p" label="Pick">
+				<option value="1h">1 hour</option>
+				<option value="6h" default>6 hours</option>
+			</modal-select>
+		);
+		expect(viaTsx).toEqual(optionSelect({
+			id: 'p',
+			label: 'Pick',
+			options: [{ label: '1 hour', value: '1h' }, { label: '6 hours', value: '6h', default: true }],
+		}));
+	});
+
+	it('an options prop and option children together throw', () => {
+		const options = [{ label: 'A', value: 'a' }];
+		expect(() => (
+			<modal-select id="p" label="Pick" options={options}>
+				<option value="b">B</option>
+			</modal-select>
+		)).toThrow(/never both/);
+	});
+
+	it('a checkbox-group carries its lifted options', () => {
+		const group = <checkbox-group id="g" label="G" required><option value="a">A</option></checkbox-group> as CheckboxGroupNode;
+		expect(group.kind).toBe('checkbox-group');
+		expect(group.required).toBe(true);
+		expect(group.options).toEqual([{ label: 'A', value: 'a' }]);
+	});
+
+	it('a non-option child in a modal-select throws', () => {
+		expect(() => (
+			<modal-select id="p" label="Pick">
+				<text>junk</text>
+			</modal-select>
+		)).toThrow(/only <option>/);
+	});
+
+	it('a bare checkbox tag is the checkbox node', () => {
+		expect(<checkbox id="t" label="T" required />).toEqual({ kind: 'checkbox', id: 't', label: 'T', required: true });
 	});
 });
 

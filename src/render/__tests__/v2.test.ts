@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { button, container, entitySelect, hr, input, link, modal, optionSelect, row, text, view } from '../../tree/builders.js';
+import { button, checkbox, checkboxGroup, container, entitySelect, hr, input, link, modal, optionSelect, radioGroup, row, text, view } from '../../tree/builders.js';
 import { SelectEntity } from '../../tree/vocab.js';
 import { actionHash } from '../action-hash.js';
 import { renderV2Message, renderV2Modal, RenderError } from '../v2.js';
@@ -182,6 +182,12 @@ describe('renderV2Message - select', () => {
 			components: [{ type: 3, custom_id: CUSTOM_ID, options: [{ label: 'A', value: 'a' }], disabled: true }],
 		}]);
 	});
+
+	it('loudly rejects a message select without a handler', () => {
+		const silent = optionSelect({ options: [{ label: 'A', value: 'a' }] });
+		expect(() => render(view({}, row({}, silent)))).toThrow(RenderError);
+		expect(() => render(view({}, row({}, silent)))).toThrow(/needs a handler/);
+	});
 });
 
 describe('renderV2Message - container', () => {
@@ -293,6 +299,136 @@ describe('renderV2Modal', () => {
 
 	it('rejects a non-modal root', () => {
 		expect(() => renderV2Modal(force<ModalNode>(text('x')), 'x')).toThrow(RenderError);
+	});
+});
+
+describe('renderV2Modal - form controls', () => {
+	const renderModal = (root: ModalNode): V2ModalPayload => renderV2Modal(root, 'ui2:sess:mod/edit#open');
+
+	it('renders a bare checkbox as a Label-wrapped checkbox, required false explicit', () => {
+		expect(renderModal(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T' }))).components).toEqual([{
+			type: 18,
+			label: 'T',
+			component: { type: 23, custom_id: 'c', required: false },
+		}]);
+	});
+
+	it('a checked checkbox sends default: true', () => {
+		const payload = renderModal(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T', checked: true })));
+		expect(payload.components[0]).toHaveProperty('component.default', true);
+	});
+
+	it('a required checkbox renders as a one-option checkbox group', () => {
+		expect(renderModal(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T', required: true }))).components).toEqual([{
+			type: 18,
+			label: 'T',
+			component: { type: 22, custom_id: 'c', required: true, min_values: 1, max_values: 1, options: [{ label: 'T', value: 'on' }] },
+		}]);
+	});
+
+	it('renders a checkbox group with min/max and the required default', () => {
+		expect(renderModal(modal({ title: 'T' }, checkboxGroup({
+			id: 'g',
+			label: 'G',
+			options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b', description: 'second', default: true }],
+			minSelected: 1,
+			maxSelected: 2,
+		}))).components).toEqual([{
+			type: 18,
+			label: 'G',
+			component: {
+				type: 22,
+				custom_id: 'g',
+				options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b', description: 'second', default: true }],
+				min_values: 1,
+				max_values: 2,
+				required: true,
+			},
+		}]);
+	});
+
+	it('renders a radio group without bounds and the required default', () => {
+		expect(renderModal(modal({ title: 'T' }, radioGroup({
+			id: 'r',
+			label: 'R',
+			options: [{ label: 'A', value: 'a', default: true }, { label: 'B', value: 'b' }],
+		}))).components).toEqual([{
+			type: 18,
+			label: 'R',
+			component: {
+				type: 21,
+				custom_id: 'r',
+				options: [{ label: 'A', value: 'a', default: true }, { label: 'B', value: 'b' }],
+				required: true,
+			},
+		}]);
+	});
+
+	it('a modal select sends required even when unset', () => {
+		const payload = renderModal(modal({ title: 'T' }, optionSelect({
+			id: 'p',
+			label: 'Pick',
+			options: [{ label: 'A', value: 'a' }],
+		})));
+		expect(payload.components).toEqual([{
+			type: 18,
+			label: 'Pick',
+			component: { type: 3, custom_id: 'p', options: [{ label: 'A', value: 'a' }], required: true },
+		}]);
+	});
+
+	it('required: false rides through when set, with placeholder and bounds', () => {
+		const payload = renderModal(modal({ title: 'T' }, optionSelect({
+			id: 'p',
+			label: 'Pick',
+			options: [{ label: 'A', value: 'a' }],
+			required: false,
+			placeholder: 'ph',
+			minSelected: 0,
+			maxSelected: 2,
+		})));
+		expect(payload.components).toEqual([{
+			type: 18,
+			label: 'Pick',
+			component: {
+				type: 3,
+				custom_id: 'p',
+				options: [{ label: 'A', value: 'a' }],
+				placeholder: 'ph',
+				min_values: 0,
+				max_values: 2,
+				required: false,
+			},
+		}]);
+	});
+
+	it('an entity select maps to its wire type without the ActionRow wrapper', () => {
+		const payload = renderModal(modal({ title: 'T' }, entitySelect({
+			id: 'c',
+			label: 'Channel',
+			entity: SelectEntity.Channels,
+			defaultIds: ['ch1'],
+		})));
+		expect(payload.components).toEqual([{
+			type: 18,
+			label: 'Channel',
+			component: { type: 8, custom_id: 'c', required: true, default_values: [{ id: 'ch1', type: 'channel' }] },
+		}]);
+	});
+
+	it('a description lands on the Label', () => {
+		const payload = renderModal(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T', description: 'why' })));
+		expect(payload.components[0]).toHaveProperty('description', 'why');
+	});
+
+	it('the input description lands on the existing Label', () => {
+		const payload = renderModal(modal({ title: 'T' }, input({ id: 'f', label: 'L', description: 'hint' })));
+		expect(payload.components[0]).toHaveProperty('description', 'hint');
+	});
+
+	it('loudly rejects a modal select that lost its label or id', () => {
+		const bare = force<ModalNode>({ ...modal({ title: 'T' }), children: [{ kind: 'select', options: [{ label: 'A', value: 'a' }] }] });
+		expect(() => renderModal(bare)).toThrow(/needs a label and an id/);
 	});
 });
 

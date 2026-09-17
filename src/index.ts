@@ -40,6 +40,6 @@ export * from './render/id-codec.js'; // isActionId, encodeActionId, decodeActio
 // Tree vocabulary: node types, builders, kit, validation.
 export * from './tree/vocab.js'; // NodeKind, ButtonStyle & InputStyle unions, SelectEntity
 export * from './tree/types.js'; // ViewNode, ButtonNode, ...
-export * from './tree/builders.js'; // view, text, row, button, ...
+export * from './tree/builders.js'; // view, text, row, button, ..., checkbox, checkboxGroup, radioGroup, option
 export * from './tree/kit.js'; // ScreenKit, runtimeKit
 export * from './tree/validate.js'; // validateTree, Violation

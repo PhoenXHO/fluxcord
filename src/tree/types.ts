@@ -117,13 +117,21 @@ export interface SelectOption {
 /**
  * A select menu that allows the user to choose from a list of options.
  * The select menu can be disabled, and can have a placeholder text.
- * 
- * The `onSelect` handler is never-erased, meaning it accepts any flow's
- * typed handler.
+ *
+ * One node, two contexts: in a message it is a control and carries the
+ * `onSelect` handler (validated as required there); in a modal it is a
+ * form field and carries `id`/`label`/`required` instead. The `onSelect`
+ * handler is never-erased, meaning it accepts any flow's typed handler.
  */
 export interface SelectNode {
 	readonly kind: NodeKind.select;
-	readonly onSelect: ActionHandler<never>;
+
+	/**
+	 * The pick handler for message context. Modal selects are data fields
+	 * read from the submission, so the handler is optional on the node;
+	 * validation enforces its presence in messages.
+	 */
+	readonly onSelect?: ActionHandler<never>;
 
 	// (options XOR entity) is enforced by the two select builders
 
@@ -158,6 +166,33 @@ export interface SelectNode {
 	 */
 	readonly maxSelected?: number;
 
+	/**
+	 * Whether a submission requires a selection. Modal-only: the platform
+	 * defaults it to true there, so the renderer always sends it explicitly.
+	 * Ignored (and omitted) in message payloads.
+	 */
+	readonly required?: boolean;
+
+	/**
+	 * Modal-only heading for the Label the select sits in. Message selects
+	 * have no heading; validation enforces presence in modals and absence
+	 * in messages.
+	 */
+	readonly label?: string;
+
+	/**
+	 * Modal-only helper line under the label, on the Label component.
+	 * Max 100 characters.
+	 */
+	readonly description?: string;
+
+	/**
+	 * Modal-only field identifier, read from the modal submission like an
+	 * input's. Message selects route through their handler instead, so
+	 * validation enforces presence in modals and absence in messages.
+	 */
+	readonly id?: string;
+
 	/** Whether the select is greyed out and unclickable. */
 	readonly disabled?: boolean;
 
@@ -183,6 +218,9 @@ export interface InputNode {
 	readonly id: string;
 
 	readonly label: string;
+
+	/** Optional helper line under the label, on the surrounding Label. Max 100 characters. */
+	readonly description?: string;
 	readonly placeholder?: string;
 	readonly style?: InputStyle;
 	readonly required?: boolean;
@@ -190,10 +228,74 @@ export interface InputNode {
 	readonly maxLength?: number;
 
 	/**
-	 * The input field's default value, which will be pre-filled in the input box.  
+	 * The input field's default value, which will be pre-filled in the input box.
 	 * Max length is 4000 characters.
 	 */
 	readonly value?: string;
+}
+
+/**
+ * A single yes/no checkbox in a modal. The label sits on the surrounding
+ * Label component; a `required` checkbox renders as a one-option checkbox
+ * group so the platform blocks submission until it is checked (a bare
+ * checkbox cannot be required).
+ */
+export interface CheckboxNode {
+	readonly kind: NodeKind.checkbox;
+
+	/** The checkbox's identifier, used to retrieve its boolean from the modal submission. */
+	readonly id: string;
+	readonly label: string;
+
+	/** Optional helper line under the label, on the surrounding Label. Max 100 characters. */
+	readonly description?: string;
+
+	/** Whether the box starts checked. */
+	readonly checked?: boolean;
+	readonly required?: boolean;
+}
+
+/**
+ * A multi-pick group of checkboxes in a modal. Options reuse the select
+ * option shape; the platform defaults `required` to true.
+ */
+export interface CheckboxGroupNode {
+	readonly kind: NodeKind.checkboxGroup;
+
+	/** The group's identifier, used to retrieve the picked values from the modal submission. */
+	readonly id: string;
+	readonly label: string;
+
+	/** Optional helper line under the label, on the surrounding Label. Max 100 characters. */
+	readonly description?: string;
+
+	/** One to ten options. */
+	readonly options: readonly SelectOption[];
+
+	/** Minimum picks; platform default 1. */
+	readonly minSelected?: number;
+	/** Maximum picks; platform default is the option count. */
+	readonly maxSelected?: number;
+	readonly required?: boolean;
+}
+
+/**
+ * A single-choice radio group in a modal. The platform takes two to ten
+ * options and defaults `required` to true.
+ */
+export interface RadioGroupNode {
+	readonly kind: NodeKind.radioGroup;
+
+	/** The group's identifier, used to retrieve the picked value from the modal submission. */
+	readonly id: string;
+	readonly label: string;
+
+	/** Optional helper line under the label, on the surrounding Label. Max 100 characters. */
+	readonly description?: string;
+
+	/** Two to ten options; at most one may be preselected. */
+	readonly options: readonly SelectOption[];
+	readonly required?: boolean;
 }
 
 // --- Node type unions ------------------------------------------------------------
@@ -203,7 +305,7 @@ export interface InputNode {
 export type ControlNode = ButtonNode | LinkNode | SelectNode;
 export type ViewChild = TextNode | RowNode | ContainerNode | HrNode;
 export type ContainerChild = TextNode | RowNode | HrNode;
-export type ModalChild = InputNode | TextNode;
+export type ModalChild = InputNode | TextNode | SelectNode | CheckboxNode | CheckboxGroupNode | RadioGroupNode;
 export type TreeRoot = ViewNode | ModalNode;
 
 /**
@@ -220,7 +322,10 @@ export type TreeNode =
 	| LinkNode
 	| SelectNode
 	| ModalNode
-	| InputNode;
+	| InputNode
+	| CheckboxNode
+	| CheckboxGroupNode
+	| RadioGroupNode;
 
 /**
  * Utility type used for TSX.  

@@ -27,15 +27,23 @@
  * components (e.g., `<Button/>`) so their handler slots stay typed against the
  * flow's data and screen keys. The draw-time kit is this module's builders
  * (runtimeKit), so kit elements produce the same trees intrinsics do.
+ * The exception proving the rule is the modal-context select: a select in
+ * a modal is a data field (id + label, read from the submission), not a
+ * control, so it is the intrinsic `modal-select` while the message-context
+ * select stays the kit's `Select`. The modal-only checkbox tags
+ * (checkbox, checkbox-group, radio-group) are intrinsics the same way.
  * Uppercase tags in general are components.
  *
  * @module tree/jsx-runtime
  */
 
 import {
+	checkbox,
+	checkboxGroup,
 	code,
 	codeblock,
 	container,
+	entitySelect,
 	error,
 	flattenTextContent,
 	hr,
@@ -43,23 +51,35 @@ import {
 	input,
 	link,
 	modal,
+	option,
+	optionSelect,
+	radioGroup,
 	row,
 	text,
 	view,
 	warning,
 } from './builders.js';
 import type {
+	CheckboxGroupProps,
+	CheckboxProps,
 	ContainerProps,
+	EntitySelectProps,
 	HrProps,
 	InputProps,
 	LinkProps,
 	ModalProps,
+	ModalSelectProps,
+	OptionProps,
+	OptionSelectProps,
+	RadioGroupProps,
 	RowProps,
 	TextProps,
 	ViewProps,
 } from './builders.js';
 import { SeparatorSpacing } from './vocab.js';
 import type {
+	CheckboxGroupNode,
+	CheckboxNode,
 	ComponentResult,
 	ContainerChild,
 	ContainerNode,
@@ -69,7 +89,10 @@ import type {
 	LinkNode,
 	ModalChild,
 	ModalNode,
+	RadioGroupNode,
 	RowNode,
+	SelectNode,
+	SelectOption,
 	TextChild,
 	TextNode,
 	TreeNode,
@@ -148,13 +171,18 @@ export function jsx(tag: 'container', props: ContainerProps & { readonly childre
 export function jsx(tag: 'link', props: LinkProps & { readonly children?: unknown } | null): LinkNode;
 export function jsx(tag: 'modal', props: ModalProps & { readonly children?: unknown } | null): ModalNode;
 export function jsx(tag: 'input', props: InputProps | null): InputNode;
+export function jsx(tag: 'modal-select', props: ModalSelectProps & { readonly children?: unknown } | null): SelectNode;
+export function jsx(tag: 'checkbox', props: CheckboxProps | null): CheckboxNode;
+export function jsx(tag: 'checkbox-group', props: Omit<CheckboxGroupProps, 'options'> & { readonly options?: readonly SelectOption[]; readonly children?: unknown } | null): CheckboxGroupNode;
+export function jsx(tag: 'radio-group', props: Omit<RadioGroupProps, 'options'> & { readonly options?: readonly SelectOption[]; readonly children?: unknown } | null): RadioGroupNode;
+export function jsx(tag: 'option', props: OptionProps & { readonly children?: unknown } | null): SelectOption;
 export function jsx(tag: 'hr', props: HrTagProps | null): HrNode;
 export function jsx(tag: 'error', props: { readonly children?: unknown } | null): TextNode;
 export function jsx(tag: 'warning', props: { readonly children?: unknown } | null): TextNode;
 export function jsx(tag: 'info', props: { readonly children?: unknown } | null): TextNode;
 export function jsx(type: typeof Fragment, props: { readonly children?: unknown } | null): readonly TreeNode[];
 export function jsx<P extends object, T extends ComponentResult>(type: (props: P) => T, props: P | null): T;
-export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode[] {
+export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode[] | SelectOption {
 	if (typeof type === 'function' && type !== Fragment) {
 		return callComponent(type as (props: unknown) => unknown, bareProps(props));
 	}
@@ -177,6 +205,11 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 		const { node, children } = splitRawChildren(props);
 		return link(node as LinkProps, ...(children as readonly TextChild[]));
 	}
+	if (type === 'option') {
+		// An option's label folds like the control labels'.
+		const { node, children } = splitRawChildren(props);
+		return option(node as OptionProps, ...(children as readonly TextChild[]));
+	}
 	const { node, children } = splitProps(props);
 	if (type === Fragment) {
 		return children;
@@ -195,6 +228,41 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 				throw new Error('input takes no children; the label is a prop');
 			}
 			return input(node as InputProps);
+		case 'modal-select': {
+			const selectProps = node as ModalSelectProps;
+			const lifted = optionsFromChildren('modal-select', children);
+			if (lifted !== undefined && selectProps.options !== undefined) {
+				throw new Error('modal-select takes an options prop or option children, never both');
+			}
+			if (selectProps.options !== undefined && selectProps.entity !== undefined) {
+				throw new Error('a select takes either options or entity, never both');
+			}
+			const withOptions = lifted !== undefined ? { ...selectProps, options: lifted } : selectProps;
+			return withOptions.entity !== undefined
+				? entitySelect(withOptions as EntitySelectProps)
+				: optionSelect(withOptions as OptionSelectProps);
+		}
+		case 'checkbox':
+			if (children.length > 0) {
+				throw new Error('checkbox takes no children; the label is a prop');
+			}
+			return checkbox(node as CheckboxProps);
+		case 'checkbox-group': {
+			const groupProps = node as CheckboxGroupProps;
+			const lifted = optionsFromChildren('checkbox-group', children);
+			if (lifted !== undefined && groupProps.options !== undefined) {
+				throw new Error('checkbox-group takes an options prop or option children, never both');
+			}
+			return checkboxGroup(lifted !== undefined ? { ...groupProps, options: lifted } : groupProps);
+		}
+		case 'radio-group': {
+			const groupProps = node as RadioGroupProps;
+			const lifted = optionsFromChildren('radio-group', children);
+			if (lifted !== undefined && groupProps.options !== undefined) {
+				throw new Error('radio-group takes an options prop or option children, never both');
+			}
+			return radioGroup(lifted !== undefined ? { ...groupProps, options: lifted } : groupProps);
+		}
 		case 'hr':
 			return hr(hrProps(node));
 		default:
@@ -267,6 +335,23 @@ function splitRawChildren(props: unknown): { node: Record<string, unknown>; chil
 	};
 }
 
+/**
+ * Lifts `<option>` children into the parent's options array: every coerced
+ * child must be an option-built SelectOption (a label/value pair). Returns
+ * undefined when there were no children, so the options prop stands.
+ */
+function optionsFromChildren(tag: string, children: readonly TreeNode[]): readonly SelectOption[] | undefined {
+	if (children.length === 0) return undefined;
+	return children.map((child) => {
+		const candidate = child as unknown as Partial<SelectOption>;
+		if (typeof candidate.label !== 'string' || typeof candidate.value !== 'string') {
+			throw new Error(`${tag} takes only <option> tags as children`);
+		}
+		return child as SelectOption;
+	});
+}
+
+
 // eslint-disable-next-line @typescript-eslint/no-namespace --- the compiler reads the JSX vocabulary from the runtime module's JSX namespace (the react-jsx convention)
 export namespace JSX {
 	/**
@@ -290,6 +375,11 @@ export namespace JSX {
 		link: LinkProps & { readonly children?: unknown };
 		modal: ModalProps & { readonly children?: unknown };
 		input: InputProps;
+		'modal-select': ModalSelectProps & { readonly children?: unknown };
+		checkbox: CheckboxProps;
+		'checkbox-group': Omit<CheckboxGroupProps, 'options'> & { readonly options?: readonly SelectOption[]; readonly children?: unknown };
+		'radio-group': Omit<RadioGroupProps, 'options'> & { readonly options?: readonly SelectOption[]; readonly children?: unknown };
+		option: OptionProps & { readonly children?: unknown };
 		hr: HrTagProps;
 	}
 }

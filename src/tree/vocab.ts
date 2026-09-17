@@ -19,6 +19,9 @@ export enum NodeKind {
 	select = 'select',
 	modal = 'modal',
 	input = 'input',
+	checkbox = 'checkbox',
+	checkboxGroup = 'checkbox-group',
+	radioGroup = 'radio-group',
 	hr = 'hr',
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	button,
+	checkbox,
+	checkboxGroup,
 	code,
 	codeblock,
 	container,
@@ -12,7 +14,9 @@ import {
 	input,
 	link,
 	modal,
+	option,
 	optionSelect,
+	radioGroup,
 	row,
 	text,
 	view,
@@ -228,5 +232,60 @@ describe('hr', () => {
 
 	it('is frozen', () => {
 		expect(Object.isFrozen(hr())).toBe(true);
+	});
+});
+
+describe('modal form controls', () => {
+	it('sets the kind matching each control builder', () => {
+		expect(checkbox({ id: 'c', label: 'T' }).kind).toBe(NodeKind.checkbox);
+		expect(checkboxGroup({ id: 'g', label: 'G', options: [{ label: 'A', value: 'a' }] }).kind).toBe(NodeKind.checkboxGroup);
+		expect(radioGroup({
+			id: 'r',
+			label: 'R',
+			options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }],
+		}).kind).toBe(NodeKind.radioGroup);
+	});
+
+	it('passes props through', () => {
+		const box = checkbox({ id: 'c', label: 'T', description: 'why', checked: true, required: true });
+		expect(box.description).toBe('why');
+		expect(box.checked).toBe(true);
+		expect(box.required).toBe(true);
+
+		const group = checkboxGroup({
+			id: 'g',
+			label: 'G',
+			options: [{ label: 'A', value: 'a' }],
+			minSelected: 0,
+			maxSelected: 2,
+			required: false,
+		});
+		expect(group.minSelected).toBe(0);
+		expect(group.maxSelected).toBe(2);
+		expect(group.required).toBe(false);
+	});
+
+	it('freezes the node and its options array', () => {
+		const group = checkboxGroup({ id: 'g', label: 'G', options: [{ label: 'A', value: 'a' }] });
+		expect(Object.isFrozen(group)).toBe(true);
+		expect(Object.isFrozen(group.options)).toBe(true);
+		expect(Object.isFrozen(radioGroup({
+			id: 'r',
+			label: 'R',
+			options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }],
+		}))).toBe(true);
+	});
+
+	it('option folds children into the label; label prop XOR children', () => {
+		expect(option({ value: '1h' }, '1 ', 'hour').label).toBe('1 hour');
+		expect(() => option({ value: '1h', label: 'One hour' }, 'Also')).toThrow(/never both/);
+	});
+
+	it('option passes value, description and default through, frozen', () => {
+		const entry = option({ value: '6h', description: 'long wait', default: true }, '6 hours');
+		expect(entry.value).toBe('6h');
+		expect(entry.description).toBe('long wait');
+		expect(entry.default).toBe(true);
+		expect(Object.isFrozen(entry)).toBe(true);
 	});
 });
