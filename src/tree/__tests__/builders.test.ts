@@ -22,7 +22,7 @@ import {
 	view,
 	warning,
 } from '../builders.js';
-import { NodeKind, SelectEntity, SeparatorSpacing } from '../vocab.js';
+import { NodeKind, SeparatorSpacing } from '../vocab.js';
 import type { ButtonProps } from '../builders.js';
 import type { TextChild } from '../types.js';
 
@@ -41,7 +41,7 @@ describe('builders', () => {
 		expect(button({ onClick: go, label: 'Go' }).kind).toBe(NodeKind.button);
 		expect(link({ url: 'https://torn.com', label: 'Site' }).kind).toBe(NodeKind.link);
 		expect(optionSelect({ onSelect: go, options: [] }).kind).toBe(NodeKind.select);
-		expect(entitySelect({ onSelect: go, entity: SelectEntity.Users }).kind).toBe(NodeKind.select);
+		expect(entitySelect({ onSelect: go, users: true }).kind).toBe(NodeKind.select);
 		expect(modal({ title: 'T' }, input({ id: 'f', label: 'L' })).kind).toBe(NodeKind.modal);
 		expect(input({ id: 'f', label: 'L' }).kind).toBe(NodeKind.input);
 		expect(hr().kind).toBe(NodeKind.hr);
@@ -103,9 +103,21 @@ describe('builders', () => {
 		expect(options.options).toHaveLength(1);
 		expect(options.entity).toBeUndefined();
 
-		const entity = entitySelect({ onSelect: go, entity: SelectEntity.Roles });
-		expect(entity.entity).toBe(SelectEntity.Roles);
+		const entity = entitySelect({ onSelect: go, roles: true });
+		expect(entity.entity).toBe('roles');
 		expect(entity.options).toBeUndefined();
+	});
+
+	it('entity flags resolve to the entity union and never ride along', () => {
+		const node = entitySelect({ onSelect: go, mentionable: true });
+		expect(node.entity).toBe('mentionable');
+		expect(node).not.toHaveProperty('mentionable');
+	});
+
+	it('two entity flags or a valued flag throw', () => {
+		type Props = Parameters<typeof entitySelect>[0];
+		expect(() => entitySelect(force<Props>({ onSelect: go, users: true, roles: true }))).toThrow(/at most one entity flag/);
+		expect(() => entitySelect(force<Props>({ onSelect: go, roles: false }))).toThrow(/takes no value/);
 	});
 });
 

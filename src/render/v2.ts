@@ -38,7 +38,8 @@ import type {
 	APISeparatorComponent,
 	APITextDisplayComponent,
 } from 'discord-api-types/v10';
-import { NodeKind, SelectEntity, SeparatorSpacing } from '../tree/vocab.js';
+import { NodeKind, SeparatorSpacing } from '../tree/vocab.js';
+import type { SelectEntity } from '../tree/vocab.js';
 import type {
 	ButtonStyle as TreeButtonStyle,
 	InputStyle as TreeInputStyle,
@@ -126,22 +127,22 @@ const HR_SPACING: Record<TreeSeparatorSpacing, SeparatorSpacingSize> = {
 
 /** Select entity source -> wire shape. Each entity kind is its own component type on the platform, so the table pairs every source with a builder taking the `custom_id` and optional preselected ids (`default_values`; mentionable ignores them — its defaults mix users and roles, and an id alone cannot say which is which). */
 const ENTITY_SELECTS: Record<SelectEntity, (customId: string, defaultIds?: readonly string[]) => APISelectMenuComponent> = {
-	[SelectEntity.Users]: (customId, defaultIds) => ({
+	users: (customId, defaultIds) => ({
 		type: ComponentType.UserSelect,
 		custom_id: customId,
 		...(defaultIds?.length ? { default_values: defaultIds.map((id) => ({ id, type: SelectMenuDefaultValueType.User })) } : {}),
 	}),
-	[SelectEntity.Roles]: (customId, defaultIds) => ({
+	roles: (customId, defaultIds) => ({
 		type: ComponentType.RoleSelect,
 		custom_id: customId,
 		...(defaultIds?.length ? { default_values: defaultIds.map((id) => ({ id, type: SelectMenuDefaultValueType.Role })) } : {}),
 	}),
-	[SelectEntity.Channels]: (customId, defaultIds) => ({
+	channels: (customId, defaultIds) => ({
 		type: ComponentType.ChannelSelect,
 		custom_id: customId,
 		...(defaultIds?.length ? { default_values: defaultIds.map((id) => ({ id, type: SelectMenuDefaultValueType.Channel })) } : {}),
 	}),
-	[SelectEntity.Mentionable]: (customId) => ({ type: ComponentType.MentionableSelect, custom_id: customId }),
+	mentionable: (customId) => ({ type: ComponentType.MentionableSelect, custom_id: customId }),
 };
 
 /** Reads a node's kind as a plain string. Trees can arrive through casts or hand-built objects whose types lie, and the error paths below still want to print the kind the object really carries. */
@@ -228,7 +229,7 @@ function selectBase(node: SelectNode, path: string, customId: string): APISelect
 	if (node.entity !== undefined) {
 		const defaultIds = node.defaultIds;
 		if (defaultIds !== undefined && defaultIds.length > 0) {
-			if (node.entity === SelectEntity.Mentionable) {
+			if (node.entity === 'mentionable') {
 				throw new RenderError(path, 'select defaultIds is not supported on mentionable selects');
 			}
 			return ENTITY_SELECTS[node.entity](customId, defaultIds);

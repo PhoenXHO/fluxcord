@@ -39,14 +39,12 @@ export type ButtonStyle = 'primary' | 'secondary' | 'success' | 'danger';
  */
 export type InputStyle = 'short' | 'paragraph';
 
-/** Entity sources a select can draw its options from. */
-export const SelectEntity = {
-	Users: 'users',
-	Roles: 'roles',
-	Channels: 'channels',
-	Mentionable: 'mentionable',
-} as const;
-export type SelectEntity = (typeof SelectEntity)[keyof typeof SelectEntity];
+/**
+ * Entity sources a select can draw its options from. Authors spell the
+ * choice through flags (`<Select roles />`); this union is the node
+ * vocabulary the builders, validator and renderer share.
+ */
+export type SelectEntity = 'users' | 'roles' | 'channels' | 'mentionable';
 
 /** Padding sizes around an hr's line, mapped to the platform's separator spacing. */
 export const SeparatorSpacing = {

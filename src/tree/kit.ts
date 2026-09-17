@@ -21,9 +21,10 @@
  */
 
 import type { ActionHandler } from '../pipeline/types.js';
-import { button, entitySelect, optionSelect } from './builders.js';
-import type { ButtonNode, SelectNode, TextChild } from './types.js';
-import type { ButtonProps, EntitySelectProps, OptionSelectProps } from './builders.js';
+import { button, entityFlagOf, entitySelect, optionSelect } from './builders.js';
+import type { ButtonNode, SelectNode, SelectOption, TextChild } from './types.js';
+import type { ButtonProps, EntitySelectProps, EntitySelectSource, OptionSelectProps, SelectEntityFlags } from './builders.js';
+import { optionsFromChildren } from './jsx-runtime.js';
 
 /**
  * Button props with the handler slot narrowed to the flow's types. The
@@ -33,14 +34,25 @@ import type { ButtonProps, EntitySelectProps, OptionSelectProps } from './builde
 export type KitButtonProps<TData, TKeys extends string> = Omit<ButtonProps, 'onClick'>
 	& { readonly onClick: ActionHandler<TData, TKeys>; readonly children?: unknown };
 
+/** The static-list arm: `options` or `<option>` children, never both (runtime throw). */
+type KitOptionSelectProps<TData, TKeys extends string> = Omit<OptionSelectProps, 'onSelect' | 'options'>
+	& { readonly options?: readonly SelectOption[]; readonly onSelect: ActionHandler<TData, TKeys>; readonly children?: unknown };
+/**
+ * The entity-source arm: one bare flag picks the source. Children are
+ * `never` here, so `<Select roles><option/></Select>` is a compile error:
+ * an entity select has no static options to lift.
+ */
+type KitEntitySelectProps<TData, TKeys extends string> = Omit<SelectNode, 'kind' | 'options' | 'entity' | 'onSelect'>
+	& SelectEntityFlags & EntitySelectSource
+	& { readonly onSelect: ActionHandler<TData, TKeys>; readonly children?: never };
+
 /**
  * Union of select props with the handler slot narrowed to the flow's types:
- * `options` for a static list, `entity` for a Discord entity source. The
- * runtime kit routes on entity presence; passing both is an author mistake
- * it throws on at construction.
+ * `options` (or `<option>` children) for a static list, one entity flag for
+ * a Discord entity source. The runtime kit routes on the resolved source;
+ * passing both is an author mistake it throws on at construction.
  */
-export type KitSelectProps<TData, TKeys extends string> = (Omit<OptionSelectProps, 'onSelect'> | Omit<EntitySelectProps, 'onSelect'>)
-	& { readonly onSelect: ActionHandler<TData, TKeys> };
+export type KitSelectProps<TData, TKeys extends string> = KitOptionSelectProps<TData, TKeys> | KitEntitySelectProps<TData, TKeys>;
 
 /**
  * The flow-typed controls a view receives as its second parameter:
@@ -51,7 +63,7 @@ export type KitSelectProps<TData, TKeys extends string> = (Omit<OptionSelectProp
 export interface ScreenKit<TData = unknown, TKeys extends string = string> {
 	/** The flow-typed button builder. */
 	Button(props: KitButtonProps<TData, TKeys>): ButtonNode;
-	/** One select, two shapes: `options` (static list) or `entity` (Discord entity source). */
+	/** One select, two shapes: `options` (or `<option>` children) for a static list, one entity flag (`roles`) for a Discord source. */
 	Select(props: KitSelectProps<TData, TKeys>): SelectNode;
 	/**
 	 * Typing identity: puts a handler arrow in an argument slot, so
@@ -83,20 +95,33 @@ export const runtimeKit: ScreenKit = {
 		return button(rest as ButtonProps, ...(kids as readonly TextChild[]));
 	},
 	Select: (props) => {
-		// The props union lets an author pass both `options` and `entity`:
-		// when an object literal is checked against a union, a property
-		// known to any member is accepted. The mistake is caught here, at
-		// construction, instead of waiting for validation at draw time.
-		const { options, entity, children } = props as { readonly options?: unknown; readonly entity?: unknown; readonly children?: unknown };
-		if (options !== undefined && entity !== undefined) {
+		// The props union lets an author pass both an options list and an
+		// entity flag: when an object literal is checked against a union, a
+		// property known to any member is accepted. The mistake is caught
+		// here, at construction, instead of waiting for validation at draw.
+		const raw = props as Record<string, unknown>;
+		const kids = raw.children === undefined || raw.children === null
+			? []
+			: Array.isArray(raw.children) ? raw.children : [raw.children];
+		const lifted = optionsFromChildren('Select', kids);
+		const entity = entityFlagOf(raw);
+		if (entity !== undefined && (raw.options !== undefined || lifted !== undefined)) {
 			throw new Error('a select takes either options or entity, never both');
 		}
-		if (children !== undefined && children !== null) {
-			throw new Error('a select takes no children; options ride the options prop');
+		const rest: Record<string, unknown> = { ...raw };
+		delete rest.children;
+		if (entity !== undefined) {
+			// The flag stays in: entitySelect resolves and strips it.
+			return entitySelect(rest as EntitySelectProps);
 		}
-		return entity !== undefined
-			? entitySelect(props as EntitySelectProps)
-			: optionSelect(props as OptionSelectProps);
+		delete rest.users;
+		delete rest.roles;
+		delete rest.channels;
+		delete rest.mentionable;
+		if (lifted !== undefined) {
+			rest.options = lifted;
+		}
+		return optionSelect(rest as OptionSelectProps);
 	},
 	handler: ({ run }) => run,
 };

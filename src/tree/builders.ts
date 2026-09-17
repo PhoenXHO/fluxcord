@@ -42,7 +42,8 @@ import type {
 // field, which makes passing both a compile error. The tree validator still
 // checks the rule at runtime for trees that arrive through casts. defaultIds
 // rides the entity side only; a static options list preselects through each
-// option's `default` flag.
+// option's `default` flag. The entity side is spelled through bare flags
+// (`roles: true`), resolved to the node's entity union by the builder.
 
 export type ViewProps = Omit<ViewNode, 'kind' | 'children'>;
 /** Text props: an optional title. The body is the children, folded at build time. */
@@ -66,13 +67,31 @@ export type ButtonProps = Omit<ButtonNode, 'kind' | 'style' | 'label'> & ButtonS
 /** Link props: the label rides the `label` prop or the children. */
 export type LinkProps = Omit<LinkNode, 'kind' | 'label'> & { readonly label?: string };
 export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity' | 'defaultIds'> & { readonly options: readonly SelectOption[] };
-export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options'> & { readonly entity: SelectEntity };
+/**
+ * The entity-source flags: each takes no value and is spelled bare
+ * (`<Select roles />` / `roles: true`). At most one may be set.
+ */
+export type SelectEntityFlags = {
+	readonly users?: true;
+	readonly roles?: true;
+	readonly channels?: true;
+	readonly mentionable?: true;
+};
+/** The one-flag-required union behind {@link EntitySelectProps}: an entity select with no source is an author mistake. */
+export type EntitySelectSource =
+	| { readonly users: true }
+	| { readonly roles: true }
+	| { readonly channels: true }
+	| { readonly mentionable: true };
+/** A select whose options come from a Discord entity source, spelled through one {@link SelectEntityFlags} flag. */
+export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options' | 'entity'> & SelectEntityFlags & EntitySelectSource;
 /**
  * The modal-select tag's props: a select as a modal form field, handler
- * off the surface. Options XOR entity is a runtime throw here (the flat
- * type cannot spell the exclusion).
+ * off the surface. The source rides the {@link SelectEntityFlags} flags or
+ * an options list; setting both is a runtime throw here (the flat type
+ * cannot spell the exclusion).
  */
-export type ModalSelectProps = Omit<SelectNode, 'kind' | 'onSelect'>;
+export type ModalSelectProps = Omit<SelectNode, 'kind' | 'onSelect' | 'entity'> & SelectEntityFlags;
 /** Option props: the label rides the `label` prop or the children. */
 export type OptionProps = Omit<SelectOption, 'label'> & { readonly label?: string };
 export type ModalProps = Omit<ModalNode, 'kind' | 'children'>;
@@ -297,6 +316,21 @@ const INPUT_FLAG_STYLES: Record<string, InputStyle> = {
 	short: 'short',
 	paragraph: 'paragraph',
 };
+const ENTITY_FLAG_ENTITIES: Record<string, SelectEntity> = {
+	users: 'users',
+	roles: 'roles',
+	channels: 'channels',
+	mentionable: 'mentionable',
+};
+
+/**
+ * Reads the entity flags off raw props: at most one may be set (two is an
+ * author mistake) and a set flag must arrive bare (`true`). Shared by the
+ * tag seams (kit Select, modal-select), which route on the resolved source.
+ */
+export function entityFlagOf(props: Record<string, unknown>): SelectEntity | undefined {
+	return styleFlag(ENTITY_FLAG_ENTITIES, props, 'entity', 'a select');
+}
 
 /**
  * Reads the style flags off raw props: at most one may be set (two is an
@@ -304,16 +338,16 @@ const INPUT_FLAG_STYLES: Record<string, InputStyle> = {
  * node's style value, or undefined when no flag was set, which leaves the
  * style off the node so the renderer's default applies.
  */
-function styleFlag<S extends string>(map: Record<string, S>, props: Record<string, unknown>): S | undefined {
+function styleFlag<S extends string>(map: Record<string, S>, props: Record<string, unknown>, noun = 'style', owner = 'a control'): S | undefined {
 	let style: S | undefined;
 	for (const [key, mapped] of Object.entries(map)) {
 		const value = props[key];
 		if (value === undefined) continue;
 		if (value !== true) {
-			throw new Error(`style flag '${key}' takes no value`);
+			throw new Error(`${noun} flag '${key}' takes no value`);
 		}
 		if (style !== undefined) {
-			throw new Error('a control takes at most one style flag');
+			throw new Error(`${owner} takes at most one ${noun} flag`);
 		}
 		style = mapped;
 	}
@@ -355,9 +389,19 @@ export function optionSelect(props: OptionSelectProps): SelectNode {
 	return deepFreeze({ kind: NodeKind.select, ...props });
 }
 
-/** A select whose options come from a Discord entity source (users, roles, channels, mentionables). */
+/**
+ * A select whose options come from a Discord entity source (users, roles,
+ * channels, mentionables), spelled through one {@link SelectEntityFlags}
+ * flag. The flags resolve to the node's entity union and never ride along.
+ */
 export function entitySelect(props: EntitySelectProps): SelectNode {
-	return deepFreeze({ kind: NodeKind.select, ...props });
+	const entity = styleFlag(ENTITY_FLAG_ENTITIES, props, 'entity', 'a select');
+	const rest = { ...props } as Record<string, unknown>;
+	delete rest.users;
+	delete rest.roles;
+	delete rest.channels;
+	delete rest.mentionable;
+	return deepFreeze({ kind: NodeKind.select, ...rest, ...(entity !== undefined ? { entity } : {}) }) as SelectNode;
 }
 
 /** A modal root: inputs and text, opened from a handler via `ui.showModal`. */

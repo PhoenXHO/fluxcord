@@ -43,6 +43,7 @@ import {
 	code,
 	codeblock,
 	container,
+	entityFlagOf,
 	entitySelect,
 	error,
 	flattenTextContent,
@@ -234,11 +235,12 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 			if (lifted !== undefined && selectProps.options !== undefined) {
 				throw new Error('modal-select takes an options prop or option children, never both');
 			}
-			if (selectProps.options !== undefined && selectProps.entity !== undefined) {
+			const entity = entityFlagOf(selectProps as Record<string, unknown>);
+			if (selectProps.options !== undefined && entity !== undefined) {
 				throw new Error('a select takes either options or entity, never both');
 			}
 			const withOptions = lifted !== undefined ? { ...selectProps, options: lifted } : selectProps;
-			return withOptions.entity !== undefined
+			return entity !== undefined
 				? entitySelect(withOptions as EntitySelectProps)
 				: optionSelect(withOptions as OptionSelectProps);
 		}
@@ -339,8 +341,9 @@ function splitRawChildren(props: unknown): { node: Record<string, unknown>; chil
  * Lifts `<option>` children into the parent's options array: every coerced
  * child must be an option-built SelectOption (a label/value pair). Returns
  * undefined when there were no children, so the options prop stands.
+ * Exported for the kit's Select, which lifts the same way at draw time.
  */
-function optionsFromChildren(tag: string, children: readonly TreeNode[]): readonly SelectOption[] | undefined {
+export function optionsFromChildren(tag: string, children: readonly unknown[]): readonly SelectOption[] | undefined {
 	if (children.length === 0) return undefined;
 	return children.map((child) => {
 		const candidate = child as unknown as Partial<SelectOption>;

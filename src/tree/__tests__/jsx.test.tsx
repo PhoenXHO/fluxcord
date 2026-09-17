@@ -14,7 +14,6 @@ import { jsx as factory, Fragment as FragmentTag } from '../jsx-runtime.js';
 import { button, entitySelect, input, link, optionSelect, text, view } from '../builders.js';
 import { runtimeKit } from '../kit.js';
 import { validateTree } from '../validate.js';
-import { SelectEntity } from '../vocab.js';
 import type { ComponentResult } from '../jsx-runtime.js';
 import type { CheckboxGroupNode, TextNode, TreeNode, ViewNode } from '../types.js';
 
@@ -105,21 +104,36 @@ describe('kit controls', () => {
 		expect(viaTsx).toEqual(optionSelect({ placeholder: 'Pick', options, onSelect: onClick }));
 	});
 
-	it('Select with entity is the entitySelect builder - same node', () => {
-		const viaTsx = <runtimeKit.Select entity={SelectEntity.Users} onSelect={onClick} />;
+	it('Select with an entity flag is the entitySelect builder - same node', () => {
+		const viaTsx = <runtimeKit.Select users onSelect={onClick} />;
 
-		expect(viaTsx).toEqual(entitySelect({ entity: SelectEntity.Users, onSelect: onClick }));
+		expect(viaTsx).toEqual(entitySelect({ users: true, onSelect: onClick }));
 	});
 
-	it('Select with both options and entity throws at construction', () => {
-		const options = [{ label: '1h', value: '1h' }];
-		expect(() => <runtimeKit.Select options={options} entity={SelectEntity.Users} onSelect={onClick} />).toThrow(/never both/);
+	it('Select lifts option children into the options list', () => {
+		const viaTsx = (
+			<runtimeKit.Select placeholder="Pick" onSelect={onClick}>
+				<option value="1h">1 hour</option>
+			</runtimeKit.Select>
+		);
+		expect(viaTsx).toEqual(optionSelect({ placeholder: 'Pick', options: [{ label: '1 hour', value: '1h' }], onSelect: onClick }));
 	});
 
-	it('Select takes no children - options ride the options prop', () => {
+	it('Select with both options and an entity flag throws at construction', () => {
 		const options = [{ label: '1h', value: '1h' }];
 		const raw = factory as unknown as (type: unknown, props: unknown) => TreeNode;
-		expect(() => raw(runtimeKit.Select, { options, onSelect: onClick, children: text('junk') })).toThrow(/no children/);
+		expect(() => raw(runtimeKit.Select, { options, users: true, onSelect: onClick })).toThrow(/never both/);
+	});
+
+	it('Select with an entity flag and option children throws at construction', () => {
+		const raw = factory as unknown as (type: unknown, props: unknown) => TreeNode;
+		expect(() => raw(runtimeKit.Select, { roles: true, onSelect: onClick, children: [{ label: 'A', value: 'a' }] })).toThrow(/never both/);
+	});
+
+	it('Select takes only option children', () => {
+		const options = [{ label: '1h', value: '1h' }];
+		const raw = factory as unknown as (type: unknown, props: unknown) => TreeNode;
+		expect(() => raw(runtimeKit.Select, { options, onSelect: onClick, children: text('junk') })).toThrow(/only <option>/);
 	});
 
 	it('Button folds its JSX children into the label', () => {
@@ -153,9 +167,9 @@ describe('jsx control surfaces', () => {
 // --- Modal form controls ---------------------------------------------------------------
 
 describe('jsx modal form controls', () => {
-	it('a modal-select with an entity is the entitySelect builder - same node', () => {
-		const viaTsx = <modal-select id="c" label="Channel" entity={SelectEntity.Channels} required />;
-		expect(viaTsx).toEqual(entitySelect({ id: 'c', label: 'Channel', entity: SelectEntity.Channels, required: true }));
+	it('a modal-select with an entity flag is the entitySelect builder - same node', () => {
+		const viaTsx = <modal-select id="c" label="Channel" channels required />;
+		expect(viaTsx).toEqual(entitySelect({ id: 'c', label: 'Channel', channels: true, required: true }));
 	});
 
 	it('a modal-select lifts option children into the options list', () => {

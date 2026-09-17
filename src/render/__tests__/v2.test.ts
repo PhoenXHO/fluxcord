@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { button, checkbox, checkboxGroup, container, entitySelect, hr, input, link, modal, optionSelect, radioGroup, row, text, view } from '../../tree/builders.js';
-import { SelectEntity } from '../../tree/vocab.js';
 import { actionHash } from '../action-hash.js';
 import { renderV2Message, renderV2Modal, RenderError } from '../v2.js';
 import type { V2MessagePayload, V2ModalPayload } from '../v2.js';
@@ -137,19 +136,19 @@ describe('renderV2Message - select', () => {
 
 	it('maps every entity source to its platform select type', () => {
 		for (const [entity, wire] of [
-			[SelectEntity.Users, 5],
-			[SelectEntity.Roles, 6],
-			[SelectEntity.Mentionable, 7],
-			[SelectEntity.Channels, 8],
+			['users', 5],
+			['roles', 6],
+			['mentionable', 7],
+			['channels', 8],
 		] as const) {
-			const payload = render(view({}, row({}, entitySelect({ onSelect: go, entity }))));
+			const payload = render(view({}, row({}, entitySelect(force<Parameters<typeof entitySelect>[0]>({ onSelect: go, [entity]: true })))));
 			expect(payload.components)
 				.toEqual([{ type: 1, components: [{ type: wire, custom_id: CUSTOM_ID }] }]);
 		}
 	});
 
 	it('renders entity defaultIds as default_values', () => {
-		const select = entitySelect({ onSelect: go, entity: SelectEntity.Roles, defaultIds: ['r1', 'r2'] });
+		const select = entitySelect({ onSelect: go, roles: true, defaultIds: ['r1', 'r2'] });
 		expect(render(view({}, row({}, select))).components).toEqual([{
 			type: 1,
 			components: [{
@@ -161,7 +160,7 @@ describe('renderV2Message - select', () => {
 	});
 
 	it('loudly rejects defaultIds on a mentionable select', () => {
-		const select = entitySelect({ onSelect: go, entity: SelectEntity.Mentionable, defaultIds: ['m1'] });
+		const select = entitySelect({ onSelect: go, mentionable: true, defaultIds: ['m1'] });
 		expect(() => render(view({}, row({}, select)))).toThrow(/mentionable/);
 	});
 
@@ -171,7 +170,7 @@ describe('renderV2Message - select', () => {
 	});
 
 	it('loudly rejects a select carrying both options and entity', () => {
-		const both = force<ControlNode>({ kind: 'select', onSelect: go, options: [{ label: 'A', value: 'a' }], entity: SelectEntity.Users });
+		const both = force<ControlNode>({ kind: 'select', onSelect: go, options: [{ label: 'A', value: 'a' }], entity: 'users' });
 		expect(() => render(view({}, row({}, both)))).toThrow(RenderError);
 	});
 
@@ -406,7 +405,7 @@ describe('renderV2Modal - form controls', () => {
 		const payload = renderModal(modal({ title: 'T' }, entitySelect({
 			id: 'c',
 			label: 'Channel',
-			entity: SelectEntity.Channels,
+			channels: true,
 			defaultIds: ['ch1'],
 		})));
 		expect(payload.components).toEqual([{

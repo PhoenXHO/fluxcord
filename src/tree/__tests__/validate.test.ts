@@ -15,7 +15,7 @@ import {
 	text,
 	view,
 } from '../builders.js';
-import { NodeKind, SelectEntity } from '../vocab.js';
+import { NodeKind } from '../vocab.js';
 import { validateTree } from '../validate.js';
 import type { ButtonNode, ContainerChild, ControlNode, InputNode, ModalChild, SelectNode, TreeRoot, ViewChild } from '../types.js';
 
@@ -93,7 +93,7 @@ describe('validateTree - structure rules', () => {
 
 	it('rule 8: select must set exactly one of options/entity (both)', () => {
 		const both = force<SelectNode>({
-			...entitySelect({ onSelect: handler, entity: SelectEntity.Users }),
+			...entitySelect({ onSelect: handler, users: true }),
 			options: [{ label: 'A', value: 'a' }],
 		});
 		const tree = view({}, row({}, both));
@@ -164,7 +164,7 @@ describe('validateTree - value & bounds rules', () => {
 		})))).toContain(12);
 		expect(rulesOf(withSelect(entitySelect({
 			onSelect: handler,
-			entity: SelectEntity.Users,
+			users: true,
 			minSelected: -1,
 		})))).toContain(12);
 	});
@@ -190,18 +190,18 @@ describe('validateTree - value & bounds rules', () => {
 	it('rule 26: entity defaultIds fit the selection cap', () => {
 		expect(rulesOf(withSelect(entitySelect({
 			onSelect: handler,
-			entity: SelectEntity.Roles,
+			roles: true,
 			defaultIds: ['1', '2', '3'],
 			maxSelected: 2,
 		})))).toContain(26);
 		expect(rulesOf(withSelect(entitySelect({
 			onSelect: handler,
-			entity: SelectEntity.Roles,
+			roles: true,
 			defaultIds: ['1', '2'],
 		})))).toContain(26);
 		expect(rulesOf(withSelect(entitySelect({
 			onSelect: handler,
-			entity: SelectEntity.Roles,
+			roles: true,
 			defaultIds: ['1'],
 			maxSelected: 3,
 		})))).toEqual([]);
