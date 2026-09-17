@@ -17,10 +17,10 @@
  * just work: false/null/undefined drop (`{cond && <row/>}`), arrays flatten
  * arbitrarily deep (`.map()`, fragments, array-returning components), and
  * bare strings/numbers throw loudly everywhere except the text-like tags
- * (text, code, codeblock), where they ARE the content.
+ * (text, code, codeblock, and the callouts error, warning, info), where they ARE the content.
  *
  * Tag vocabulary splits one way, with no overlap: layout and leaf kinds
- * are the intrinsics (view, text, row, container, link, modal, input);
+ * are the intrinsics (view, text, row, container, link, modal, input, hr);
  * none of them carries a handler. The handler-carrying controls (Button,
  * Select) exist only as screen-kit members (tree/kit):
  * a view destructures them from its kit parameter and uses them as
@@ -36,16 +36,21 @@ import {
 	code,
 	codeblock,
 	container,
+	error,
 	flattenTextContent,
+	hr,
+	info,
 	input,
 	link,
 	modal,
 	row,
 	text,
 	view,
+	warning,
 } from './builders.js';
 import type {
 	ContainerProps,
+	HrProps,
 	InputProps,
 	LinkProps,
 	ModalProps,
@@ -53,11 +58,13 @@ import type {
 	TextProps,
 	ViewProps,
 } from './builders.js';
+import { SeparatorSpacing } from './vocab.js';
 import type {
 	ComponentResult,
 	ContainerChild,
 	ContainerNode,
 	ControlNode,
+	HrNode,
 	InputNode,
 	LinkNode,
 	ModalChild,
@@ -73,6 +80,53 @@ import { coerceChildren } from './normalize.js';
 
 /** The element union lives with the tree types; re-exported for TSX authors. */
 export type { ComponentResult };
+
+/** The callout tags keyed as their JSX spellings; each folds its children and fences them in its color. */
+const CALLOUT_TAGS: Record<'error' | 'warning' | 'info', (...children: readonly TextChild[]) => TextNode> = {
+	error,
+	info,
+	warning,
+};
+
+/**
+ * The hr tag's flag vocabulary: `p-small` / `p-large` pick the padding,
+ * `no-divider` drops the visible line. A flag takes no value. Note the
+ * compiler skips hyphenated JSX attributes when checking a tag, so this
+ * type documents the surface rather than enforcing it; the runtime
+ * rejects typoed flags and valued flags alike.
+ */
+export type HrTagProps = {
+	readonly 'p-small'?: true;
+	readonly 'p-large'?: true;
+	readonly 'no-divider'?: true;
+};
+
+/** hr tag flags -> the node's spacing value. */
+const HR_SPACING_FLAGS: Record<string, SeparatorSpacing> = {
+	'p-small': SeparatorSpacing.Small,
+	'p-large': SeparatorSpacing.Large,
+};
+
+/**
+ * Turns the hr tag's raw props into node props. Every key must be a
+ * known flag and every flag must arrive bare (`true`, as the compiler
+ * emits for `<hr p-large />`): anything else throws, because a typoed
+ * flag would otherwise ride into the tree unnoticed.
+ */
+function hrProps(raw: Record<string, unknown>): HrProps {
+	let out: HrProps = {};
+	for (const [key, value] of Object.entries(raw)) {
+		const spacing = HR_SPACING_FLAGS[key];
+		if (spacing === undefined && key !== 'no-divider') {
+			throw new Error(`unknown hr flag '${key}'`);
+		}
+		if (value !== true) {
+			throw new Error(`hr flag '${key}' takes no value`);
+		}
+		out = spacing !== undefined ? { ...out, spacing } : { ...out, divider: false };
+	}
+	return out;
+}
 
 /**
  * The fragment tag (`<>...</>`). Declared as a function because the compiler
@@ -94,18 +148,25 @@ export function jsx(tag: 'container', props: ContainerProps & { readonly childre
 export function jsx(tag: 'link', props: LinkProps | null): LinkNode;
 export function jsx(tag: 'modal', props: ModalProps & { readonly children?: unknown } | null): ModalNode;
 export function jsx(tag: 'input', props: InputProps | null): InputNode;
+export function jsx(tag: 'hr', props: HrTagProps | null): HrNode;
+export function jsx(tag: 'error', props: { readonly children?: unknown } | null): TextNode;
+export function jsx(tag: 'warning', props: { readonly children?: unknown } | null): TextNode;
+export function jsx(tag: 'info', props: { readonly children?: unknown } | null): TextNode;
 export function jsx(type: typeof Fragment, props: { readonly children?: unknown } | null): readonly TreeNode[];
 export function jsx<P extends object, T extends ComponentResult>(type: (props: P) => T, props: P | null): T;
 export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode[] {
 	if (typeof type === 'function' && type !== Fragment) {
 		return callComponent(type as (props: unknown) => unknown, bareProps(props));
 	}
-	if (type === 'text' || type === 'code' || type === 'codeblock') {
+	if (type === 'text' || type === 'code' || type === 'codeblock' || type === 'error' || type === 'warning' || type === 'info') {
 		// The text-like tags fold their children themselves: copy arrives as
 		// bare strings, which coerceChildren would reject.
 		const { node, children } = splitRawChildren(props);
 		if (type === 'text') {
 			return text(node as TextProps, ...(children as readonly TextChild[]));
+		}
+		if (type === 'error' || type === 'warning' || type === 'info') {
+			return CALLOUT_TAGS[type](...(children as readonly TextChild[]));
 		}
 		const body = flattenTextContent(children);
 		return type === 'code' ? code(body) : codeblock(body, (node as { readonly lang?: string }).lang);
@@ -127,6 +188,8 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 			return modal(node as ModalProps, ...children as readonly ModalChild[]);
 		case 'input':
 			return input(node as InputProps);
+		case 'hr':
+			return hr(hrProps(node));
 		default:
 			throw new Error(`jsx: unknown tag '${String(type)}'`);
 	}
@@ -212,10 +275,14 @@ export namespace JSX {
 		text: TextProps & { readonly children?: unknown };
 		code: { readonly children?: unknown };
 		codeblock: { readonly lang?: string; readonly children?: unknown };
+		error: { readonly children?: unknown };
+		warning: { readonly children?: unknown };
+		info: { readonly children?: unknown };
 		row: RowProps & { readonly children?: unknown };
 		container: ContainerProps & { readonly children?: unknown };
 		link: LinkProps;
 		modal: ModalProps & { readonly children?: unknown };
 		input: InputProps;
+		hr: HrTagProps;
 	}
 }

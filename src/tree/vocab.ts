@@ -19,6 +19,7 @@ export enum NodeKind {
 	select = 'select',
 	modal = 'modal',
 	input = 'input',
+	hr = 'hr',
 }
 
 /** Button visual styles, mapped straight to Discord's. */
@@ -45,3 +46,10 @@ export const SelectEntity = {
 	Mentionable: 'mentionable',
 } as const;
 export type SelectEntity = (typeof SelectEntity)[keyof typeof SelectEntity];
+
+/** Padding sizes around an hr's line, mapped to the platform's separator spacing. */
+export const SeparatorSpacing = {
+	Small: 'small',
+	Large: 'large',
+} as const;
+export type SeparatorSpacing = (typeof SeparatorSpacing)[keyof typeof SeparatorSpacing];

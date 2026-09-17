@@ -20,6 +20,7 @@ import {
 	ComponentType,
 	MessageFlags,
 	SelectMenuDefaultValueType,
+	SeparatorSpacingSize,
 	TextInputStyle,
 } from 'discord-api-types/v10';
 import type {
@@ -31,6 +32,7 @@ import type {
 	APIMessageTopLevelComponent,
 	APIModalInteractionResponseCallbackComponent,
 	APISelectMenuComponent,
+	APISeparatorComponent,
 	APITextDisplayComponent,
 } from 'discord-api-types/v10';
 import {
@@ -38,11 +40,14 @@ import {
 	InputStyle as TreeInputStyle,
 	NodeKind,
 	SelectEntity,
+	SeparatorSpacing,
 } from '../tree/vocab.js';
+import type { SeparatorSpacing as TreeSeparatorSpacing } from '../tree/vocab.js';
 import type {
 	ButtonNode,
 	ContainerNode,
 	ControlNode,
+	HrNode,
 	InputNode,
 	ModalNode,
 	RowNode,
@@ -107,6 +112,12 @@ const INPUT_STYLES: Record<TreeInputStyle, TextInputStyle> = {
 	[TreeInputStyle.Paragraph]: TextInputStyle.Paragraph,
 };
 
+/** Tree hr spacing -> platform separator padding size. */
+const HR_SPACING: Record<TreeSeparatorSpacing, SeparatorSpacingSize> = {
+	[SeparatorSpacing.Small]: SeparatorSpacingSize.Small,
+	[SeparatorSpacing.Large]: SeparatorSpacingSize.Large,
+};
+
 /** Select entity source -> wire shape. Each entity kind is its own component type on the platform, so the table pairs every source with a builder taking the `custom_id` and optional preselected ids (`default_values`; mentionable ignores them — its defaults mix users and roles, and an id alone cannot say which is which). */
 const ENTITY_SELECTS: Record<SelectEntity, (customId: string, defaultIds?: readonly string[]) => APISelectMenuComponent> = {
 	[SelectEntity.Users]: (customId, defaultIds) => ({
@@ -147,6 +158,15 @@ function textDisplay(content: string, path: string): APITextDisplayComponent {
 /** Renders a text node. A title, when present, becomes a bold line above the body; the platform has no titled text block of its own. */
 function renderText(node: TextNode, path: string): APITextDisplayComponent {
 	return textDisplay(node.title === undefined ? node.body : `**${node.title}**\n${node.body}`, path);
+}
+
+/** Renders an hr into the platform's Separator. Defaults ride the platform (visible line, small padding), so they are omitted from the payload. */
+function renderSeparator(node: HrNode): APISeparatorComponent {
+	return {
+		type: ComponentType.Separator,
+		...(node.divider === false ? { divider: false } : {}),
+		...(node.spacing !== undefined ? { spacing: HR_SPACING[node.spacing] } : {}),
+	};
 }
 
 /** Encodes a control's `custom_id` from its stamp. Nothing an author named rides the wire, only session, screen and handler. */
@@ -240,7 +260,8 @@ function renderContainer(node: ContainerNode, path: string, sessionId: string, s
 			switch (child.kind) {
 				case NodeKind.text: return renderText(child, childPath);
 				case NodeKind.row: return renderRow(child, childPath, sessionId, screenKey, stampOf);
-				default: throw new RenderError(childPath, `container child must be text or row, got '${kindOf(child)}'`);
+				case NodeKind.hr: return renderSeparator(child);
+				default: throw new RenderError(childPath, `container child must be text, row or hr, got '${kindOf(child)}'`);
 			}
 		}),
 	};
@@ -252,6 +273,7 @@ function renderTopLevel(node: ViewNode['children'][number], path: string, sessio
 		case NodeKind.text: return renderText(node, path);
 		case NodeKind.row: return renderRow(node, path, sessionId, screenKey, stampOf);
 		case NodeKind.container: return renderContainer(node, path, sessionId, screenKey, stampOf);
+		case NodeKind.hr: return renderSeparator(node);
 		default: throw new RenderError(path, `unknown view child kind '${kindOf(node)}'`);
 	}
 }

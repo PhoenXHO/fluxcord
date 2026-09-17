@@ -17,6 +17,7 @@ import type {
 	ContainerChild,
 	ContainerNode,
 	ControlNode,
+	HrNode,
 	InputNode,
 	LinkNode,
 	ModalChild,
@@ -45,6 +46,7 @@ export type ViewProps = Omit<ViewNode, 'kind' | 'children'>;
 export type TextProps = { readonly title?: string };
 export type RowProps = Omit<RowNode, 'kind' | 'children'>;
 export type ContainerProps = Omit<ContainerNode, 'kind' | 'children'>;
+export type HrProps = Omit<HrNode, 'kind'>;
 export type ButtonProps = Omit<ButtonNode, 'kind'>;
 export type LinkProps = Omit<LinkNode, 'kind'>;
 export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity' | 'defaultIds'> & { readonly options: readonly SelectOption[] };
@@ -105,6 +107,26 @@ export function code(content: string): TextNode {
  */
 export function codeblock(content: string, lang?: string): TextNode {
 	return deepFreeze({ kind: NodeKind.text, body: fencedCodeBlock(content, lang) });
+}
+
+/**
+ * The message as red text in an ansi code fence. The children fold like
+ * the text tag's, so interpolated values read naturally:
+ * `error(\`Key ${key} rejected\`)` or `<error>Key {key} rejected</error>`.
+ * A callout is block-level: the fence always renders as its own block.
+ */
+export function error(...children: readonly TextChild[]): TextNode {
+	return callout(ANSI_RED, children);
+}
+
+/** The message as yellow text in an ansi code fence, folded like {@link error}. */
+export function warning(...children: readonly TextChild[]): TextNode {
+	return callout(ANSI_YELLOW, children);
+}
+
+/** The message as blue text in an ansi code fence, folded like {@link error}. */
+export function info(...children: readonly TextChild[]): TextNode {
+	return callout(ANSI_BLUE, children);
 }
 
 /**
@@ -172,6 +194,24 @@ function fencedCodeBlock(content: string, lang?: string): string {
 	return `${fence}${lang ?? ''}\n${body}\n${fence}`;
 }
 
+// --- Callouts ---------------------------------------------------------------------
+
+/** Discord's ANSI foreground codes: red, yellow and blue inside an ```ansi fence. */
+const ANSI_RED = 31;
+const ANSI_YELLOW = 33;
+const ANSI_BLUE = 34;
+
+/**
+ * Folds the children and wraps the result in a color-wrapped ansi fence.
+ * The color state holds for the whole fence, so multi-line messages stay
+ * colored; the fence grows past any backtick run in the message, per the
+ * CommonMark rule the other fence helpers follow.
+ */
+function callout(color: number, children: readonly TextChild[]): TextNode {
+	const body = `\u001b[0;${color}m${flattenTextContent(children)}\u001b[0m`;
+	return deepFreeze({ kind: NodeKind.text, body: fencedCodeBlock(body, 'ansi') });
+}
+
 /** A control row: up to 5 buttons or links, or exactly one select. */
 export function row(props: RowProps, ...children: readonly ControlNode[]): RowNode {
 	return deepFreeze({ kind: NodeKind.row, ...props, children });
@@ -180,6 +220,16 @@ export function row(props: RowProps, ...children: readonly ControlNode[]): RowNo
 /** A boxed section: text and rows, optional accent color. */
 export function container(props: ContainerProps, ...children: readonly ContainerChild[]): ContainerNode {
 	return deepFreeze({ kind: NodeKind.container, ...props, children });
+}
+
+/**
+ * A horizontal separator: a divider line with vertical padding, between
+ * top-level children or inside a container. `divider: false` drops the
+ * line and keeps only the spacing. The tag form spells the options as
+ * flags: `<hr p-large />` and `<hr no-divider />`.
+ */
+export function hr(props: HrProps = {}): HrNode {
+	return deepFreeze({ kind: NodeKind.hr, ...props });
 }
 
 /** A clickable button bound to a handler. */

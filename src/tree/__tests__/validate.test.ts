@@ -3,6 +3,7 @@ import {
 	button,
 	container,
 	entitySelect,
+	hr,
 	input,
 	link,
 	modal,
@@ -274,5 +275,21 @@ describe('validateTree - violation details', () => {
 		const tree = view({}, row({}, go(), button({ onClick: handler, label: '' })));
 		const violation = validateTree(tree).find((v) => v.rule === 15);
 		expect(violation?.path).toBe('view/row[0]/button[1]');
+	});
+});
+
+describe('validateTree - hr', () => {
+	it('accepts an hr in views and containers', () => {
+		expect(rulesOf(view({}, text('a'), hr(), container({}, text('b'), hr())))).toEqual([]);
+	});
+
+	it('rule 6: an hr is not a modal child', () => {
+		expect(rulesOf(force<TreeRoot>(
+			modal({ title: 'T' }, note(), force<ModalChild>(hr())),
+		))).toContain(6);
+	});
+
+	it('rule 27: hr spacing must be small or large', () => {
+		expect(rulesOf(view({}, force<ViewChild>(hr({ spacing: 'huge' as never }))))).toContain(27);
 	});
 });

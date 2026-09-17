@@ -14,10 +14,11 @@
  * @module tree/validate
  */
 
-import { NodeKind } from './vocab.js';
+import { NodeKind, SeparatorSpacing } from './vocab.js';
 import type {
 	ButtonNode,
 	ContainerNode,
+	HrNode,
 	InputNode,
 	LinkNode,
 	ModalNode,
@@ -84,6 +85,7 @@ function validateNode(node: TreeNode, path: string, violations: Violation[]): vo
 		case NodeKind.select: validateSelect(node, path, violations); break;
 		case NodeKind.modal: validateModal(node, path, violations); break;
 		case NodeKind.input: validateInput(node, path, violations); break;
+		case NodeKind.hr: validateHr(node, path, violations); break;
 		default: {
 			// Exhaustive check: adding a kind to NodeKind without a case here
 			// breaks the build. So `node` stops being `never` in this arm.
@@ -110,11 +112,11 @@ function validateView(node: ViewNode, path: string, violations: Violation[]): vo
 		if (!KNOWN_KINDS.has(child.kind)) {
 			// Unknown kind: report it and move on.
 			violations.push({ path: childPath, rule: 9, message: `unknown node kind '${kindOf(child)}'` });
-		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.container) {
+		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.container && child.kind !== NodeKind.hr) {
 			violations.push({
 				path: childPath,
 				rule: 3,
-				message: `view child must be text, row or container, got '${kindOf(child)}'`,
+				message: `view child must be text, row, container or hr, got '${kindOf(child)}'`,
 			});
 		} else {
 			validateNode(child, childPath, violations);
@@ -142,11 +144,11 @@ function validateContainer(node: ContainerNode, path: string, violations: Violat
 		const childPath = `${path}/${kindOf(child)}[${index}]`;
 		if (!KNOWN_KINDS.has(child.kind)) {
 			violations.push({ path: childPath, rule: 9, message: `unknown node kind '${kindOf(child)}'` });
-		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row) {
+		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.hr) {
 			violations.push({
 				path: childPath,
 				rule: 23,
-				message: `container child must be text or row, got '${kindOf(child)}'`,
+				message: `container child must be text, row or hr, got '${kindOf(child)}'`,
 			});
 		} else {
 			validateNode(child, childPath, violations);
@@ -273,6 +275,20 @@ function isHttpUrl(url: string): boolean {
 		return parsed.protocol === 'http:' || parsed.protocol === 'https:';
 	} catch {
 		return false;
+	}
+}
+
+/**
+ * An hr's spacing is small or large; `divider` is boolean by type, so
+ * only a corrupted spacing can arrive through a cast.
+ */
+function validateHr(node: HrNode, path: string, violations: Violation[]): void {
+	if (node.spacing !== undefined && node.spacing !== SeparatorSpacing.Small && node.spacing !== SeparatorSpacing.Large) {
+		violations.push({
+			path,
+			rule: 27,
+			message: `hr spacing must be 'small' or 'large', got '${String(node.spacing)}'`,
+		});
 	}
 }
 

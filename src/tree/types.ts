@@ -13,7 +13,7 @@
  */
 
 import { NodeKind } from './vocab.js';
-import type { ButtonStyle, InputStyle, SelectEntity } from './vocab.js';
+import type { ButtonStyle, InputStyle, SelectEntity, SeparatorSpacing } from './vocab.js';
 import type { ActionHandler, PermissionPolicy } from '../pipeline/types.js';
 
 // Properties of each node type are read-only because the tree is immutable
@@ -54,6 +54,19 @@ export interface ContainerNode {
 	/** Panel accent color; absent = neutral panel. */
 	readonly color?: number;
 	readonly children: readonly ContainerChild[];
+}
+
+/**
+ * A horizontal separator: a divider line with vertical padding, or with
+ * `divider: false`, padding alone. Maps to the platform's Separator
+ * component; legal in views and containers, never in modals.
+ */
+export interface HrNode {
+	readonly kind: NodeKind.hr;
+	/** Whether the visible line is drawn. Default true. */
+	readonly divider?: boolean;
+	/** Padding size around the line. Default small. */
+	readonly spacing?: SeparatorSpacing;
 }
 
 /**
@@ -185,8 +198,8 @@ export interface InputNode {
 // compiler enforces these relationships, so illegal nesting is a compile error.
 
 export type ControlNode = ButtonNode | LinkNode | SelectNode;
-export type ViewChild = TextNode | RowNode | ContainerNode;
-export type ContainerChild = TextNode | RowNode;
+export type ViewChild = TextNode | RowNode | ContainerNode | HrNode;
+export type ContainerChild = TextNode | RowNode | HrNode;
 export type ModalChild = InputNode | TextNode;
 export type TreeRoot = ViewNode | ModalNode;
 
@@ -199,6 +212,7 @@ export type TreeNode =
 	| TextNode
 	| RowNode
 	| ContainerNode
+	| HrNode
 	| ButtonNode
 	| LinkNode
 	| SelectNode

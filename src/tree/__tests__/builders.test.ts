@@ -5,7 +5,10 @@ import {
 	codeblock,
 	container,
 	entitySelect,
+	error,
 	flattenTextContent,
+	hr,
+	info,
 	input,
 	link,
 	modal,
@@ -13,8 +16,10 @@ import {
 	row,
 	text,
 	view,
+	warning,
 } from '../builders.js';
-import { ButtonStyle, InputStyle, NodeKind, SelectEntity } from '../vocab.js';
+import { ButtonStyle, InputStyle, NodeKind, SelectEntity, SeparatorSpacing } from '../vocab.js';
+import type { TextChild } from '../types.js';
 
 /** Identity-bound fixture: the handler object itself is the binding. */
 const go = (): void => {};
@@ -34,6 +39,7 @@ describe('builders', () => {
 		expect(entitySelect({ onSelect: go, entity: SelectEntity.Users }).kind).toBe(NodeKind.select);
 		expect(modal({ title: 'T' }, input({ id: 'f', label: 'L' })).kind).toBe(NodeKind.modal);
 		expect(input({ id: 'f', label: 'L' }).kind).toBe(NodeKind.input);
+		expect(hr().kind).toBe(NodeKind.hr);
 	});
 
 	it('passes props through', () => {
@@ -142,5 +148,48 @@ describe('text content', () => {
 	it('code and codeblock output is frozen', () => {
 		expect(Object.isFrozen(code('x'))).toBe(true);
 		expect(Object.isFrozen(codeblock('x'))).toBe(true);
+	});
+});
+
+describe('callouts', () => {
+	it('error, warning and info fence their message in their color', () => {
+		expect(error('API key rejected').body).toBe('```ansi\n\u001b[0;31mAPI key rejected\u001b[0m\n```');
+		expect(warning('careful').body).toBe('```ansi\n\u001b[0;33mcareful\u001b[0m\n```');
+		expect(info('heads up').body).toBe('```ansi\n\u001b[0;34mheads up\u001b[0m\n```');
+	});
+
+	it('children fold like the text tag - numbers included', () => {
+		expect(error('Key ', 42, ' rejected').body).toBe('```ansi\n\u001b[0;31mKey 42 rejected\u001b[0m\n```');
+	});
+
+	it('multi-line messages stay in one fence; a backtick run grows it', () => {
+		expect(error('line1\nline2').body).toBe('```ansi\n\u001b[0;31mline1\nline2\u001b[0m\n```');
+		expect(error('a```b').body.startsWith('````ansi')).toBe(true);
+	});
+
+	it('only copy belongs in a callout', () => {
+		const rowNode = row({}, button({ onClick: go, label: 'Go' }));
+		expect(() => error(force<TextChild>(rowNode))).toThrow(/not text content/);
+	});
+
+	it('callout output is frozen', () => {
+		expect(Object.isFrozen(error('x'))).toBe(true);
+		expect(Object.isFrozen(warning('x'))).toBe(true);
+		expect(Object.isFrozen(info('x'))).toBe(true);
+	});
+});
+
+describe('hr', () => {
+	it('defaults to a visible line with small padding; props pass through', () => {
+		expect(hr()).toEqual({ kind: NodeKind.hr });
+		expect(hr({ spacing: SeparatorSpacing.Large, divider: false })).toEqual({
+			kind: NodeKind.hr,
+			divider: false,
+			spacing: 'large',
+		});
+	});
+
+	it('is frozen', () => {
+		expect(Object.isFrozen(hr())).toBe(true);
 	});
 });

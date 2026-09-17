@@ -187,3 +187,39 @@ describe('jsx text content', () => {
 		expect(kids(tree)[0].kind).toBe('text');
 	});
 });
+
+// --- Callouts & hr ------------------------------------------------------------------------
+
+describe('jsx callouts', () => {
+	it('the callout tags fold their children into colored ansi fences', () => {
+		expect((<error>Key {'k'} rejected</error> as TextNode).body).toBe('```ansi\n\u001b[0;31mKey k rejected\u001b[0m\n```');
+		expect((<warning>w</warning> as TextNode).body).toBe('```ansi\n\u001b[0;33mw\u001b[0m\n```');
+		expect((<info>i</info> as TextNode).body).toBe('```ansi\n\u001b[0;34mi\u001b[0m\n```');
+	});
+
+	it('a callout folds inside a text body like any other text node', () => {
+		expect((<text>Step 2 failed: <error>bad key</error></text> as TextNode).body)
+			.toBe('Step 2 failed: ```ansi\n\u001b[0;31mbad key\u001b[0m\n```');
+	});
+});
+
+describe('jsx hr flags', () => {
+	it('bare hr is the default node; flags map to clean props', () => {
+		expect(<hr />).toEqual({ kind: 'hr' });
+		expect(<hr p-small />).toEqual({ kind: 'hr', spacing: 'small' });
+		expect(<hr p-large />).toEqual({ kind: 'hr', spacing: 'large' });
+		expect(<hr no-divider p-large />).toEqual({ kind: 'hr', divider: false, spacing: 'large' });
+	});
+
+	it('flag typos and valued flags throw - the compiler skips hyphenated attributes', () => {
+		const raw = factory as unknown as (type: string, props: unknown) => TreeNode;
+		expect(() => raw('hr', { 'p-lage': true })).toThrow(/unknown hr flag 'p-lage'/);
+		expect(() => raw('hr', { 'p-large': false })).toThrow(/takes no value/);
+		expect(() => raw('hr', { divider: false })).toThrow(/unknown hr flag 'divider'/);
+	});
+
+	it('hr is legal in views and containers', () => {
+		const tree = <view><text>a</text><hr /><container><text>b</text><hr /></container></view>;
+		expect(validateTree(tree as ViewNode)).toEqual([]);
+	});
+});

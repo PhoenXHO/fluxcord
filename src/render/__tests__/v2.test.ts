@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { button, container, entitySelect, input, link, modal, optionSelect, row, text, view } from '../../tree/builders.js';
+import { button, container, entitySelect, hr, input, link, modal, optionSelect, row, text, view } from '../../tree/builders.js';
 import { ButtonStyle, InputStyle, SelectEntity } from '../../tree/vocab.js';
 import { actionHash } from '../action-hash.js';
 import { renderV2Message, renderV2Modal, RenderError } from '../v2.js';
@@ -278,5 +278,24 @@ describe('renderV2Modal', () => {
 
 	it('rejects a non-modal root', () => {
 		expect(() => renderV2Modal(force<ModalNode>(text('x')), 'x')).toThrow(RenderError);
+	});
+});
+
+describe('renderV2Message - hr (Separator)', () => {
+	it('renders the platform default payload when no props are set', () => {
+		expect(render(view({}, text('a'), hr())).components[1]).toEqual({ type: 14 });
+	});
+
+	it('maps spacing and divider:false onto the payload', () => {
+		expect(render(view({}, hr({ spacing: 'large' }))).components[0]).toEqual({ type: 14, spacing: 2 });
+		expect(render(view({}, hr({ divider: false }))).components[0]).toEqual({ type: 14, divider: false });
+	});
+
+	it('renders inside containers', () => {
+		const payload = render(view({}, container({}, text('x'), hr({ spacing: 'large' }))));
+		expect(payload.components[0]).toEqual({
+			type: 17,
+			components: [{ type: 10, content: 'x' }, { type: 14, spacing: 2 }],
+		});
 	});
 });
