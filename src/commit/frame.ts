@@ -54,11 +54,14 @@ export function materializeTree(tree: ViewNode): MaterializedTree {
 		// The cast is the one type-erase point: controls carry never-typed
 		// handlers so any flow's typed handler fits, while the frame speaks
 		// the erased form. A control-declared policy rides its record to the
-		// policy consult.
+		// policy consult; the draw-phase ownership tag rides too (an empty
+		// array is a real tag: the root bag), so dispatch lenses by the
+		// handler's owner rather than the screen drawn on.
 		frame[id] = {
 			handler: handler as ActionHandler<unknown>,
 			label,
 			...(control.policy !== undefined ? { policy: control.policy } : {}),
+			...(control.slot !== undefined ? { slot: control.slot } : {}),
 		};
 	}
 

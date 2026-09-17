@@ -146,6 +146,20 @@ export function defineFlow<TData, const TScreens extends string = string>(
 }
 
 /**
+ * Marks the plugs' done handlers: though bound by the parent's wrap (a
+ * root-bag surface), a done handler must keep reading the SCREEN's slot
+ * lens, because `event.session.data` there is the subflow's final state.
+ * The commit phase's slot-tagging kit consults this and leaves such
+ * buttons untagged, so dispatch falls back to the screen's lens.
+ */
+const DONE_TAG = Symbol('fluxcord.subflowDone');
+
+/** True when the handler is a `subflow()` plug's done handler. */
+export function isSubflowDone(handler: unknown): boolean {
+	return typeof handler === 'function' && (handler as unknown as Record<symbol, unknown>)[DONE_TAG] === true;
+}
+
+/**
  * Builds a `SubflowPlug`. The subflow's data type is inferred from its
  * definition, so `onDone`'s `state` comes out fully typed with no
  * annotations at the call site. The returned `done` is one function
@@ -162,5 +176,6 @@ export function subflow<TSub>(spec: SubflowSpec<TSub>): SubflowPlug {
 		navigateBack(event.session);
 		spec.onDone?.(state as never, event.ui);
 	};
+	(done as unknown as Record<symbol, unknown>)[DONE_TAG] = true;
 	return { use: spec.use, at: spec.at, done };
 }

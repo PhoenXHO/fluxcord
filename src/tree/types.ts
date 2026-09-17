@@ -88,6 +88,15 @@ export interface ButtonNode {
 	 * If present, the button's policy overrides the flow's own policy.
 	 */
 	readonly policy?: PermissionPolicy;
+
+	/**
+	 * Draw-phase ownership tag, set by the commit phase's slot-tagging
+	 * kit: the bag path the handler lenses to at click time. The screen's
+	 * own controls carry their slot; the flow wrap's carry `[]` (the root
+	 * bag). Authors never set this by hand; untagged controls fall back to
+	 * the screen's slot at dispatch.
+	 */
+	readonly slot?: readonly string[];
 }
 
 /**
@@ -132,6 +141,13 @@ export interface SelectNode {
 	 * validation enforces its presence in messages.
 	 */
 	readonly onSelect?: ActionHandler<never>;
+
+	/**
+	 * Draw-phase ownership tag, set by the commit phase's slot-tagging
+	 * kit: the bag path the handler lenses to at click time. Same contract
+	 * as ButtonNode's `slot`; authors never set this by hand.
+	 */
+	readonly slot?: readonly string[];
 
 	// (options XOR entity) is enforced by the two select builders
 

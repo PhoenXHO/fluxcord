@@ -440,7 +440,10 @@ function world(options: WorldOptions = {}): World {
 	};
 	const refresh: ActionHandler<LottoData> = (event) => {
 		event.mutate((data) => {
-			data.count += 1;
+			// A different expression from bump on purpose: source-identical
+			// handlers share one action hash, and the stale-frame test below
+			// needs 'bump' truly absent from picker.pick's frame.
+			data.count = data.count + 1;
 		});
 	};
 	const open: ActionHandler<LottoData> = (event) => {
@@ -471,12 +474,12 @@ function world(options: WorldOptions = {}): World {
 		first: 'main',
 		initialData: { count: 0, picker: { chosen: 'none' } },
 		components: [
-			(tree, session): ViewNode => view({},
+			(tree, session, kit): ViewNode => view({},
 				...tree.children,
 				text('flow chrome'),
 				row({},
-					button({ onClick: refresh, label: 'refresh' }),
-					...(session.screen.startsWith('picker.') ? [button({ onClick: plug.done, label: 'Done' })] : []),
+					kit.Button({ onClick: refresh, label: 'refresh' }),
+					...(session.screen.startsWith('picker.') ? [kit.Button({ onClick: plug.done, label: 'Done' })] : []),
 				),
 			),
 		],
@@ -617,6 +620,19 @@ describe('dispatch - flow integration through the frame', () => {
 
 		expect(w.session.data.picker).toEqual({ chosen: 'winner' }); // the mutate hook wrote through the slot
 		expect(w.calls).toEqual(['redraw:picker.pick']);
+	});
+
+	it('a flow wrap control clicked on a subflow screen lenses to the root bag', async () => {
+		const w = world();
+		w.session.screen = 'picker.pick';
+		await w.draw();
+
+		await w.click('refresh');
+
+		// The wrap's refresh owns the root bag even though the click landed
+		// on a slotted screen: count increments on the bag, the slot untouched.
+		expect(w.session.data.count).toBe(1);
+		expect(w.session.data.picker).toEqual({ chosen: 'none' });
 	});
 
 	it('ui.go resolves a subflow root to its entry screen', async () => {

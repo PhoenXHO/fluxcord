@@ -11,6 +11,8 @@
 import { describe, expect, it } from 'vitest';
 import { actionHash } from '../../render/action-hash.js';
 import { button, container, optionSelect, row, text, view } from '../../tree/builders.js';
+import { runtimeKit } from '../../tree/kit.js';
+import { screenKitAt } from '../commit.js';
 import { materializeTree } from '../frame.js';
 
 /** Two products of one factory share byte-identical source: the collision shape. */
@@ -111,5 +113,35 @@ describe('materializeTree - the frame', () => {
 		expect(frame[stampOf(open)].policy).toBe(gate);
 		expect('policy' in frame[stampOf(plain)]).toBe(false);
 		expect(frame[stampOf(picked)].policy).toEqual({ owner: { ownerOnly: true, allowAdminOverride: true } });
+	});
+
+	it('an untagged control carries no slot: dispatch falls back to the screen lens', () => {
+		const node = runtimeKit.Button({ onClick: (): void => {}, label: 'Go' });
+		const { frame, stampOf } = materializeTree(view({}, row({}, node)));
+
+		expect('slot' in frame[stampOf(node)]).toBe(false);
+	});
+});
+
+describe('screenKitAt - draw-phase ownership tags', () => {
+	it('tags buttons and selects with the slot, and the record carries it', () => {
+		const kit = screenKitAt(['picker']);
+		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
+		const picked = kit.Select({ options: [{ label: 'A', value: 'a' }], onSelect: (): void => {} });
+		const { frame, stampOf } = materializeTree(view({}, row({}, node, picked)));
+
+		expect(node.slot).toEqual(['picker']);
+		expect(picked.slot).toEqual(['picker']);
+		expect(frame[stampOf(node)].slot).toEqual(['picker']);
+		expect(frame[stampOf(picked)].slot).toEqual(['picker']);
+	});
+
+	it('an empty tag is the root bag, not the absence of one', () => {
+		const kit = screenKitAt([]);
+		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
+		const { frame, stampOf } = materializeTree(view({}, row({}, node)));
+
+		expect(node.slot).toEqual([]);
+		expect(frame[stampOf(node)].slot).toEqual([]);
 	});
 });

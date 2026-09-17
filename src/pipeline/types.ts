@@ -354,6 +354,13 @@ export interface ActionRecord<TData = unknown> {
 	readonly label: string;
 	/** The control's own gate, when it declared one, rides the record to the policy consult. */
 	readonly policy?: PermissionPolicy;
+	/**
+	 * Draw-phase ownership tag copied from the control: the bag path the
+	 * handler lenses to at click time. `[]` is a real tag meaning the root
+	 * bag (flow-wrap controls); absent means the screen's own slot — the
+	 * historical lens a subflow screen's controls keep.
+	 */
+	readonly slot?: readonly string[];
 }
 
 /** The flow-authored death copy: command restart hint, extra note, or a whole custom screen. */

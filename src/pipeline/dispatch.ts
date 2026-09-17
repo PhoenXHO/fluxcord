@@ -341,15 +341,20 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 			}
 
 			const tools = options.makeUi(session, address, options.platform);
-			// Subflow screens (slot set) receive a lensed session: data reads
-			// and writes land in the bag slot their screen owns; every other
-			// property is the live record itself.
-			const slot = screen.slot;
-			const handlerSession: Session<unknown> = slot === undefined ? session : lensSession(session, slot);
-			const mutate = slot === undefined
+			// Lensing follows ownership, not the screen: the draw phase tags
+			// every control with the bag path its handler lenses to (the
+			// screen's slot for the screen's own controls, the root bag for
+			// the flow wrap's). The tag rides the record; a record without one
+			// (older frames, modal handlers) falls back to the screen's slot,
+			// the historical lens. Empty paths are the root bag: the session
+			// itself, no lens.
+			const slot = record.slot ?? screen.slot;
+			const lensPath = slot !== undefined && slot.length > 0 ? slot : undefined;
+			const handlerSession: Session<unknown> = lensPath === undefined ? session : lensSession(session, lensPath);
+			const mutate = lensPath === undefined
 				? tools.mutate
 				: (fn: (data: unknown) => void): void => tools.mutate((bag: unknown) => {
-					fn(getPath(bag, slot));
+					fn(getPath(bag, lensPath));
 				});
 			const snapshot = snapshotData(session.data);
 			try {
