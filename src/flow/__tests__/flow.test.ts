@@ -66,7 +66,7 @@ const choose: ActionHandler<PickData> = (event) => {
 function pickerScreen(): Screen<PickData> {
 	return screen<PickData>()((data) => view(
 		{},
-		text({ body: `picked: ${data.chosen}` }),
+		text(`picked: ${data.chosen}`),
 		row({}, button({ onClick: choose, label: 'choose' })),
 	));
 }
@@ -74,7 +74,7 @@ function pickerScreen(): Screen<PickData> {
 describe('defineFlow - validations', () => {
 	it('builds screens with the framework defaults, carrying the declared initialData', () => {
 		const def = defineFlow<LottoData>({
-			screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: { count: 0, picker: { chosen: 'none' } },
 		});
@@ -93,7 +93,7 @@ describe('defineFlow - validations', () => {
 	});
 
 	it('rejects non-finite and non-positive ttlMs', () => {
-		const screens = { main: { view: () => view({}, text({ body: 'm' })) } } as const;
+		const screens = { main: { view: () => view({}, text('m')) } } as const;
 		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: Infinity })).toThrow(/ttlMs/);
 		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: 0 })).toThrow(/ttlMs/);
 		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: -1000 })).toThrow(/ttlMs/);
@@ -101,22 +101,22 @@ describe('defineFlow - validations', () => {
 
 	it('rejects screen ids and subflow keys the customId codec cannot carry', () => {
 		expect(() => defineFlow({
-			screens: { 'a.b': { view: () => view({}, text({ body: 'm' })) } },
+			screens: { 'a.b': { view: () => view({}, text('m')) } },
 			first: 'a.b',
 			initialData: {},
 		})).toThrow(/namespace separator/);
 		expect(() => defineFlow({
-			screens: { 'a:b': { view: () => view({}, text({ body: 'm' })) } },
+			screens: { 'a:b': { view: () => view({}, text('m')) } },
 			first: 'a:b',
 			initialData: {},
 		})).toThrow(/must not contain/);
 	});
 
 	it('composes component wraps left to right - later entries wrap earlier output', () => {
-		const marker = view({}, text({ body: 'first' }));
+		const marker = view({}, text('first'));
 		const second = vi.fn((tree: ViewNode): ViewNode => tree);
 		const def = defineFlow<LottoData>({
-			screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: { count: 0, picker: { chosen: 'none' } },
 			components: [
@@ -126,7 +126,7 @@ describe('defineFlow - validations', () => {
 		});
 
 		const fakeSession = {} as Session<LottoData>;
-		const base = view({}, text({ body: 'base' }));
+		const base = view({}, text('base'));
 		const result = def.wrap?.(base, fakeSession, runtimeKit);
 
 		expect(second).toHaveBeenCalledWith(marker, fakeSession, runtimeKit);
@@ -135,7 +135,7 @@ describe('defineFlow - validations', () => {
 
 	it('declares no wrap when there are no components', () => {
 		const def = defineFlow<LottoData>({
-			screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: { count: 0, picker: { chosen: 'none' } },
 		});
@@ -147,7 +147,7 @@ describe('defineFlow - subflow plugs', () => {
 	it('namespaces screens, rebases slot paths, and maps the root', () => {
 		const plug = subflow({ use: defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } }), at: 'picker' });
 		const def = defineFlow<LottoData>({
-			screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: { count: 0, picker: { chosen: 'none' } },
 			subflows: [plug],
@@ -164,18 +164,18 @@ describe('defineFlow - subflow plugs', () => {
 
 	it('composes namespaces and slot paths through nested plugs', () => {
 		const leaf = defineFlow<{ n: number }>({
-			screens: { leaf: { view: (data) => view({}, text({ body: `n ${data.n}` })) } },
+			screens: { leaf: { view: (data) => view({}, text(`n ${data.n}`)) } },
 			first: 'leaf',
 			initialData: { n: 0 },
 		});
 		const middle = defineFlow<{ m: string }>({
-			screens: { mid: { view: (data) => view({}, text({ body: data.m })) } },
+			screens: { mid: { view: (data) => view({}, text(data.m)) } },
 			first: 'mid',
 			initialData: { m: 'm' },
 			subflows: [subflow({ use: leaf, at: 'inner' })],
 		});
 		const outer = defineFlow<{ top: boolean }>({
-			screens: { top: { view: () => view({}, text({ body: 'top' })) } },
+			screens: { top: { view: () => view({}, text('top')) } },
 			first: 'top',
 			initialData: { top: false },
 			subflows: [subflow({ use: middle, at: 'mid' })],
@@ -190,13 +190,13 @@ describe('defineFlow - subflow plugs', () => {
 	it('throws on duplicate plug keys and keys colliding with own screens', () => {
 		const picker = defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } });
 		expect(() => defineFlow({
-			screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: {},
 			subflows: [subflow({ use: picker, at: 'x' }), subflow({ use: picker, at: 'x' })],
 		})).toThrow(/one plug per key/);
 		expect(() => defineFlow({
-			screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: {},
 			subflows: [subflow({ use: picker, at: 'main' })],
@@ -212,7 +212,7 @@ describe('the drawn session', () => {
 				main: {
 					view: (_data, _kit, session) => {
 						seen.push(session);
-						return view({}, text({ body: `owner ${session.ownerId} on ${session.screen}` }));
+						return view({}, text(`owner ${session.ownerId} on ${session.screen}`));
 					},
 				},
 			},
@@ -325,7 +325,7 @@ describe('the lens', () => {
 
 describe('registry population and cross-flow validation', () => {
 	const flow = defineFlow<LottoData>({
-		screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+		screens: { main: { view: () => view({}, text('m')) } },
 		first: 'main',
 		initialData: { count: 0, picker: { chosen: 'none' } },
 		parting: { command: 'lotto' },
@@ -344,7 +344,7 @@ describe('registry population and cross-flow validation', () => {
 	});
 
 	it('validateFlows throws when two flows declare the same screen key', () => {
-		const other = defineFlow<unknown>({ screens: { main: { view: () => view({}, text({ body: 'o' })) } }, first: 'main', initialData: {} });
+		const other = defineFlow<unknown>({ screens: { main: { view: () => view({}, text('o')) } }, first: 'main', initialData: {} });
 		expect(() => validateFlows([
 			{ moduleId: 'lotto', flowId: 'lottoWizard', definition: flow },
 			{ moduleId: 'lotto', flowId: 'otherWizard', definition: other },
@@ -359,7 +359,7 @@ describe('registry population and cross-flow validation', () => {
 
 describe('screen', () => {
 	it('validates shape and returns the frozen bundle', () => {
-		const bundle = screen<LottoData>()(() => view({}, text({ body: 'm' })));
+		const bundle = screen<LottoData>()(() => view({}, text('m')));
 		expect(Object.isFrozen(bundle)).toBe(true);
 		expect(() => screen<LottoData>()(undefined as never)).toThrow(/view/);
 	});
@@ -367,16 +367,16 @@ describe('screen', () => {
 
 describe('subview', () => {
 	it('hands back the same arrow: the value is all at the type level', () => {
-		const arrow = (): ViewNode => view({}, text({ body: 'arm' }));
+		const arrow = (): ViewNode => view({}, text('arm'));
 		const helper = subview<LottoData>()(arrow);
 		expect(helper).toBe(arrow);
 	});
 
 	it('draws when the screen forwards its kit: helpers are plain calls', () => {
-		const helper = subview<LottoData>()((data) => view({}, text({ body: `count: ${data.count}` })));
+		const helper = subview<LottoData>()((data) => view({}, text(`count: ${data.count}`)));
 		const stub: ViewSession = { ownerId: '', createdAt: 0, screen: 'main', history: [], lastActivityAt: 0, ttlMs: 0 };
 		const tree = helper({ count: 3, picker: { chosen: 'x' } }, runtimeKit, stub);
-		expect(tree).toEqual(view({}, text({ body: 'count: 3' })));
+		expect(tree).toEqual(view({}, text('count: 3')));
 	});
 
 	it('throws on a non-function view, mirroring screen', () => {
@@ -460,7 +460,7 @@ function world(options: WorldOptions = {}): World {
 		screens: {
 			main: screen<LottoData>()((data) => view(
 				{},
-				text({ body: `count: ${data.count}` }),
+				text(`count: ${data.count}`),
 				row({},
 					button({ onClick: bump, label: 'bump' }),
 					button({ onClick: open, label: 'open' }),
@@ -473,7 +473,7 @@ function world(options: WorldOptions = {}): World {
 		components: [
 			(tree, session): ViewNode => view({},
 				...tree.children,
-				text({ body: 'flow chrome' }),
+				text('flow chrome'),
 				row({},
 					button({ onClick: refresh, label: 'refresh' }),
 					...(session.screen.startsWith('picker.') ? [button({ onClick: plug.done, label: 'Done' })] : []),
@@ -763,7 +763,7 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			screens: {
 				main: screen<ListData>()((data) => view(
 					{},
-					text({ body: `picked: ${data.picked.join(', ') || 'none'}` }),
+					text(`picked: ${data.picked.join(', ') || 'none'}`),
 					row({}, ...items.map((item) => button({ onClick: pick(item), label: item }))),
 				)),
 			},

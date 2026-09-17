@@ -23,11 +23,11 @@ const render = (tree: ViewNode): V2MessagePayload => {
 
 describe('renderV2Message - message envelope', () => {
 	it('always sets the Components V2 flag', () => {
-		expect(render(view({}, text({ body: 'x' }))).flags).toBe(32768);
+		expect(render(view({}, text('x'))).flags).toBe(32768);
 	});
 
 	it('renders children flat at the top level', () => {
-		const payload = render(view({}, text({ body: 'a' }), row({}, button({ onClick: go, label: 'Go' }))));
+		const payload = render(view({}, text('a'), row({}, button({ onClick: go, label: 'Go' }))));
 		expect(payload.components).toEqual([
 			{ type: 10, content: 'a' },
 			{ type: 1, components: [{ type: 2, style: 1, label: 'Go', custom_id: CUSTOM_ID }] },
@@ -37,16 +37,16 @@ describe('renderV2Message - message envelope', () => {
 
 describe('renderV2Message - text', () => {
 	it('renders a bare text node as a TextDisplay of its body', () => {
-		expect(render(view({}, text({ body: 'hello' }))).components).toEqual([{ type: 10, content: 'hello' }]);
+		expect(render(view({}, text('hello'))).components).toEqual([{ type: 10, content: 'hello' }]);
 	});
 
 	it('prefixes a title as a bold leading line', () => {
-		expect(render(view({}, text({ title: 'T', body: 'b' }))).components)
+		expect(render(view({}, text({ title: 'T' }, 'b'))).components)
 			.toEqual([{ type: 10, content: '**T**\nb' }]);
 	});
 
 	it('renders a view title as a # heading first', () => {
-		const payload = render(view({ title: 'Panel' }, text({ body: 'b' })));
+		const payload = render(view({ title: 'Panel' }, text('b')));
 		expect(payload.components).toEqual([
 			{ type: 10, content: '# Panel' },
 			{ type: 10, content: 'b' },
@@ -175,7 +175,7 @@ describe('renderV2Message - container', () => {
 	it('renders a container with its color and children', () => {
 		const payload = render(view({}, container(
 			{ color: 0xff0000 },
-			text({ body: 'panel' }),
+			text('panel'),
 			row({}, button({ onClick: go, label: 'Go' })),
 		)));
 		expect(payload.components).toEqual([{
@@ -189,30 +189,30 @@ describe('renderV2Message - container', () => {
 	});
 
 	it('omits accent_color when unset', () => {
-		const payload = render(view({}, container({}, text({ body: 'x' }))));
+		const payload = render(view({}, container({}, text('x'))));
 		expect(payload.components).toEqual([{ type: 17, components: [{ type: 10, content: 'x' }] }]);
 	});
 });
 
 describe('renderV2Message - RenderError limits', () => {
 	it('rejects text over 4000 chars with the node path', () => {
-		const tree = view({}, text({ body: 'x'.repeat(4001) }));
+		const tree = view({}, text('x'.repeat(4001)));
 		expect(() => render(tree)).toThrow(RenderError);
 		expect(() => render(tree)).toThrow(/view\/text\[0\].*4000/);
 	});
 
 	it('rejects messages over 40 components', () => {
-		const children = Array.from({ length: 41 }, () => text({ body: 'x' }));
+		const children = Array.from({ length: 41 }, () => text('x'));
 		expect(() => render(view({}, ...children))).toThrow(/41 components, max is 40/);
 	});
 
 	it('rejects accent_color outside 24 bits', () => {
-		expect(() => render(view({}, container({ color: 0x1000000 }, text({ body: 'x' })))))
+		expect(() => render(view({}, container({ color: 0x1000000 }, text('x')))))
 			.toThrow(/accent_color/);
 	});
 
 	it('rejects a non-view root', () => {
-		expect(() => renderV2Message(force<ViewNode>(text({ body: 'x' })), SESSION, SCREEN, () => '0')).toThrow(RenderError);
+		expect(() => renderV2Message(force<ViewNode>(text('x')), SESSION, SCREEN, () => '0')).toThrow(RenderError);
 	});
 });
 
@@ -272,11 +272,11 @@ describe('renderV2Modal', () => {
 	});
 
 	it('passes text children through as TextDisplays', () => {
-		const payload = renderModal(modal({ title: 'T' }, text({ body: 'terms...' })));
+		const payload = renderModal(modal({ title: 'T' }, text('terms...')));
 		expect(payload.components).toEqual([{ type: 10, content: 'terms...' }]);
 	});
 
 	it('rejects a non-modal root', () => {
-		expect(() => renderV2Modal(force<ModalNode>(text({ body: 'x' })), 'x')).toThrow(RenderError);
+		expect(() => renderV2Modal(force<ModalNode>(text('x')), 'x')).toThrow(RenderError);
 	});
 });

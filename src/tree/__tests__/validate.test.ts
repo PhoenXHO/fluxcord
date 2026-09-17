@@ -32,7 +32,7 @@ describe('validateTree - happy path', () => {
 	it('accepts a fully valid view', () => {
 		const tree = view(
 			{ title: 'T' },
-			text({ body: 'hello' }),
+			text('hello'),
 			row({}, go(), link({ url: 'https://torn.com', label: 'Site' })),
 		);
 		expect(validateTree(tree)).toEqual([]);
@@ -41,14 +41,14 @@ describe('validateTree - happy path', () => {
 	it('accepts colored and colorless containers', () => {
 		const tree = view(
 			{},
-			container({ color: 0xff0000 }, text({ body: 'panel' })),
+			container({ color: 0xff0000 }, text('panel')),
 			container({}, row({}, go())),
 		);
 		expect(validateTree(tree)).toEqual([]);
 	});
 
 	it('accepts a fully valid modal', () => {
-		expect(validateTree(modal({ title: 'T' }, note(), text({ body: 'terms...' })))).toEqual([]);
+		expect(validateTree(modal({ title: 'T' }, note(), text('terms...')))).toEqual([]);
 	});
 });
 
@@ -67,7 +67,7 @@ describe('validateTree - structure rules', () => {
 	});
 
 	it('rule 4: row children are controls only', () => {
-		const tree = view({}, row({}, force<ControlNode>(text({ body: 'x' }))));
+		const tree = view({}, row({}, force<ControlNode>(text('x'))));
 		expect(rulesOf(tree)).toEqual([4]);
 	});
 
@@ -113,7 +113,7 @@ describe('validateTree - structure rules', () => {
 	});
 
 	it('rule 23: container children are text/row only (no nesting)', () => {
-		const nested = container({}, force<ContainerChild>(container({}, text({ body: 'x' }))));
+		const nested = container({}, force<ContainerChild>(container({}, text('x'))));
 		expect(rulesOf(view({}, nested))).toEqual([23]);
 		expect(rulesOf(view({}, container({}, force<ContainerChild>(go()))))).toEqual([23]);
 	});
@@ -257,8 +257,8 @@ describe('validateTree - value & bounds rules', () => {
 	});
 
 	it('rule 21: container color integer in range', () => {
-		expect(rulesOf(view({}, container({ color: 0x1000000 }, text({ body: 'x' }))))).toContain(21);
-		expect(rulesOf(view({}, container({ color: 1.5 }, text({ body: 'x' }))))).toContain(21);
+		expect(rulesOf(view({}, container({ color: 0x1000000 }, text('x'))))).toContain(21);
+		expect(rulesOf(view({}, container({ color: 1.5 }, text('x'))))).toContain(21);
 	});
 
 	it('rule 25: input id 1-100 chars, unique within the modal', () => {

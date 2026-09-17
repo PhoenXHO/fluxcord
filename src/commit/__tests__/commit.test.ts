@@ -48,7 +48,7 @@ const OWNER_ID = 'user-1';
 const noop = (): void => { };
 
 function confirmView(): ViewNode {
-	return view({}, text({ body: 'Are you sure?' }));
+	return view({}, text('Are you sure?'));
 }
 
 /** Every text display's content, top-level only, for content assertions on payloads. */
@@ -109,7 +109,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		const { tickets } = data as LottoData;
 		return view(
 			{ title: 'Lotto' },
-			text({ body: `Tickets: ${tickets}` }),
+			text(`Tickets: ${tickets}`),
 			row({}, button({ onClick: handler, label: 'Join' }), button({ onClick: handler, label: 'Open modal' })),
 		);
 	};
@@ -403,7 +403,7 @@ describe('modals (event-based, E1)', () => {
 describe('freezeTree (pure transform)', () => {
 	it('strips buttons and selects, keeps links and text, drops emptied rows', () => {
 		const frozen = freezeTree(view({},
-			text({ body: 'Final state' }),
+			text('Final state'),
 			row({}, button({ onClick: noop, label: 'Join' }), link({ url: 'https://torn.com', label: 'Open' })),
 			row({}, optionSelect({ onSelect: noop, options: [{ label: 'One', value: '1' }] })),
 			row({}, link({ url: 'https://example.com', label: 'Docs' })),
@@ -421,7 +421,7 @@ describe('freezeTree (pure transform)', () => {
 	it('drops emptied containers, keeps containers with surviving content', () => {
 		const frozen = freezeTree(view({},
 			container({}, row({}, button({ onClick: noop, label: 'Join' }))),
-			container({}, text({ body: 'Summary' })),
+			container({}, text('Summary')),
 		));
 
 		expect(frozen.children).toHaveLength(1);

@@ -38,7 +38,7 @@ describe('materializeTree - stamps', () => {
 		const three = button({ onClick: factory(), label: 'three' });
 		const tree = view({},
 			row({}, one),
-			container({}, text({ body: 'chrome' }), row({}, two)),
+			container({}, text('chrome'), row({}, two)),
 			row({}, three),
 		);
 
@@ -71,7 +71,7 @@ describe('materializeTree - stamps', () => {
 	});
 
 	it('stampOf throws for a control the walk never saw', () => {
-		const { stampOf } = materializeTree(view({}, text({ body: 'x' })));
+		const { stampOf } = materializeTree(view({}, text('x')));
 
 		expect(() => stampOf(button({ onClick: factory(), label: 'stray' }))).toThrow(/not stamped/);
 	});
@@ -93,7 +93,7 @@ describe('materializeTree - the frame', () => {
 		const stamped = materializeTree(view({}, row({}, button({ onClick: (): void => {}, label: 'Go' }))));
 		expect(Object.isFrozen(stamped.frame)).toBe(true);
 
-		const stripped = materializeTree(view({}, text({ body: 'frozen screen' })));
+		const stripped = materializeTree(view({}, text('frozen screen')));
 		expect(stripped.frame).toEqual({});
 	});
 

@@ -33,6 +33,13 @@ export interface TextNode {
 	readonly body: string;
 }
 
+/**
+ * What may sit between a text block's tags: copy, numbers, and text nodes
+ * (what the inline `code` / block `codeblock` sugar produce). Folded into
+ * the body string at build time; the tree only ever sees finished text.
+ */
+export type TextChild = string | number | TextNode;
+
 /** Horizontal control group (Discord action row). */
 export interface RowNode {
 	readonly kind: NodeKind.row;

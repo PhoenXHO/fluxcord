@@ -23,7 +23,7 @@ interface PanelData {
 const join = (): void => undefined;
 
 /** A bare one-screen definition for the shape-validation cases. */
-const bareScreens = { main: { view: () => view({}, text({ body: 'm' })) } } as const;
+const bareScreens = { main: { view: () => view({}, text('m')) } } as const;
 const bareOptions = { screens: bareScreens, first: 'main', initialData: {} } as const;
 
 type FlowOverrides = Parameters<typeof defineFlow<PanelData>>[0];
@@ -34,7 +34,7 @@ function makeFlow(overrides: Partial<FlowOverrides> = {}): Flow<PanelData> {
 			main: {
 				view: (data) => view(
 					{},
-					text({ body: `count ${data.count}` }),
+					text(`count ${data.count}`),
 					row({}, button({ onClick: join, label: 'Join' })),
 				),
 			},
@@ -75,7 +75,7 @@ describe('buildFlowCatalog', () => {
 
 	it('the same bare name in two modules coexists - the prefix disambiguates', () => {
 		const other = flow<PanelData>('host', {
-			screens: { extra: { view: () => view({}, text({ body: 'e' })) } },
+			screens: { extra: { view: () => view({}, text('e')) } },
 			first: 'extra',
 			initialData: { count: 0 },
 		});
@@ -87,7 +87,7 @@ describe('buildFlowCatalog', () => {
 
 	it('merges entries across flows and throws on a duplicate flowId', () => {
 		const other = flow<PanelData>('other', {
-			screens: { extra: { view: () => view({}, text({ body: 'e' })) } },
+			screens: { extra: { view: () => view({}, text('e')) } },
 			first: 'extra',
 			initialData: { count: 0 },
 		});
@@ -96,7 +96,7 @@ describe('buildFlowCatalog', () => {
 
 		// Same module + same name: the flowId guard fires.
 		const twin = flow<PanelData>('host', {
-			screens: { alt: { view: () => view({}, text({ body: 'a' })) } },
+			screens: { alt: { view: () => view({}, text('a')) } },
 			first: 'alt',
 			initialData: { count: 0 },
 		});
@@ -105,7 +105,7 @@ describe('buildFlowCatalog', () => {
 
 	it('throws when one screen key belongs to two flows (validateFlows passthrough)', () => {
 		const evil = flow<PanelData>('twin', {
-			screens: { main: { view: () => view({}, text({ body: 'm' })) } },
+			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: { count: 0 },
 		});
@@ -120,7 +120,7 @@ describe('coverageScan', () => {
 			module: 'panel', flow: flow<{ count: number; picked: string | null }>('host', {
 				screens: {
 					main: {
-						view: (data) => view({}, text({ body: `picked ${data.picked!.toUpperCase()}` })),
+						view: (data) => view({}, text(`picked ${data.picked!.toUpperCase()}`)),
 					},
 				},
 				first: 'main',
@@ -140,7 +140,7 @@ describe('coverageScan', () => {
 	it('ignores views with no actionable controls', () => {
 		const catalog = buildFlowCatalog([{
 			module: 'panel', flow: flow<PanelData>('host', {
-				screens: { main: { view: () => view({}, text({ body: 'just words' })) } },
+				screens: { main: { view: () => view({}, text('just words')) } },
 				first: 'main',
 				initialData: { count: 0 },
 			})

@@ -16,7 +16,7 @@ import { runtimeKit } from '../kit.js';
 import { validateTree } from '../validate.js';
 import { ButtonStyle, SelectEntity } from '../vocab.js';
 import type { ComponentResult } from '../jsx-runtime.js';
-import type { TreeNode, ViewNode } from '../types.js';
+import type { TextNode, TreeNode, ViewNode } from '../types.js';
 
 const onClick = (): void => {};
 
@@ -30,8 +30,8 @@ function kids(node: unknown): readonly TreeNode[] {
 
 describe('jsx elements', () => {
 	it('a tagged element is the builder\'s node - same tree, frozen', () => {
-		const viaTsx = <view title="t"><text body="b" /></view>;
-		const viaBuilders = view({ title: 't' }, text({ body: 'b' }));
+		const viaTsx = <view title="t"><text>b</text></view>;
+		const viaBuilders = view({ title: 't' }, text('b'));
 
 		expect(viaTsx).toEqual(viaBuilders);
 		expect(Object.isFrozen(viaTsx)).toBe(true);
@@ -47,8 +47,8 @@ describe('jsx elements', () => {
 	});
 
 	it('a bare tag with no attributes passes empty props, not null', () => {
-		const viaTsx = <text body="x" />;
-		expect(viaTsx).toEqual(text({ body: 'x' }));
+		const viaTsx = <text>x</text>;
+		expect(viaTsx).toEqual(text('x'));
 
 		const fromNull = factory('row', null);
 		expect(fromNull.kind).toBe('row');
@@ -56,7 +56,7 @@ describe('jsx elements', () => {
 	});
 
 	it('the built tree passes validateTree untouched', () => {
-		const tree = <view title="ok"><text body="a" /><row><runtimeKit.Button label="Go" onClick={onClick} /></row></view>;
+		const tree = <view title="ok"><text>a</text><row><runtimeKit.Button label="Go" onClick={onClick} /></row></view>;
 		expect(validateTree(tree as ViewNode)).toEqual([]);
 	});
 });
@@ -66,23 +66,27 @@ describe('jsx elements', () => {
 describe('child coercion', () => {
 	it('drops false/null/undefined - conditionals just work', () => {
 		const show = false;
-		const tree = <view>{show && <text body="no" />}{show ? <text body="yes" /> : null}</view>;
+		const tree = <view>{show && <text>no</text>}{show ? <text>yes</text> : null}</view>;
 
 		expect(kids(tree)).toEqual([]);
 	});
 
 	it('flattens mapped lists and nested arrays arbitrarily deep', () => {
 		const items = ['a', 'b'];
-		const tree = <view>{items.map((body) => <text body={body} />)}</view>;
-		expect(kids(tree)).toEqual([text({ body: 'a' }), text({ body: 'b' })]);
+		const tree = <view>{items.map((body) => <text>{body}</text>)}</view>;
+		expect(kids(tree)).toEqual([text('a'), text('b')]);
 
-		const nested = factory('view', { children: [factory('text', { body: 'a' }), [factory('text', { body: 'b' }), [factory('text', { body: 'c' })]]] });
-		expect(kids(nested)).toEqual([text({ body: 'a' }), text({ body: 'b' }), text({ body: 'c' })]);
+		const nested = factory('view', { children: [<text>a</text>, [<text>b</text>, [<text>c</text>]]] });
+		expect(kids(nested)).toEqual([text('a'), text('b'), text('c')]);
 	});
 
-	it('a bare string or number child throws loudly - copy belongs in <text>', () => {
+	it('a bare string or number child still throws outside text - copy belongs in <text>', () => {
 		expect(() => factory('view', { children: 'nope' })).toThrow(/bare string/);
 		expect(() => factory('view', { children: [42] })).toThrow(/bare number/);
+		expect(() => factory('row', { children: 'nope' })).toThrow(/bare string/);
+
+		const fine = <view><text>plain {42}</text></view>;
+		expect((kids(fine)[0] as TextNode).body).toBe('plain 42');
 	});
 
 	it('an unknown tag throws with the legal vocabulary', () => {
@@ -119,38 +123,67 @@ describe('components', () => {
 	it('a function tag is called with its props (children inside), spliced by result', () => {
 		const Card = (props: { title: string; children?: ComponentResult }): ComponentResult => (
 			<container>
-				<text title={props.title} body="card" />
+				<text title={props.title}>card</text>
 				{props.children}
 			</container>
 		);
 
-		const tree = <view><Card title="T"><text body="inner" /></Card></view>;
+		const tree = <view><Card title="T"><text>inner</text></Card></view>;
 
 		expect((tree as { kind: string }).kind).toBe('view');
 		const card = kids(tree)[0] as TreeNode;
 		expect(card.kind).toBe('container');
-		expect(kids(card)).toEqual([text({ title: 'T', body: 'card' }), text({ body: 'inner' })]);
+		expect(kids(card)).toEqual([text({ title: 'T' }, 'card'), text('inner')]);
 	});
 
 	it('an array-returning component splices flat; a falsey return drops', () => {
-		const Pair = (): ComponentResult => [<text body="1" />, <text body="2" />];
-		const Maybe = (props: { show: boolean }): ComponentResult => (props.show && <text body="maybe" />);
+		const Pair = (): ComponentResult => [<text>1</text>, <text>2</text>];
+		const Maybe = (props: { show: boolean }): ComponentResult => (props.show && <text>maybe</text>);
 
 		const full = <view><Pair /><Maybe show={false} /></view>;
-		expect(kids(full)).toEqual([text({ body: '1' }), text({ body: '2' })]);
+		expect(kids(full)).toEqual([text('1'), text('2')]);
 	});
 });
 
 describe('fragments', () => {
 	it('builds nothing of its own - its children splice into the parent', () => {
-		const tree = <view><><text body="a" /><text body="b" /></><text body="c" /></view>;
+		const tree = <view><><text>a</text><text>b</text></><text>c</text></view>;
 
-		expect(kids(tree)).toEqual([text({ body: 'a' }), text({ body: 'b' }), text({ body: 'c' })]);
+		expect(kids(tree)).toEqual([text('a'), text('b'), text('c')]);
 	});
 
 	it('the Fragment factory is an intercept-by-identity marker, never called', () => {
 		expect(typeof FragmentTag).toBe('function');
-		const fromTag = factory(FragmentTag, { children: <text body="x" /> });
-		expect(fromTag).toEqual([text({ body: 'x' })]);
+		const fromTag = factory(FragmentTag, { children: <text>x</text> });
+		expect(fromTag).toEqual([text('x')]);
+	});
+});
+
+// --- Text content (children carry the body) --------------------------------------------
+
+describe('jsx text content', () => {
+	it('adjacent strings and expressions join into one body', () => {
+		expect((<text>Hello {'world'}</text> as TextNode).body).toBe('Hello world');
+	});
+
+	it('a title rides props; inline code contributes its delimiters', () => {
+		const node = <text title="T">a<code>b</code>c</text> as TextNode;
+		expect(node.title).toBe('T');
+		expect(node.body).toBe('a`b`c');
+	});
+
+	it('falsey expressions drop mid-body', () => {
+		const cond = false;
+		expect((<text>{cond && 'x'}y</text> as TextNode).body).toBe('y');
+	});
+
+	it('code and codeblock are text nodes with fenced bodies', () => {
+		expect((<code>{'v'}</code> as TextNode).body).toBe('`v`');
+		expect((<codeblock lang="ansi">{'X'}</codeblock> as TextNode).body).toBe('```ansi\nX\n```');
+	});
+
+	it('code tags are legal inside view and arrive as text-kind nodes', () => {
+		const tree = <view><code>x</code></view>;
+		expect(kids(tree)[0].kind).toBe('text');
 	});
 });

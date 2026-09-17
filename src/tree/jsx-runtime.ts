@@ -16,7 +16,8 @@
  * Children follow React's coercion rules, so the idioms TSX authors expect
  * just work: false/null/undefined drop (`{cond && <row/>}`), arrays flatten
  * arbitrarily deep (`.map()`, fragments, array-returning components), and
- * bare strings/numbers throw loudly.
+ * bare strings/numbers throw loudly everywhere except the text-like tags
+ * (text, code, codeblock), where they ARE the content.
  *
  * Tag vocabulary splits one way, with no overlap: layout and leaf kinds
  * are the intrinsics (view, text, row, container, link, modal, input);
@@ -32,7 +33,10 @@
  */
 
 import {
+	code,
+	codeblock,
 	container,
+	flattenTextContent,
 	input,
 	link,
 	modal,
@@ -59,6 +63,7 @@ import type {
 	ModalChild,
 	ModalNode,
 	RowNode,
+	TextChild,
 	TextNode,
 	TreeNode,
 	ViewChild,
@@ -81,7 +86,9 @@ export function Fragment(props: { readonly children?: unknown }): readonly TreeN
 }
 
 export function jsx(tag: 'view', props: ViewProps & { readonly children?: unknown } | null): ViewNode;
-export function jsx(tag: 'text', props: TextProps | null): TextNode;
+export function jsx(tag: 'text', props: TextProps & { readonly children?: unknown } | null): TextNode;
+export function jsx(tag: 'code', props: { readonly children?: unknown } | null): TextNode;
+export function jsx(tag: 'codeblock', props: { readonly lang?: string; readonly children?: unknown } | null): TextNode;
 export function jsx(tag: 'row', props: RowProps & { readonly children?: unknown } | null): RowNode;
 export function jsx(tag: 'container', props: ContainerProps & { readonly children?: unknown } | null): ContainerNode;
 export function jsx(tag: 'link', props: LinkProps | null): LinkNode;
@@ -93,6 +100,16 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 	if (typeof type === 'function' && type !== Fragment) {
 		return callComponent(type as (props: unknown) => unknown, bareProps(props));
 	}
+	if (type === 'text' || type === 'code' || type === 'codeblock') {
+		// The text-like tags fold their children themselves: copy arrives as
+		// bare strings, which coerceChildren would reject.
+		const { node, children } = splitRawChildren(props);
+		if (type === 'text') {
+			return text(node as TextProps, ...(children as readonly TextChild[]));
+		}
+		const body = flattenTextContent(children);
+		return type === 'code' ? code(body) : codeblock(body, (node as { readonly lang?: string }).lang);
+	}
 	const { node, children } = splitProps(props);
 	if (type === Fragment) {
 		return children;
@@ -100,8 +117,6 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 	switch (type) {
 		case 'view':
 			return view(node as ViewProps, ...children as readonly ViewChild[]);
-		case 'text':
-			return text(node as TextProps);
 		case 'row':
 			return row(node as RowProps, ...children as readonly ControlNode[]);
 		case 'container':
@@ -163,10 +178,23 @@ function bareProps(props: unknown): Record<string, unknown> {
 
 /** Splits intrinsic props into node props and coerced children (children ride props under the automatic runtime). */
 function splitProps(props: unknown): { node: Record<string, unknown>; children: readonly TreeNode[] } {
+	const { node, children: raw } = splitRawChildren(props);
+	return { node, children: coerceChildren(raw) };
+}
+
+/**
+ * Like splitProps but keeps the children raw: the text-like tags receive
+ * strings and numbers as content, so coercion would reject exactly what
+ * they exist to accept.
+ */
+function splitRawChildren(props: unknown): { node: Record<string, unknown>; children: readonly unknown[] } {
 	const bare = bareProps(props);
-	const children = coerceChildren(bare.children);
+	const children = bare.children;
 	delete bare.children;
-	return { node: bare, children };
+	return {
+		node: bare,
+		children: children === undefined || children === null ? [] : Array.isArray(children) ? children : [children],
+	};
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace --- the compiler reads the JSX vocabulary from the runtime module's JSX namespace (the react-jsx convention)
@@ -181,7 +209,9 @@ export namespace JSX {
 	export type Element = ComponentResult;
 	export interface IntrinsicElements {
 		view: ViewProps & { readonly children?: unknown };
-		text: TextProps;
+		text: TextProps & { readonly children?: unknown };
+		code: { readonly children?: unknown };
+		codeblock: { readonly lang?: string; readonly children?: unknown };
 		row: RowProps & { readonly children?: unknown };
 		container: ContainerProps & { readonly children?: unknown };
 		link: LinkProps;

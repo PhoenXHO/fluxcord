@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
 	button,
+	code,
+	codeblock,
 	container,
 	entitySelect,
+	flattenTextContent,
 	input,
 	link,
 	modal,
@@ -21,10 +24,10 @@ const force = <T,>(value: unknown): T => value as T;
 
 describe('builders', () => {
 	it('sets the kind matching each builder', () => {
-		expect(view({}, text({ body: 'x' })).kind).toBe(NodeKind.view);
-		expect(text({ body: 'x' }).kind).toBe(NodeKind.text);
+		expect(view({}, text('x')).kind).toBe(NodeKind.view);
+		expect(text('x').kind).toBe(NodeKind.text);
 		expect(row({}, button({ onClick: go, label: 'Go' })).kind).toBe(NodeKind.row);
-		expect(container({}, text({ body: 'x' })).kind).toBe(NodeKind.container);
+		expect(container({}, text('x')).kind).toBe(NodeKind.container);
 		expect(button({ onClick: go, label: 'Go' }).kind).toBe(NodeKind.button);
 		expect(link({ url: 'https://torn.com', label: 'Site' }).kind).toBe(NodeKind.link);
 		expect(optionSelect({ onSelect: go, options: [] }).kind).toBe(NodeKind.select);
@@ -49,7 +52,7 @@ describe('builders', () => {
 		expect(field.style).toBe(InputStyle.Paragraph);
 		expect(field.value).toBe('prefilled');
 
-		const panel = container({ color: 0x5865f2 }, text({ body: 'x' }));
+		const panel = container({ color: 0x5865f2 }, text('x'));
 		expect(panel.color).toBe(0x5865f2);
 	});
 
@@ -75,12 +78,12 @@ describe('builders', () => {
 	});
 
 	it('throws on mutation attempts at any depth', () => {
-		const tree = view({ title: 'T' }, text({ body: 'x' }));
+		const tree = view({ title: 'T' }, text('x'));
 		expect(() => {
 			force<{ title: string }>(tree).title = 'changed';
 		}).toThrow();
 		expect(() => {
-			force<{ push: (n: unknown) => void }>(tree.children).push(text({ body: 'y' }));
+			force<{ push: (n: unknown) => void }>(tree.children).push(text('y'));
 		}).toThrow();
 	});
 
@@ -92,5 +95,52 @@ describe('builders', () => {
 		const entity = entitySelect({ onSelect: go, entity: SelectEntity.Roles });
 		expect(entity.entity).toBe(SelectEntity.Roles);
 		expect(entity.options).toBeUndefined();
+	});
+});
+
+describe('text content', () => {
+	it('children carry the body; a bare string or number is content too', () => {
+		const node = text('Hi');
+		expect(node.kind).toBe(NodeKind.text);
+		expect(node.body).toBe('Hi');
+		expect(node.title).toBeUndefined();
+		expect(text(42).body).toBe('42');
+	});
+
+	it('a title rides props, the body stays a child', () => {
+		const node = text({ title: 'T' }, 'Body');
+		expect(node.title).toBe('T');
+		expect(node.body).toBe('Body');
+	});
+
+	it('throws when there is no content at all', () => {
+		expect(() => text()).toThrow(/text needs content/);
+		expect(() => text({ title: 'T' })).toThrow(/text needs content/);
+	});
+
+	it('flattenTextContent: nodes contribute their body, arrays flatten, falsey drops, rows throw', () => {
+		expect(flattenTextContent([text('a'), 'b', 3])).toBe('ab3');
+		expect(flattenTextContent([text({ title: 'T' }, code('x')), 'y'])).toBe('`x`y');
+		expect(flattenTextContent(['a', [text('b'), [text('c')]]])).toBe('abc');
+		expect(flattenTextContent([false, null, undefined, text('d')])).toBe('d');
+		expect(() => flattenTextContent([row({}, button({ onClick: go, label: 'Go' }))])).toThrow();
+	});
+
+	it('code wraps in inline backticks, lengthening around embedded backticks', () => {
+		expect(code('x').body).toBe('`x`');
+		expect(code('a`b').body).toBe('``a`b``');
+		expect(() => code('a\nb')).toThrow();
+	});
+
+	it('codeblock fences with a language and grows around long backtick runs', () => {
+		expect(codeblock('x').body).toBe('```\nx\n```');
+		expect(codeblock('x', 'ts').body).toBe('```ts\nx\n```');
+		const grown = codeblock('x\n```\ny').body;
+		expect(grown.startsWith('````')).toBe(true);
+	});
+
+	it('code and codeblock output is frozen', () => {
+		expect(Object.isFrozen(code('x'))).toBe(true);
+		expect(Object.isFrozen(codeblock('x'))).toBe(true);
 	});
 });

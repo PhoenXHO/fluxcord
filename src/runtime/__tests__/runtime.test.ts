@@ -99,7 +99,7 @@ function world(options: {
 			main: {
 				view: (data) => view(
 					{},
-					text({ body: `count ${data.count}` }),
+					text(`count ${data.count}`),
 					row({}, button({ onClick: handler, label: 'Join' })),
 				),
 			},

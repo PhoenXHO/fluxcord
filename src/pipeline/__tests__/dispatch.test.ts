@@ -38,7 +38,7 @@ const MESSAGE_ID = 'message-1';
 const OWNER_ID = 'user-1';
 
 /** The registered screen's template, dispatch tests never render it (the platform is fake). */
-const lottoView: ViewNode = view({}, text({ body: 'Lotto main' }));
+const lottoView: ViewNode = view({}, text('Lotto main'));
 
 function fakePolicy(decision: PolicyDecision = { allowed: true }): PolicyPort & { decide(next: PolicyDecision): void } {
 	let current = decision;

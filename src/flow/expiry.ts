@@ -54,5 +54,5 @@ export interface ExpiryProps {
  * @returns The text node carrying the countdown.
  */
 export function Expiry(props: ExpiryProps): TextNode {
-	return text({ body: `${props.label ?? 'Expires'} <t:${props.until}:R>` });
+	return text(`${props.label ?? 'Expires'} <t:${props.until}:R>`);
 }
