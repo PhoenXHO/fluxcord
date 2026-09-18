@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { createMakeUi } from '../ui.js';
 import { createSessionStore } from '../../state/store.js';
 import { DEFAULT_TTL_MS } from '../../state/types.js';
-import { input, modal } from '../../tree/builders.js';
+import { input, modal, text, view } from '../../tree/builders.js';
 import type { RegisteredScreen, ScreenRegistry, PlatformPort, UiToolkit } from '../../pipeline/types.js';
 import type { Session } from '../../state/types.js';
 import type { ActionAddress } from '../../render/id-codec.js';
@@ -174,6 +174,40 @@ describe('subflow roots', () => {
 		// Had the root NAME fed the lookup instead, this would have pushed.
 		expect(session.screen).toBe('pick.first');
 		expect(session.history).toEqual([]);
+	});
+});
+
+/** The close test's world: session, its toolkit, and the owning store. */
+interface CloseWorld {
+	session: Session<Record<string, never>>;
+	ui: UiToolkit;
+	store: ReturnType<typeof createSessionStore>;
+}
+
+describe('ui.close - the authored goodbye', () => {
+	function world(): CloseWorld {
+		const store = createSessionStore();
+		const session = store.create<Record<string, never>>({
+			flowId: 'f', moduleId: 'm', ownerId: 'u1',
+			messageRef: { channelId: 'c1', messageId: 'm1' },
+			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
+		});
+		const { ui } = createMakeUi({ store })(session, ADDRESS, PLATFORM);
+		return { session, ui, store };
+	}
+
+	it('plain close records no final view and ends the session', () => {
+		const w = world();
+		w.ui.close();
+		expect(w.session.finalView).toBeUndefined();
+		expect(w.store.get(w.session.id)).toBeUndefined();
+	});
+
+	it('close(view) records the goodbye and ends the session', () => {
+		const w = world();
+		w.ui.close(view({ title: 'Done' }, text('All set.')));
+		expect(w.session.finalView?.kind).toBe('view');
+		expect(w.store.get(w.session.id)).toBeUndefined();
 	});
 });
 

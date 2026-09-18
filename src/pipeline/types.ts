@@ -80,8 +80,14 @@ export interface UiToolkit<TKeys extends string = string> {
 	 * (the entry screen). The one-word Back.
 	 */
 	back(): void;
-	/** End the session; the message is tidied by the commit phase (frozen final screen). */
-	close(): void;
+	/**
+	 * End the session; the message is tidied by the commit phase. Without
+	 * an argument the final screen is frozen (controls stripped). With a
+	 * view, that authored goodbye is left on the message instead, rendered
+	 * as-is with no wrap around it: the ending for flows whose last step
+	 * has its own parting words (a wizard's "you're all set").
+	 */
+	close(final?: ComponentResult): void;
 	/**
 	 * Open a modal; resolves once opened. Submitted values arrive as the
 	 * modal-submit event to the same action; dismissal is Discord silence

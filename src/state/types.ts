@@ -18,6 +18,7 @@
  * @module state/types
  */
 
+import type { ViewNode } from '../tree/types.js';
 import type { ActionHandler, ActionRecord, PermissionPolicy } from '../pipeline/types.js';
 
 // --- Live-message shapes ---------------------------------------------------------
@@ -129,6 +130,13 @@ export interface Session<TData> {
 	 * snapshotted next to `modalHandler` and the submit answers under it.
 	 */
 	modalPolicy?: PermissionPolicy;
+	/**
+	 * The goodbye a closing handler authored: `ui.close(view)` records it
+	 * here, and the close death path renders it through the parting seam
+	 * (final edit, done-set dedupe) instead of freezing the current
+	 * screen. Absent: close freezes as usual.
+	 */
+	finalView?: ViewNode;
 }
 
 /** Everything the store needs to create a session; the caller resolves flow options first. */

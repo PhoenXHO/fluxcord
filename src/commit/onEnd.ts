@@ -4,9 +4,13 @@
  * The store reports every session death with a reason and stays out of the
  * message business; this wiring decides what each death does to the message:
  *
- *   close                -> freeze the final screen; delete the rehydrate row
+ * ```plaintext
+ *   close, authored      -> parting edit with the goodbye view (once; the
+ *                           done-set dedupes); delete the rehydrate row
+ *   close, plain         -> freeze the final screen; delete the rehydrate row
  *   expire, no rehydrate -> parting edit (once; the done-set dedupes)
  *   expire, rehydrate    -> untouched; the row survives for late-click revive
+ * ```
  *
  * The store's hook is synchronous, so the async commit work is
  * fire-and-forget; failures route to the injected logger instead of dying
@@ -44,7 +48,14 @@ export function createOnEnd(options: OnEndOptions): OnEnd {
 		options.onSessionEnd?.(session, reason);
 
 		if (reason === EndReason.Close) {
-			options.commit.commitFreeze(session).catch(fail);
+			const finalView = session.finalView;
+			if (finalView !== undefined) {
+				// The handler authored the goodbye: the parting seam renders it
+				// as-is and marks the message done, so no later path edits it.
+				options.commit.commitParting(session.messageRef, { view: () => finalView }).catch(fail);
+			} else {
+				options.commit.commitFreeze(session).catch(fail);
+			}
 			options.rehydrate?.delete(session.messageRef.messageId).catch(fail);
 			return;
 		}

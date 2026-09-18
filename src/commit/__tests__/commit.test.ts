@@ -294,6 +294,23 @@ describe('close freezes the message', () => {
 		expect(w.edits).toHaveLength(1); // still the frozen payload
 		expect(textContents(w.edits[0].payload)).toContain('Tickets: 3');
 	});
+
+	it('close with a view leaves the authored goodbye instead of the frozen screen', async () => {
+		const w = world();
+		w.handler.mockImplementationOnce(async (): Promise<void> => {
+			w.currentEvent().ui.close(view({ title: 'All set' }, text('Your faction is connected.')));
+		});
+		await w.click();
+		await vi.waitFor(() => expect(w.edits).toHaveLength(1));
+
+		const contents = textContents(w.edits[0].payload);
+		expect(contents).toContain('# All set');
+		expect(contents).toContain('Your faction is connected.');
+		expect(hasActionRow(w.edits[0].payload)).toBe(false);
+		expect(w.store.get(w.session.id)).toBeUndefined();
+		await vi.waitFor(() => expect(w.rows.has(MESSAGE_ID)).toBe(false));
+		expect(w.onEndErrors).toEqual([]);
+	});
 });
 
 describe('the death map (onEnd wiring)', () => {

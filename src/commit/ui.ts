@@ -31,7 +31,7 @@ import { generateId } from '../state/store.js';
 import type { SessionStore } from '../state/store.js';
 import type { Session } from '../state/types.js';
 import type { ComponentResult } from '../tree/types.js';
-import { normalizeModalRoot } from '../tree/normalize.js';
+import { normalizeModalRoot, normalizeViewRoot } from '../tree/normalize.js';
 import type { EventTools, PlatformPort, ScreenRegistry, UiToolkit } from '../pipeline/types.js';
 
 export interface MakeUiOptions {
@@ -91,7 +91,13 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 			back(): void {
 				navigateBack(session);
 			},
-			close(): void {
+			close(final?: ComponentResult): void {
+				if (final !== undefined) {
+					// The authored goodbye rides the session to the store's onEnd,
+					// which renders it through the parting seam instead of
+					// freezing the screen under the user.
+					session.finalView = normalizeViewRoot(final);
+				}
 				options.store.close(session.id);
 			},
 			showModal(modal: ComponentResult): Promise<void> {
