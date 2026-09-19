@@ -1,4 +1,25 @@
-# fluxcord
+<p align="center">
+	<picture>
+		<source
+			media="(prefers-color-scheme: dark)"
+			srcset=".github/assets/horizontal-lockup-dark.png"
+		/>
+		<img
+			src=".github/assets/horizontal-lockup-light.png"
+			alt="fluxcord"
+			width="560"
+		/>
+	</picture>
+</p>
+
+<div align="center">
+
+[![CI](https://github.com/PhoenXHO/fluxcord/actions/workflows/ci.yml/badge.svg)](https://github.com/PhoenXHO/fluxcord/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/fluxcord)](https://www.npmjs.com/package/fluxcord)
+[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![Node](https://img.shields.io/node/v/fluxcord)](https://nodejs.org)
+
+</div>
 
 Stateful, multi-screen Discord UIs in TSX. Built on discord.js v14
 (Components V2).
@@ -6,6 +27,27 @@ Stateful, multi-screen Discord UIs in TSX. Built on discord.js v14
 A screen is a plain function of state: when a click changes that state
 through a handler you wrote, the framework re-renders the screen and edits
 the message, so you never touch edits or component ids yourself.
+
+<!-- Hero demo GIF goes here once the example bot records it:
+![Two screens of a dice panel, rolling and paging through history](.github/assets/demo.gif)
+-->
+
+## Features
+
+- Sessions with real state: every mounted panel owns its data, a FIFO
+  click queue that keeps handlers from racing each other, and an idle
+  expiry swept on an interval.
+- Multi-screen flows with compile-time navigation: the targets of `go`,
+  `push`, and `back` are checked against your screens map by TypeScript.
+- TSX authoring through a custom JSX runtime, with plain builder
+  functions as the non-TSX path; both compile to the same trees.
+- Handlers bound by identity, so no custom-id strings exist to parse, and
+  the commit phase re-renders the screen and edits the message for you.
+- Permission gates declared on flows and on single controls, decided per
+  click by the policy port you wire at boot.
+- Panels survive redeploys through an optional rehydrate store.
+- A platform-free core with the discord.js binding isolated in a
+  peer-dependent `fluxcord/discord` entry.
 
 ## The problem
 
