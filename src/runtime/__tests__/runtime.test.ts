@@ -90,6 +90,8 @@ function world(options: {
 	remount?: RemountPolicy;
 	/** The flow's registration facts; the lifecycle-hook tests land here. */
 	meta?: FlowMeta<PanelData>;
+	/** Default false: most tests drive the sweeper by hand. */
+	sweeper?: boolean;
 } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
@@ -153,6 +155,7 @@ function world(options: {
 		flows: buildFlowCatalog([{ module: 'panel', flow: panelFlow }]),
 		...(options.noRehydrateStore === true ? {} : { rehydrate: rehydrateStore }),
 		now: () => clock.now,
+		sweeper: options.sweeper ?? false,
 	});
 
 	async function mount(mountOptions: MountArgs = {}): Promise<MountHandle<PanelData>> {
@@ -606,6 +609,42 @@ describe('the sweeper', () => {
 
 			expect(w.edits).toEqual([]);
 			expect(w.rows.has(handle.messageId)).toBe(true);
+		} finally {
+			w.runtime.stopSweeper();
+			vi.useRealTimers();
+		}
+	});
+
+	it('starts by default at create, so no one has to remember it', async () => {
+		vi.useFakeTimers();
+		const w = world({ sweeper: true });
+		try {
+			const handle = await w.mount({ to: { channel: 'ch-1' } });
+
+			w.clock.advance(31 * MINUTE);
+			await vi.advanceTimersByTimeAsync(DEFAULT_SWEEP_INTERVAL_MS);
+
+			expect(w.edits).toEqual([handle.messageId]); // reaped with no startSweeper call anywhere
+		} finally {
+			w.runtime.stopSweeper();
+			vi.useRealTimers();
+		}
+	});
+
+	it('sweeper: false hands the lifecycle to the host until it starts one', async () => {
+		vi.useFakeTimers();
+		const w = world({ sweeper: false });
+		try {
+			const handle = await w.mount({ to: { channel: 'ch-1' } });
+
+			w.clock.advance(31 * MINUTE);
+			await vi.advanceTimersByTimeAsync(DEFAULT_SWEEP_INTERVAL_MS);
+
+			expect(w.edits).toEqual([]); // expired but unswept: nobody is watching
+
+			w.runtime.startSweeper(DEFAULT_SWEEP_INTERVAL_MS);
+			await vi.advanceTimersByTimeAsync(DEFAULT_SWEEP_INTERVAL_MS);
+			expect(w.edits).toEqual([handle.messageId]); // the host's start takes over
 		} finally {
 			w.runtime.stopSweeper();
 			vi.useRealTimers();

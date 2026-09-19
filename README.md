@@ -219,7 +219,7 @@ const runtime = createUiRuntime({
 });
 
 setUiHost({ mount: runtime.mount, replySender: bridge.replySender });
-runtime.startSweeper(); // reaps idle sessions on an interval
+// The expiry sweeper starts with the runtime; pass sweeper: false to run it yourself.
 
 const commands = [deriveCommand(diceCommand)];
 // Register commands.map((c) => c.data.toJSON()) with the REST API once at
@@ -270,8 +270,8 @@ framework, so Discord never paints a failure state onto your buttons.
 
 Each mounted flow is a session that owns the state, a FIFO queue which
 serializes clicks so handlers never race each other on the same panel, and
-an expiry. Idle panels are swept on an interval you start with
-`runtime.startSweeper()` and die with a parting screen that tells the user
+an expiry. Idle panels are swept on an interval that starts with the
+runtime (`sweeper: false` opts out) and die with a parting screen that tells the user
 how to reopen the panel, while a handler can close its own session at any
 time through `event.ui.close()`. Panels mount as public replies because
 the framework edits the message over its lifetime and Discord makes

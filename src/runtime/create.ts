@@ -284,16 +284,25 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		}
 	}
 
+	const startSweeper = (intervalMs: number = DEFAULT_SWEEP_INTERVAL_MS): void => {
+		stopSweeper();
+		sweeperTimer = setInterval(() => {
+			store.sweep();
+		}, intervalMs);
+		sweeperTimer.unref?.();
+	};
+
+	// The sweeper runs from create. A runtime whose host forgot to start
+	// it would let expired sessions pile up in the store forever, so the
+	// default is on; the timer is unref'd and stopSweeper stays in the
+	// host's shutdown registry. `sweeper: false` hands the lifecycle back
+	// to the host (tests, custom intervals).
+	if (options.sweeper !== false) startSweeper();
+
 	return {
 		mount,
 		dispatch: (incoming: IncomingEvent): Promise<void> => dispatch(incoming),
-		startSweeper(intervalMs: number = DEFAULT_SWEEP_INTERVAL_MS): void {
-			stopSweeper();
-			sweeperTimer = setInterval(() => {
-				store.sweep();
-			}, intervalMs);
-			sweeperTimer.unref?.();
-		},
+		startSweeper,
 		stopSweeper,
 	};
 }

@@ -95,6 +95,13 @@ export interface RuntimeOptions {
 	readonly onError?: ErrorHandler;
 	/** Injectable clock for tests; defaults to Date.now. */
 	readonly now?: () => number;
+	/**
+	 * Runs the expiry sweeper from create; true by default. The timer is
+	 * unref'd, so it never holds the process open, and `stopSweeper` still
+	 * belongs in the host's shutdown registry. Set false to manage
+	 * `startSweeper` yourself (tests, custom intervals).
+	 */
+	readonly sweeper?: boolean;
 }
 
 export interface UiRuntime {
@@ -107,8 +114,9 @@ export interface UiRuntime {
 	/** The dispatch core: the bridge feeds it one IncomingEvent per interaction. */
 	dispatch(incoming: IncomingEvent): Promise<void>;
 	/**
-	 * Starts the expiry sweeper on an interval; explicit lifecycle so the
-	 * host registers stop in its own shutdown registry (no hidden timers).
+	 * Starts (or restarts) the expiry sweeper on an interval. The sweeper
+	 * already runs from create; this exists to set a custom interval or to
+	 * resume after `stopSweeper`.
 	 */
 	startSweeper(intervalMs?: number): void;
 	/** Stops the sweeper timer; safe when it was never started. */
