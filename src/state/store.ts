@@ -18,6 +18,7 @@
  * @module state/store
  */
 
+import { randomInt } from 'node:crypto';
 import type { CreateSessionInput, Session } from './types.js';
 import { EndReason, RemountPolicy } from './types.js';
 
@@ -28,7 +29,8 @@ const ID_LENGTH = 8;
 
 /**
  * Generates a short opaque id from the 62-char alphabet; session ids and
- * modal nonces both. Uniqueness among live sessions is guarded by the
+ * modal nonces both. Seeded by node:crypto, so ids are not guessable
+ * from earlier ones. Uniqueness among live sessions is guarded by the
  * collision loop in `create`; reuse after death is guarded by id space
  * (62^8) plus frame resolution: a wrong-session click misses that
  * session's frame and bounces as stale, so it can never misdeliver.
@@ -36,7 +38,7 @@ const ID_LENGTH = 8;
 export function generateId(): string {
 	let id = '';
 	for (let i = 0; i < ID_LENGTH; i += 1) {
-		id += ID_ALPHABET[Math.floor(Math.random() * ID_ALPHABET.length)];
+		id += ID_ALPHABET[randomInt(ID_ALPHABET.length)];
 	}
 	return id;
 }
