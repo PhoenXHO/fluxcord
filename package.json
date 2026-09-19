@@ -2,8 +2,27 @@
 	"name": "fluxcord",
 	"version": "0.1.0",
 	"description": "Session-based Components V2 UI framework for Discord bots: flows, screens, TSX views.",
+	"keywords": [
+		"discord",
+		"discord-bot",
+		"discord-js",
+		"components-v2",
+		"ui",
+		"tsx",
+		"framework",
+		"sessions",
+		"interactions"
+	],
+	"homepage": "https://github.com/PhoenXHO/fluxcord#readme",
+	"bugs": {
+		"url": "https://github.com/PhoenXHO/fluxcord/issues"
+	},
 	"license": "MIT",
-	"author": "FeenX",
+	"author": "PhoenixHO",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PhoenXHO/fluxcord.git"
+	},
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -36,6 +55,7 @@
 		"build": "tsc -p tsconfig.build.json",
 		"test": "vitest",
 		"test:run": "vitest run",
+		"test:coverage": "vitest run --coverage",
 		"lint": "eslint .",
 		"prepack": "npm run build",
 		"prepublishOnly": "npm run lint && npm run test:run"
@@ -52,6 +72,7 @@
 		"@types/node": "^24.3.0",
 		"@typescript-eslint/eslint-plugin": "^8.43.0",
 		"@typescript-eslint/parser": "^8.43.0",
+		"@vitest/coverage-v8": "^4.1.11",
 		"discord.js": "^14.25.1",
 		"eslint": "^9.35.0",
 		"globals": "^16.3.0",
