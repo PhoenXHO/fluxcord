@@ -22,11 +22,11 @@
  * Tag vocabulary splits one way, with no overlap: layout and leaf kinds
  * are the intrinsics (view, text, row, container, link, modal, input, hr);
  * none of them carries a handler. The handler-carrying controls (Button,
- * Select) exist only as screen-kit members (tree/kit):
+ * Select, Back) exist only as screen-kit members (tree/kit):
  * a view destructures them from its kit parameter and uses them as
  * components (e.g., `<Button/>`) so their handler slots stay typed against the
  * flow's data and screen keys. The draw-time kit is this module's builders
- * (runtimeKit), so kit elements produce the same trees intrinsics do.
+ * (kitFor(session)), so kit elements produce the same trees intrinsics do.
  * The exception proving the rule is the modal-context select: a select in
  * a modal is a data field (id + label, read from the submission), not a
  * control, so it is the intrinsic `modal-select` while the message-context

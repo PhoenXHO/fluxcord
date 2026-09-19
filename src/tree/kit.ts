@@ -14,16 +14,18 @@
  * controls are kit members, one way each.
  *
  * The kit produces the SAME nodes the global builders produce; only the
- * accepted props are narrowed. At draw time the commit phase passes the
- * erased {@link runtimeKit}: the global builders themselves.
+ * accepted props are narrowed. The engine builds one erased kit per draw
+ * with {@link kitFor}, so session-aware members (Back) bind the drawing
+ * session's live history: a view never passes the session to a control.
  *
  * @module tree/kit
  */
 
+import type { ViewSession } from '../flow/types.js';
 import type { ActionHandler } from '../pipeline/types.js';
 import { button, entityFlagOf, entitySelect, optionSelect } from './builders.js';
 import type { ButtonNode, SelectNode, SelectOption, TextChild } from './types.js';
-import type { ButtonProps, EntitySelectProps, EntitySelectSource, OptionSelectProps, SelectEntityFlags } from './builders.js';
+import type { ButtonProps, ButtonStyleFlags, EntitySelectProps, EntitySelectSource, OptionSelectProps, SelectEntityFlags } from './builders.js';
 import { optionsFromChildren } from './jsx-runtime.js';
 
 /**
@@ -55,9 +57,27 @@ type KitEntitySelectProps<TData, TKeys extends string> = Omit<SelectNode, 'kind'
 export type KitSelectProps<TData, TKeys extends string> = KitOptionSelectProps<TData, TKeys> | KitEntitySelectProps<TData, TKeys>;
 
 /**
+ * Props for the kit's {@link ScreenKit.Back Back}: the pre-nav seam, an
+ * optional label, and the style flags. No session, no history, no
+ * `disabled` prop: the engine supplies all three.
+ */
+export type KitBackProps<TData, TKeys extends string> = ButtonStyleFlags & {
+	/**
+	 * Runs BEFORE the built-in back nav, with the same event shape as any
+	 * handler (in a plugged screen it sees the slot's lens, like the
+	 * screen's buttons). Async-friendly; throwing from it cancels the
+	 * nav, reported like any handler error. Read-only seam: leave the
+	 * actual navigation to Back.
+	 */
+	readonly onLeave?: ActionHandler<TData, TKeys>;
+	/** The face label. Defaults to 'Back'. */
+	readonly label?: string;
+};
+
+/**
  * The flow-typed controls a view receives as its second parameter:
- * `Button`, `Select` and `handler`. Mainly a type-level bridge: the
- * nodes it builds are the plain builders' output, only the handler
+ * `Button`, `Select`, `Back` and `handler`. Mainly a type-level bridge:
+ * the nodes it builds are the plain builders' output, only the handler
  * slots are narrowed to the flow's data and screen keys.
  */
 export interface ScreenKit<TData = unknown, TKeys extends string = string> {
@@ -66,62 +86,91 @@ export interface ScreenKit<TData = unknown, TKeys extends string = string> {
 	/** One select, two shapes: `options` (or `<option>` children) for a static list, one entity flag (`roles`) for a Discord source. */
 	Select(props: KitSelectProps<TData, TKeys>): SelectNode;
 	/**
+	 * The smart back button: one tag, no wiring. Disabled whenever the
+	 * drawing session's history is empty, pops one entry on click. The
+	 * disabled state is the engine's: props cannot override it.
+	 */
+	Back(props: KitBackProps<TData, TKeys>): ButtonNode;
+	/**
 	 * Typing identity: puts a handler arrow in an argument slot, so
 	 * view-local factories get full contextual typing with no annotations.
 	 */
 	handler(slot: { readonly run: ActionHandler<TData, TKeys> }): ActionHandler;
 }
 
-// Button, Select and handler are written as methods on purpose. Method
-// syntax makes TypeScript compare them more loosely, so a kit built for the
-// flow's whole data bag can also be passed to a screen that only works with
-// a smaller piece of it. Writing them as arrow properties would turn that
-// into a compile error.
+// The controls are written as methods on purpose. Method syntax makes
+// TypeScript compare them more loosely, so a kit built for the flow's whole
+// data bag can also be passed to a screen that only works with a smaller
+// piece of it. Writing them as arrow properties would turn that into a
+// compile error.
 
 /**
- * The erased kit the pipeline passes at draw time. `Button` and `Select`
- * are thin adapters over the global builders: components receive their
- * JSX children inside the props object, so `Button` lifts them out into
- * the builder's rest args before delegating.
+ * The erased kit for one draw. Session-blind members (`Button`, `Select`,
+ * `handler`) are the thin adapters they always were; `Back` closes over
+ * the drawing session's history, so it renders disabled on an entry
+ * screen and generates its own pop handler. Views receive the product as
+ * their second parameter; the slot-tagged variants come from the commit
+ * phase's `screenKitAt`.
  */
-export const runtimeKit: ScreenKit = {
-	Button: (props) => {
-		const { children, ...rest } = props as { readonly children?: unknown };
-		// JSX hands a single child through bare and multiple children as an
-		// array; either way the builder's rest args want a flat list.
-		const kids: readonly unknown[] = children === undefined || children === null
-			? []
-			: Array.isArray(children) ? children : [children];
-		return button(rest as ButtonProps, ...(kids as readonly TextChild[]));
-	},
-	Select: (props) => {
-		// The props union lets an author pass both an options list and an
-		// entity flag: when an object literal is checked against a union, a
-		// property known to any member is accepted. The mistake is caught
-		// here, at construction, instead of waiting for validation at draw.
-		const raw = props as Record<string, unknown>;
-		const kids = raw.children === undefined || raw.children === null
-			? []
-			: Array.isArray(raw.children) ? raw.children : [raw.children];
-		const lifted = optionsFromChildren('Select', kids);
-		const entity = entityFlagOf(raw);
-		if (entity !== undefined && (raw.options !== undefined || lifted !== undefined)) {
-			throw new Error('a select takes either options or entity, never both');
-		}
-		const rest: Record<string, unknown> = { ...raw };
-		delete rest.children;
-		if (entity !== undefined) {
-			// The flag stays in: entitySelect resolves and strips it.
-			return entitySelect(rest as EntitySelectProps);
-		}
-		delete rest.users;
-		delete rest.roles;
-		delete rest.channels;
-		delete rest.mentionable;
-		if (lifted !== undefined) {
-			rest.options = lifted;
-		}
-		return optionSelect(rest as OptionSelectProps);
-	},
-	handler: ({ run }) => run,
-};
+export function kitFor(session: Pick<ViewSession, 'history'>): ScreenKit {
+	return {
+		Button: (props): ButtonNode => {
+			const { children, ...rest } = props as { readonly children?: unknown };
+			// JSX hands a single child through bare and multiple children as an
+			// array; either way the builder's rest args want a flat list.
+			const kids: readonly unknown[] = children === undefined || children === null
+				? []
+				: Array.isArray(children) ? children : [children];
+			return button(rest as ButtonProps, ...(kids as readonly TextChild[]));
+		},
+		Select: (props): SelectNode => {
+			// The props union lets an author pass both an options list and an
+			// entity flag: when an object literal is checked against a union, a
+			// property known to any member is accepted. The mistake is caught
+			// here, at construction, instead of waiting for validation at draw.
+			const raw = props as Record<string, unknown>;
+			const kids = raw.children === undefined || raw.children === null
+				? []
+				: Array.isArray(raw.children) ? raw.children : [raw.children];
+			const lifted = optionsFromChildren('Select', kids);
+			const entity = entityFlagOf(raw);
+			if (entity !== undefined && (raw.options !== undefined || lifted !== undefined)) {
+				throw new Error('a select takes either options or entity, never both');
+			}
+			const rest: Record<string, unknown> = { ...raw };
+			delete rest.children;
+			if (entity !== undefined) {
+				// The flag stays in: entitySelect resolves and strips it.
+				return entitySelect(rest as EntitySelectProps);
+			}
+			delete rest.users;
+			delete rest.roles;
+			delete rest.channels;
+			delete rest.mentionable;
+			if (lifted !== undefined) {
+				rest.options = lifted;
+			}
+			return optionSelect(rest as OptionSelectProps);
+		},
+		Back: (props): ButtonNode => {
+			const { onLeave, label, ...rest } = props as KitBackProps<unknown, string> & { readonly [key: string]: unknown };
+			// One bare style flag defaults the face to secondary; the spread
+			// order makes the author's flag win and the computed disabled
+			// state final (props cannot re-enable an empty history).
+			const hasFlag = rest.primary !== undefined || rest.secondary !== undefined
+				|| rest.success !== undefined || rest.danger !== undefined;
+			const run: ActionHandler = async (event) => {
+				await onLeave?.(event);
+				event.ui.back();
+			};
+			return button({
+				...(hasFlag ? {} : { secondary: true }),
+				...rest,
+				label: label ?? 'Back',
+				disabled: session.history.length === 0,
+				onClick: run,
+			} as ButtonProps);
+		},
+		handler: ({ run }) => run,
+	};
+}

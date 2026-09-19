@@ -40,7 +40,7 @@ import type {
 import { defineFlow, subflow } from '../define.js';
 import { viewOf } from '../../commit/commit.js';
 import { screen, subview } from '../screen.js';
-import { runtimeKit } from '../../tree/kit.js';
+import { kitFor } from '../../tree/kit.js';
 import { getPath, lensSession, setPath } from '../lens.js';
 import { asScreenRegistry, screenEntries } from '../registry.js';
 import { validateFlows } from '../validate.js';
@@ -126,10 +126,11 @@ describe('defineFlow - validations', () => {
 		});
 
 		const fakeSession = {} as Session<LottoData>;
+		const kit = kitFor(fakeSession);
 		const base = view({}, text('base'));
-		const result = def.wrap?.(base, fakeSession, runtimeKit);
+		const result = def.wrap?.(base, fakeSession, kit);
 
-		expect(second).toHaveBeenCalledWith(marker, fakeSession, runtimeKit);
+		expect(second).toHaveBeenCalledWith(marker, fakeSession, kit);
 		expect(result).toBe(marker);
 	});
 
@@ -375,7 +376,7 @@ describe('subview', () => {
 	it('draws when the screen forwards its kit: helpers are plain calls', () => {
 		const helper = subview<LottoData>()((data) => view({}, text(`count: ${data.count}`)));
 		const stub: ViewSession = { ownerId: '', createdAt: 0, screen: 'main', history: [], lastActivityAt: 0, ttlMs: 0 };
-		const tree = helper({ count: 3, picker: { chosen: 'x' } }, runtimeKit, stub);
+		const tree = helper({ count: 3, picker: { chosen: 'x' } }, kitFor(stub), stub);
 		expect(tree).toEqual(view({}, text('count: 3')));
 	});
 

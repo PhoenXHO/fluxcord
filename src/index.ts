@@ -41,5 +41,5 @@ export * from './render/id-codec.js'; // isActionId, encodeActionId, decodeActio
 export * from './tree/vocab.js'; // NodeKind & the style/entity unions
 export * from './tree/types.js'; // ViewNode, ButtonNode, ...
 export * from './tree/builders.js'; // view, text, row, button, ..., checkbox, checkboxGroup, radioGroup, option
-export * from './tree/kit.js'; // ScreenKit, runtimeKit
+export * from './tree/kit.js'; // ScreenKit, kitFor
 export * from './tree/validate.js'; // validateTree, Violation

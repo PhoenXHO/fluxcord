@@ -12,12 +12,15 @@ import { describe, expect, it } from 'vitest';
 // these bindings exist for the direct factory calls below.
 import { jsx as factory, Fragment as FragmentTag } from '../jsx-runtime.js';
 import { button, entitySelect, input, link, optionSelect, text, view } from '../builders.js';
-import { runtimeKit } from '../kit.js';
+import { kitFor } from '../kit.js';
 import { validateTree } from '../validate.js';
 import type { ComponentResult } from '../jsx-runtime.js';
 import type { CheckboxGroupNode, TextNode, TreeNode, ViewNode } from '../types.js';
 
 const onClick = (): void => {};
+
+/** The kit the tests draw with: entry-screen stub (empty history). */
+const kit = kitFor({ history: [] });
 
 /** Coerces an element (or expression) to a child list, for asserting children arrays. */
 function kids(node: unknown): readonly TreeNode[] {
@@ -38,7 +41,7 @@ describe('jsx elements', () => {
 	});
 
 	it('kit control attributes ride props straight into the builder - handlers included', () => {
-		const viaTsx = <runtimeKit.Button label="Go" success onClick={onClick} />;
+		const viaTsx = <kit.Button label="Go" success onClick={onClick} />;
 		const viaBuilders = button({ label: 'Go', success: true, onClick });
 
 		expect(viaTsx).toEqual(viaBuilders);
@@ -55,7 +58,7 @@ describe('jsx elements', () => {
 	});
 
 	it('the built tree passes validateTree untouched', () => {
-		const tree = <view title="ok"><text>a</text><row><runtimeKit.Button label="Go" onClick={onClick} /></row></view>;
+		const tree = <view title="ok"><text>a</text><row><kit.Button label="Go" onClick={onClick} /></row></view>;
 		expect(validateTree(tree as ViewNode)).toEqual([]);
 	});
 });
@@ -99,22 +102,22 @@ describe('child coercion', () => {
 describe('kit controls', () => {
 	it('Select with options is the optionSelect builder - same node', () => {
 		const options = [{ label: '1h', value: '1h' }];
-		const viaTsx = <runtimeKit.Select placeholder="Pick" options={options} onSelect={onClick} />;
+		const viaTsx = <kit.Select placeholder="Pick" options={options} onSelect={onClick} />;
 
 		expect(viaTsx).toEqual(optionSelect({ placeholder: 'Pick', options, onSelect: onClick }));
 	});
 
 	it('Select with an entity flag is the entitySelect builder - same node', () => {
-		const viaTsx = <runtimeKit.Select users onSelect={onClick} />;
+		const viaTsx = <kit.Select users onSelect={onClick} />;
 
 		expect(viaTsx).toEqual(entitySelect({ users: true, onSelect: onClick }));
 	});
 
 	it('Select lifts option children into the options list', () => {
 		const viaTsx = (
-			<runtimeKit.Select placeholder="Pick" onSelect={onClick}>
+			<kit.Select placeholder="Pick" onSelect={onClick}>
 				<option value="1h">1 hour</option>
-			</runtimeKit.Select>
+			</kit.Select>
 		);
 		expect(viaTsx).toEqual(optionSelect({ placeholder: 'Pick', options: [{ label: '1 hour', value: '1h' }], onSelect: onClick }));
 	});
@@ -122,27 +125,27 @@ describe('kit controls', () => {
 	it('Select with both options and an entity flag throws at construction', () => {
 		const options = [{ label: '1h', value: '1h' }];
 		const raw = factory as unknown as (type: unknown, props: unknown) => TreeNode;
-		expect(() => raw(runtimeKit.Select, { options, users: true, onSelect: onClick })).toThrow(/never both/);
+		expect(() => raw(kit.Select, { options, users: true, onSelect: onClick })).toThrow(/never both/);
 	});
 
 	it('Select with an entity flag and option children throws at construction', () => {
 		const raw = factory as unknown as (type: unknown, props: unknown) => TreeNode;
-		expect(() => raw(runtimeKit.Select, { roles: true, onSelect: onClick, children: [{ label: 'A', value: 'a' }] })).toThrow(/never both/);
+		expect(() => raw(kit.Select, { roles: true, onSelect: onClick, children: [{ label: 'A', value: 'a' }] })).toThrow(/never both/);
 	});
 
 	it('Select takes only option children', () => {
 		const options = [{ label: '1h', value: '1h' }];
 		const raw = factory as unknown as (type: unknown, props: unknown) => TreeNode;
-		expect(() => raw(runtimeKit.Select, { options, onSelect: onClick, children: text('junk') })).toThrow(/only <option>/);
+		expect(() => raw(kit.Select, { options, onSelect: onClick, children: text('junk') })).toThrow(/only <option>/);
 	});
 
 	it('Button folds its JSX children into the label', () => {
-		const viaTsx = <runtimeKit.Button onClick={onClick}>Go {2}</runtimeKit.Button>;
+		const viaTsx = <kit.Button onClick={onClick}>Go {2}</kit.Button>;
 		expect(viaTsx).toEqual(button({ onClick, label: 'Go 2' }));
 	});
 
 	it('Button label prop and children together throw', () => {
-		expect(() => <runtimeKit.Button label="Go" onClick={onClick}>Also</runtimeKit.Button>).toThrow(/never both/);
+		expect(() => <kit.Button label="Go" onClick={onClick}>Also</kit.Button>).toThrow(/never both/);
 	});
 });
 

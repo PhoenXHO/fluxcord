@@ -24,9 +24,10 @@ import type { V2MessagePayload } from '../render/v2.js';
 import type { MessageRef, Session } from '../state/types.js';
 import type { PartingOptions, PlatformPort, ScreenRegistry } from '../pipeline/types.js';
 import type { ButtonNode, SelectNode, ViewNode } from '../tree/types.js';
-import { runtimeKit } from '../tree/kit.js';
+import { kitFor } from '../tree/kit.js';
 import type { ScreenKit } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
+import type { ViewSession } from '../flow/types.js';
 import { getPath } from '../flow/lens.js';
 import { isSubflowDone } from '../flow/define.js';
 import { materializeTree } from './frame.js';
@@ -56,23 +57,27 @@ export interface CommitOptions {
 }
 
 /**
- * A kit whose controls carry an ownership tag: the bag path the handler
- * lenses to at click time. Tagged controls ride their tag on the frame
- * record, so dispatch lenses by the HANDLER's owner instead of the
- * screen it was drawn on. Nodes are frozen, so the tag lands on a fresh
- * frozen copy; the originals never enter the tree. A subflow plug's
- * done handler is left untagged (it must keep the screen's lens to read
- * the subflow state), as are handlers the kit builds for a screen with
- * no slot at all.
+ * The draw kit for a plugged screen: the session-bound kit, every control
+ * tagged with the bag path the handler lenses to at click time. Tagged
+ * controls ride their tag on the frame record, so dispatch lenses by the
+ * HANDLER's owner instead of the screen it was drawn on. Nodes are
+ * frozen, so the tag lands on a fresh frozen copy; the originals never
+ * enter the tree. A subflow plug's done handler is left untagged (it
+ * must keep the screen's lens to read the subflow state), as are
+ * handlers the kit builds for a screen with no slot at all. Back is
+ * tagged like any control (its onLeave sees the slot's lens); the pop
+ * itself rides the ui toolkit, which always acts on the real session.
  */
-export function screenKitAt(slot: readonly string[]): ScreenKit {
+export function screenKitAt(session: Pick<ViewSession, 'history'>, slot: readonly string[]): ScreenKit {
+	const base = kitFor(session);
 	function withSlot<N extends ButtonNode | SelectNode>(node: N): N {
 		return Object.freeze({ ...node, slot }) as unknown as N;
 	}
 	return {
-		Button: (props) => isSubflowDone(props.onClick) ? runtimeKit.Button(props) : withSlot(runtimeKit.Button(props)),
-		Select: (props) => withSlot(runtimeKit.Select(props)),
-		handler: runtimeKit.handler,
+		Button: (props) => isSubflowDone(props.onClick) ? base.Button(props) : withSlot(base.Button(props)),
+		Select: (props) => withSlot(base.Select(props)),
+		Back: (props) => withSlot(base.Back(props)),
+		handler: base.handler,
 	};
 }
 
@@ -85,7 +90,7 @@ export function screenKitAt(slot: readonly string[]): ScreenKit {
  *
  * Ownership is tagged at draw: a plugged screen's view is tagged with
  * the screen's slot, and the wrap (the parent flow's surface) with the
- * root bag. Own screens draw with the plain runtime kit — no slot, no
+ * root bag. Own screens draw with the session-bound kit — no slot, no
  * tag, and dispatch keeps its direct session.
  */
 export function viewOf(session: Session<unknown>, screens: ScreenRegistry): ViewNode {
@@ -98,9 +103,9 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 	// Views return the element union (TSX roots type flat), folded to a
 	// view node here, one place; validateTree polices the walk next. Same
 	// for the composed wrap's result.
-	let tree = normalizeViewRoot(screen.view(data, screen.slot === undefined ? runtimeKit : screenKitAt(screen.slot), session));
+	let tree = normalizeViewRoot(screen.view(data, screen.slot === undefined ? kitFor(session) : screenKitAt(session, screen.slot), session));
 	if (screen.flow?.wrap !== undefined) {
-		tree = normalizeViewRoot(screen.flow.wrap(tree, session, screen.slot === undefined ? runtimeKit : screenKitAt([])));
+		tree = normalizeViewRoot(screen.flow.wrap(tree, session, screen.slot === undefined ? kitFor(session) : screenKitAt(session, [])));
 	}
 	return tree;
 }

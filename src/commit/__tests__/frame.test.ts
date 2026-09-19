@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { actionHash } from '../../render/action-hash.js';
 import { button, container, optionSelect, row, text, view } from '../../tree/builders.js';
-import { runtimeKit } from '../../tree/kit.js';
+import { kitFor } from '../../tree/kit.js';
 import { screenKitAt } from '../commit.js';
 import { materializeTree } from '../frame.js';
 
@@ -116,7 +116,7 @@ describe('materializeTree - the frame', () => {
 	});
 
 	it('an untagged control carries no slot: dispatch falls back to the screen lens', () => {
-		const node = runtimeKit.Button({ onClick: (): void => {}, label: 'Go' });
+		const node = kitFor({ history: [] }).Button({ onClick: (): void => {}, label: 'Go' });
 		const { frame, stampOf } = materializeTree(view({}, row({}, node)));
 
 		expect('slot' in frame[stampOf(node)]).toBe(false);
@@ -125,7 +125,7 @@ describe('materializeTree - the frame', () => {
 
 describe('screenKitAt - draw-phase ownership tags', () => {
 	it('tags buttons and selects with the slot, and the record carries it', () => {
-		const kit = screenKitAt(['picker']);
+		const kit = screenKitAt({ history: [] }, ['picker']);
 		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
 		const picked = kit.Select({ options: [{ label: 'A', value: 'a' }], onSelect: (): void => {} });
 		const { frame, stampOf } = materializeTree(view({}, row({}, node, picked)));
@@ -137,7 +137,7 @@ describe('screenKitAt - draw-phase ownership tags', () => {
 	});
 
 	it('an empty tag is the root bag, not the absence of one', () => {
-		const kit = screenKitAt([]);
+		const kit = screenKitAt({ history: [] }, []);
 		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
 		const { frame, stampOf } = materializeTree(view({}, row({}, node)));
 
