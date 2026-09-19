@@ -33,10 +33,12 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "tsc -p .",
+		"build": "tsc -p tsconfig.build.json",
 		"test": "vitest",
 		"test:run": "vitest run",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"prepack": "npm run build",
+		"prepublishOnly": "npm run lint && npm run test:run"
 	},
 	"dependencies": {
 		"discord-api-types": "^0.38.36"
