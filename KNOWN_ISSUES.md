@@ -9,7 +9,6 @@ is the scale fluxcord is built and tested at today.
 | [All clicks share one queue](#all-clicks-share-one-queue)                 | A slow handler delays clicks on every panel           | None needed at single-community scale          |
 | [Old clicks break after a restart](#old-clicks-break-after-a-restart)     | Harmless errors from panels opened before the restart | None needed; the errors are cosmetic           |
 | [Every draw fetches over REST](#every-draw-fetches-over-rest)             | Rate-limit pressure on very busy bots                 | None needed at single-community scale          |
-| [Unlisted flows fail at first click](#unlisted-flows-fail-at-first-click) | A command registers fine, then fails on first use     | List the flow in the module manifest's `flows` |
 
 ## All clicks share one queue
 
@@ -33,11 +32,3 @@ restarts when configured; it does not preserve this bookkeeping.
 Rendering a panel fetches its channel and message fresh on each draw,
 with no caching between draws. This keeps the rendering path simple,
 but a very busy bot pays for it in rate-limit headroom.
-
-## Unlisted flows fail at first click
-
-A command that mounts a flow must also list that flow in its module
-manifest's `flows` array. Skipping the listing registers the command
-normally, and the failure only surfaces when someone uses it, throwing
-`mount: flow X is not in the boot catalog`. We plan to catch this at
-boot in a future release.
