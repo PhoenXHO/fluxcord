@@ -26,9 +26,10 @@ import type { Screen, DeepReadonly, ViewSession } from './types.js';
  * Curried screen factory. The first call declares the screen's data
  * slice; the second receives the view. `TKeys` is solved from context when
  * the flow assembles its screens map, so a screen file never names the
- * flow it joins.
+ * flow it joins. `TData` defaults to `void` for stateless screens, where
+ * the view may then drop the parameters it does not use.
  */
-export function screen<TData>(): <TKeys extends string>(
+export function screen<TData = void>(): <TKeys extends string>(
 	view: (data: DeepReadonly<TData>, controls: ScreenKit<TData, NoInfer<TKeys>>, session: ViewSession) => ComponentResult,
 ) => Screen<TData, TKeys> {
 	return (view) => {

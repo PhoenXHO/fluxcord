@@ -119,7 +119,8 @@ const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  *
  * @param id The flow's bare kebab name within its module; the loader
  *   assembles `'<module>/<name>'` from it.
- * @param options Screens, `first`, `initialData`, and the optional pieces.
+ * @param options Screens, `first`, `initialData` (omit for a stateless
+ *   flow), and the optional pieces.
  * @param meta Registration facts: the default policy gate and the
  *   session lifecycle hooks.
  * @returns The `Flow` to list in the module manifest's `flows`, or mount
@@ -127,7 +128,7 @@ const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  * @throws When the name is not a bare kebab name, or the options fail
  *   {@link defineFlow}'s validation.
  */
-export function flow<TData, const TScreens extends string = string>(
+export function flow<TData = void, const TScreens extends string = string>(
 	id: string,
 	options: FlowOptions<TData, TScreens>,
 	meta?: FlowMeta<TData>,

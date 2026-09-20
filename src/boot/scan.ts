@@ -44,7 +44,7 @@ export function coverageScan(catalog: FlowCatalog): string[] {
 					lastActivityAt: 0,
 					ttlMs: def.ttlMs,
 				};
-				const tree = normalizeViewRoot(screen.view(structuredClone(def.initialData) as never, kitFor(stub), stub));
+				const tree = normalizeViewRoot(screen.view(structuredClone(def.initialData ?? {}) as never, kitFor(stub), stub));
 				void tree;
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);

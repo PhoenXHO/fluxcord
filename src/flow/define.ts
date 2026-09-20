@@ -74,7 +74,7 @@ function assertId(kind: string, id: string): void {
  * @throws On an invalid screen id, a non-finite `ttlMs`, or a subflow key
  *   collision.
  */
-export function defineFlow<TData, const TScreens extends string = string>(
+export function defineFlow<TData = void, const TScreens extends string = string>(
 	options: FlowOptions<TData, TScreens>,
 ): FlowDefinition<TData> {
 	// Own screens: ids validated. Handlers live in the views, so there is

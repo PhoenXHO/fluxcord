@@ -113,10 +113,13 @@ export interface FlowOptions<TData, TScreens extends string = string> {
 	 * command, which lotto) arrive via the `onSessionStart` hook plus
 	 * `handle.redraw`, not by widening this bag.
 	 *
+	 * Omit for a stateless flow: sessions start from an empty bag, and
+	 * the screens can be built with `screen()` and no data slice.
+	 *
 	 * Keep the bag plain JSON data: functions or class instances throw at
 	 * mount.
 	 */
-	readonly initialData: TData;
+	readonly initialData?: TData;
 	/**
 	 * Components drawn around every screen, as an onion: the first entry
 	 * sits closest to the screen, later entries wrap around it, and each

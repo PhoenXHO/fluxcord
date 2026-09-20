@@ -92,30 +92,40 @@ function world(options: {
 	meta?: FlowMeta<PanelData>;
 	/** Default false: most tests drive the sweeper by hand. */
 	sweeper?: boolean;
+	/** Swap in a stateless flow (initialData omitted); its view ignores data. */
+	stateless?: boolean;
 } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
 
-	const panelFlow: Flow<PanelData> = flow<PanelData>('host', {
-		screens: {
-			main: {
-				view: (data) => view(
-					{},
-					text(`count ${data.count}`),
-					row({}, button({ onClick: handler, label: 'Join' })),
-				),
+	// The stateless cast is the fixture's erase: the bare view reads no
+	// data, so nothing type-dependent runs under the PanelData label.
+	const panelFlow: Flow<PanelData> = (options.stateless === true
+		? flow('bare', {
+			screens: { main: { view: () => view({}, text('bare panel')) } },
+			first: 'main',
+			ttlMs: 30 * MINUTE,
+		})
+		: flow<PanelData>('host', {
+			screens: {
+				main: {
+					view: (data) => view(
+						{},
+						text(`count ${data.count}`),
+						row({}, button({ onClick: handler, label: 'Join' })),
+					),
+				},
 			},
-		},
-		first: 'main',
-		// The flow-owned fresh bag: mount clones this per session.
-		initialData: { count: 3 },
-		ttlMs: 30 * MINUTE,
-		...(options.remount !== undefined ? { remount: options.remount } : {}),
-		// 'dead-ref' models a domain object that no longer exists: undefined = dead.
-		...(options.rehydratable === true
-			? { rehydrate: (ref: string): PanelData | undefined => (ref === 'dead-ref' ? undefined : { count: 77 }) }
-			: {}),
-	}, options.meta);
+			first: 'main',
+			// The flow-owned fresh bag: mount clones this per session.
+			initialData: { count: 3 },
+			ttlMs: 30 * MINUTE,
+			...(options.remount !== undefined ? { remount: options.remount } : {}),
+			// 'dead-ref' models a domain object that no longer exists: undefined = dead.
+			...(options.rehydratable === true
+				? { rehydrate: (ref: string): PanelData | undefined => (ref === 'dead-ref' ? undefined : { count: 77 }) }
+				: {}),
+		}, options.meta));
 
 	const { platform, edits, replies } = fakeBridge();
 	const rows = new Map<string, RehydrateRow>();
@@ -264,6 +274,14 @@ describe('mount - wall ceilings', () => {
 });
 
 describe('mount - the flow-owned bag', () => {
+	it('mounts a stateless flow - omitted initialData starts from an empty bag', async () => {
+		const w = world({ stateless: true });
+		const handle = await w.mount();
+
+		expect(textBodies(w.sent[0].payload)).toContain('bare panel');
+		expect(handle.sessionId).toMatch(/^[0-9A-Za-z]{8}$/);
+	});
+
 	it('clones the initialData per mount - two sessions never share bag state', async () => {
 		// Coexist so both panels stay live (replace would close the first).
 		const w = world({ remount: RemountPolicy.Coexist });

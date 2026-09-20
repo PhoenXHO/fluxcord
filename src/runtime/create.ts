@@ -191,7 +191,8 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		// shared object: the send renders from the draft, the store keeps it.
 		// (The unknown->TData assertion is the definition-boundary erase; the
 		// author's initialData was checked against TData at defineFlow time.)
-		const data = structuredClone(def.initialData) as TData;
+		// A stateless flow (initialData omitted) starts from an empty bag.
+		const data = structuredClone(def.initialData ?? {}) as TData;
 
 		// Draft session: same shape the store will create, messageRef pending.
 		// It exists only so viewOf/wrap have a full session to read; it is

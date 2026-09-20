@@ -92,6 +92,15 @@ describe('defineFlow - validations', () => {
 		expect(Object.isFrozen(def.initialData)).toBe(false);
 	});
 
+	it('builds a stateless flow when initialData is omitted', () => {
+		const def = defineFlow({ screens: { main: { view: () => view({}, text('m')) } }, first: 'main' });
+
+		expect(def.screenIds).toEqual(['main']);
+		expect(def.first).toBe('main');
+		expect(def.ttlMs).toBe(DEFAULT_TTL_MS);
+		expect(def.initialData).toBeUndefined();
+	});
+
 	it('rejects non-finite and non-positive ttlMs', () => {
 		const screens = { main: { view: () => view({}, text('m')) } } as const;
 		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: Infinity })).toThrow(/ttlMs/);
