@@ -135,8 +135,10 @@ tracks rather than in a `Map` you babysit.
 ## Contributing
 
 fluxcord is young and maintained by one person. Bug reports with a minimal
-reproduction are the most useful thing right now. For anything larger,
-open an issue first so the scope can settle before code arrives.
+reproduction are the most useful thing right now. Before filing one,
+check [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) in case it is already on the
+list. For anything larger, open an issue first so the scope can settle
+before code arrives.
 
 ## Roadmap
 
