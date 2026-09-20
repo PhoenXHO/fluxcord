@@ -128,9 +128,9 @@ instead of through id strings, so there is nothing to parse and nothing
 that can drift out of sync, and the state lives in a session the framework
 tracks rather than in a `Map` you babysit.
 
-<!-- Screenshot of this exact counter running in Discord goes here:
-![The counter panel this code renders](.github/assets/counter.png)
--->
+<p align="center">
+	<img src=".github/assets/fluxcord-example-counter.gif" alt="The counter panel from the example, with the count climbing as +1 is clicked" width="480" />
+</p>
 
 ## Contributing
 
