@@ -12,4 +12,6 @@ export { setUiHost, uiHost } from './ui-host.js';
 export type { UiHost } from './ui-host.js';
 export { deriveCommand } from './derive.js';
 export type { DerivedCommand } from './derive.js';
+export { createBot } from './create-bot.js';
+export type { Bot, CreateBotOptions } from './create-bot.js';
 export type { BridgeLogger, BridgeOptions } from './platform.js';
