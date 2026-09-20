@@ -36,9 +36,7 @@ the message, so you never touch edits or component ids yourself. fluxcord
 was extracted from a production Discord bot, where it runs every admin
 panel today.
 
-<!-- Hero demo GIF goes here once the example bot records it:
-![Two screens of a dice panel, rolling and paging through history](.github/assets/demo.gif)
--->
+<!--![Two screens of a dice panel, rolling and paging through history](.github/assets/demo.gif)-->
 
 ## Features
 
@@ -88,7 +86,7 @@ For TSX authoring, point `jsxImportSource` at the package:
 A counter written as a flow:
 
 ```tsx
-import { action, ButtonStyle, screen, flow } from 'fluxcord';
+import { action, screen, flow } from 'fluxcord';
 
 interface CounterData {
 	count: number;
@@ -108,10 +106,10 @@ const minus = action<CounterData>()((event) => {
 
 const counterScreen = screen<CounterData>()((data, { Button }) => (
 	<view>
-		<text body={`Count: ${data.count}`} />
+		<text>Count: {data.count}</text>
 		<row>
-			<Button onClick={minus} label="-1" style={ButtonStyle.Secondary} />
-			<Button onClick={plus} label="+1" style={ButtonStyle.Primary} />
+			<Button onClick={minus} label="-1" secondary />
+			<Button onClick={plus} label="+1" />
 		</row>
 	</view>
 ));
@@ -128,7 +126,7 @@ one of them, `event.mutate` applies the change, and the framework handles
 the re-render and the message edit. Buttons bind to handlers by identity
 instead of through id strings, so there is nothing to parse and nothing
 that can drift out of sync, and the state lives in a session the framework
-tracks rather than in a Map you babysit.
+tracks rather than in a `Map` you babysit.
 
 <!-- Screenshot of this exact counter running in Discord goes here:
 ![The counter panel this code renders](.github/assets/counter.png)

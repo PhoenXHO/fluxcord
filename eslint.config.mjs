@@ -57,6 +57,15 @@ export default defineConfig([
 		},
 	},
 	{
+		// The examples bot is its own package with its own tsconfig project.
+		files: ['examples/src/**'],
+		languageOptions: {
+			parserOptions: {
+				project: './examples/tsconfig.json',
+			},
+		},
+	},
+	{
 		ignores: ['eslint.config.mjs', 'dist/**', 'node_modules/**'],
 	},
 ]);
