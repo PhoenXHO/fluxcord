@@ -132,6 +132,13 @@ tracks rather than in a `Map` you babysit.
 	<img src=".github/assets/fluxcord-example-counter.gif" alt="The counter panel from the example, with the count climbing as +1 is clicked" width="480" />
 </p>
 
+## Documentation
+
+You'll find full documentation in [docs/](./docs/README.md). The guide walks you
+from an empty folder to a running bot; since it is written directly from the
+example bot in [examples/](./examples/), every snippet comes from code that
+actually builds and runs.
+
 ## Contributing
 
 fluxcord is young and maintained by one person. Bug reports with a minimal
@@ -142,7 +149,8 @@ before code arrives.
 
 ## Roadmap
 
-Version goals and their checkboxes live in [ROADMAP.md](./ROADMAP.md).
+Version goals and their checkboxes live in [ROADMAP.md](./ROADMAP.md), and
+notable changes are tracked in [CHANGELOG.md](./CHANGELOG.md).
 
 ---
 

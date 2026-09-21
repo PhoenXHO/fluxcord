@@ -97,4 +97,4 @@ If the command doesn't show up in the picker, double-check the `applications.com
 
 ## Next
 
-That completes the getting started section! Now that you have a working development workflow, you can move on to the [Core concepts](core-concepts.md) section to learn how state, navigation, custom controls, and modals work.
+That completes the getting started section! Now that you have a working development workflow, you can move on to the [Core concepts](../core-concepts/README.md) section to learn how state, navigation, custom controls, and modals work.
