@@ -13,6 +13,11 @@
  * whoever opened it and everyone else gets a denial. A `policy` option
  * replaces it with any PolicyPort engine.
  *
+ * The conventional environment variables spare the common host any
+ * plumbing: an omitted `token` or `guildId` option falls back to
+ * `DISCORD_TOKEN` / `DISCORD_GUILD_ID`, and the explicit option wins
+ * when both exist.
+ *
  * @module discord/create-bot
  */
 
@@ -51,9 +56,17 @@ export interface CommandRegistration {
 export interface CreateBotOptions {
 	/** The modules to harvest; each carries its commands (and any flows no command mounts). */
 	readonly modules: readonly FlowSourceModule[];
-	/** The bot token; `start` logs in with it. */
-	readonly token: string;
-	/** Scopes command registration to one guild when set; global otherwise. */
+	/**
+	 * The bot token; `start` logs in with it. Omit to read the
+	 * conventional `DISCORD_TOKEN` environment variable; one of the two
+	 * must exist.
+	 */
+	readonly token?: string;
+	/**
+	 * Scopes command registration to one guild when set; global
+	 * otherwise. Omit to read the `DISCORD_GUILD_ID` environment
+	 * variable; the option wins when both exist.
+	 */
 	readonly guildId?: string;
 	/**
 	 * Replaces the built-in registration wholesale: the ready client and
@@ -111,6 +124,14 @@ const ownerOnlyPolicy: PolicyPort = {
  * @returns The bot: start, the raw client, and mount.
  */
 export function createBot(options: CreateBotOptions): Bot {
+	// A missing token fails here, readable, instead of surfacing as a
+	// cryptic login rejection later.
+	const token = options.token ?? process.env.DISCORD_TOKEN;
+	if (token === undefined) {
+		throw new Error('DISCORD_TOKEN is not set: pass a token option or set DISCORD_TOKEN');
+	}
+	// Guild scoping follows the same option-wins pattern.
+	const guildId = options.guildId ?? process.env.DISCORD_GUILD_ID;
 	const client = options.client ?? new Client({ intents: [...(options.intents ?? [GatewayIntentBits.Guilds])] });
 	const bridge = createUiBridge(client, {
 		...(options.logger !== undefined ? { logger: options.logger } : {}),
@@ -144,8 +165,8 @@ export function createBot(options: CreateBotOptions): Bot {
 		const bodies = commands.map((c) => c.data.toJSON());
 		// Guild-scoped when a guild id is set, global otherwise. Two call
 		// sites, not one: the API overload refuses string | undefined.
-		if (options.guildId !== undefined) {
-			await ready.application.commands.set(bodies, options.guildId);
+		if (guildId !== undefined) {
+			await ready.application.commands.set(bodies, guildId);
 		} else {
 			await ready.application.commands.set(bodies);
 		}
@@ -187,7 +208,7 @@ export function createBot(options: CreateBotOptions): Bot {
 	}
 
 	return {
-		start: (): Promise<void> => client.login(options.token).then(() => undefined),
+		start: (): Promise<void> => client.login(token).then(() => undefined),
 		client,
 		mount: runtime.mount,
 	};

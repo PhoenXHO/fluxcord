@@ -1,17 +1,14 @@
 // The whole host: modules in, running bot out.
+// The token and the dev guild id come from .env (DISCORD_TOKEN / DISCORD_GUILD_ID).
 import { createBot } from 'fluxcord/discord';
+import { aboutCommand } from './apps/about.js';
 import { counterCommand } from './apps/counter.js';
 
-const token = process.env.DISCORD_TOKEN;
-if (token === undefined) {
-	throw new Error('DISCORD_TOKEN is not set');
-}
-
 const bot = createBot({
-	modules: [{ name: 'counter', commands: [counterCommand] }],
-	token,
-	// Guild-scoped commands while testing; remove the line for global registration.
-	...(process.env.DISCORD_GUILD_ID ? { guildId: process.env.DISCORD_GUILD_ID } : {}),
+	modules: [
+		{ name: 'about', commands: [aboutCommand] },
+		{ name: 'counter', commands: [counterCommand] },
+	],
 });
 
 void bot.start();
