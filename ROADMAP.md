@@ -7,8 +7,8 @@ Fluxcord's version goals, checked off as they land.
 - [x] Public repository with CI on Node 22 and 24
 - [x] Coverage tooling and package metadata
 - [x] Logo, lockups, and README
-- [ ] Kitchen-sink example bot in examples/ that exercises every supported feature
-- [ ] Guide written from the example bot's working code
+- [ ] Kitchen-sink example bot in examples/ that exercises every supported feature (skeleton, counter, and about apps so far)
+- [ ] Guide written from the example bot's working code (getting-started section done: installation, project setup, first panel, hosting)
 - [ ] Per-export API reference
 - [ ] Hero demo GIF recorded from the example bot
 - [ ] Publish v0.1.0 to npm
