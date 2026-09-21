@@ -29,6 +29,7 @@ import type { RehydrateStore } from '../state/types.js';
 import { createUiRuntime } from '../runtime/create.js';
 import type { MountHandle, MountOptions } from '../runtime/types.js';
 import { deriveCommand } from './derive.js';
+import type { DerivedCommand } from './derive.js';
 import { createUiBridge } from './platform.js';
 import type { BridgeLogger } from './platform.js';
 import { setUiHost } from './ui-host.js';
@@ -38,6 +39,14 @@ import { setUiHost } from './ui-host.js';
 import { UiRuntime } from '../runtime/types.js';
 /* eslint-enable */
 
+/** One registration entry: a derived command and the module that declared it. */
+export interface CommandRegistration {
+	/** The name of the module the command came from. */
+	readonly module: string;
+	/** The derived command; its `data` builder is registration-ready. */
+	readonly command: DerivedCommand;
+}
+
 /** What createBot takes: the modules, the token, and any seam to override. */
 export interface CreateBotOptions {
 	/** The modules to harvest; each carries its commands (and any flows no command mounts). */
@@ -46,6 +55,13 @@ export interface CreateBotOptions {
 	readonly token: string;
 	/** Scopes command registration to one guild when set; global otherwise. */
 	readonly guildId?: string;
+	/**
+	 * Replaces the built-in registration wholesale: the ready client and
+	 * every derived command (with its source module) arrive here, and
+	 * whatever the callback does is the registration. `guildId` only
+	 * feeds the default path. Omit for the default bulk `set()`.
+	 */
+	readonly registerCommands?: (client: Client<true>, commands: readonly CommandRegistration[]) => Promise<void>;
 	/** The permission engine behind every click. Default: the panel's owner only. */
 	readonly policy?: PolicyPort;
 	/** Gateway intents for the built client. Default: `[Guilds]`. */
@@ -113,11 +129,18 @@ export function createBot(options: CreateBotOptions): Bot {
 	});
 	setUiHost({ mount: runtime.mount, replySender: bridge.replySender });
 
-	const commands = options.modules
-		.flatMap((mod) => mod.commands ?? [])
-		.map(deriveCommand);
+	// Module pairing survives derivation: a custom registration may want
+	// to route by source module.
+	const registrations = options.modules.flatMap((mod) =>
+		(mod.commands ?? []).map((command) => ({ module: mod.name, command: deriveCommand(command) })),
+	);
+	const commands = registrations.map((entry) => entry.command);
 
 	const register = async (ready: Client<true>): Promise<void> => {
+		if (options.registerCommands !== undefined) {
+			await options.registerCommands(ready, registrations);
+			return;
+		}
 		const bodies = commands.map((c) => c.data.toJSON());
 		// Guild-scoped when a guild id is set, global otherwise. Two call
 		// sites, not one: the API overload refuses string | undefined.
