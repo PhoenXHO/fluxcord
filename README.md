@@ -144,6 +144,8 @@ before code arrives.
 
 Version goals and their checkboxes live in [ROADMAP.md](./ROADMAP.md).
 
+---
+
 <div align="center">
 
 <img src=".github/assets/mark-dark.png" alt="The fluxcord mark" width="72" />

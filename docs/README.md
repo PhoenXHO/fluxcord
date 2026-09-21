@@ -13,7 +13,7 @@ Rather than dumping disconnected code snippets, this guide builds a real bot ste
 1. [Installation](getting-started/installation.md) — Set up a fresh TypeScript project ready for building panels.
 2. [Project setup](getting-started/project-setup.md) — Add a source folder, an entry point, and a run script.
 3. [Your first panel](getting-started/your-first-panel.md) — Build a stateless about panel end to end.
-4. Hosting and commands — Run your bot with `createBot` and open the panel with a slash command.
+4. [Hosting and commands](getting-started/hosting-and-commands.md) — Run your bot with `createBot` and open the panel with a slash command.
 
 ### Core concepts
 
