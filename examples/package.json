@@ -5,7 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"start": "node --env-file=.env dist/index.js"
+		"start": "node --env-file=.env dist/index.js",
+		"dev": "node --watch --env-file=.env dist/index.js"
 	},
 	"dependencies": {
 		"discord.js": "^14.25.1",
