@@ -232,14 +232,14 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 		case 'modal-select': {
 			const selectProps = node as ModalSelectProps;
 			const lifted = optionsFromChildren('modal-select', children);
-			if (lifted !== undefined && selectProps.options !== undefined) {
-				throw new Error('modal-select takes an options prop or option children, never both');
-			}
+			const options = lifted !== undefined && selectProps.options !== undefined
+				? [...selectProps.options, ...lifted]
+				: selectProps.options ?? lifted;
 			const entity = entityFlagOf(selectProps as Record<string, unknown>);
-			if (selectProps.options !== undefined && entity !== undefined) {
+			if (options !== undefined && entity !== undefined) {
 				throw new Error('a select takes either options or entity, never both');
 			}
-			const withOptions = lifted !== undefined ? { ...selectProps, options: lifted } : selectProps;
+			const withOptions = options !== undefined ? { ...selectProps, options } : selectProps;
 			return entity !== undefined
 				? entitySelect(withOptions as EntitySelectProps)
 				: optionSelect(withOptions as OptionSelectProps);
@@ -252,18 +252,16 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 		case 'checkbox-group': {
 			const groupProps = node as CheckboxGroupProps;
 			const lifted = optionsFromChildren('checkbox-group', children);
-			if (lifted !== undefined && groupProps.options !== undefined) {
-				throw new Error('checkbox-group takes an options prop or option children, never both');
-			}
-			return checkboxGroup(lifted !== undefined ? { ...groupProps, options: lifted } : groupProps);
+			if (lifted === undefined) return checkboxGroup(groupProps);
+			const options = groupProps.options === undefined ? lifted : [...groupProps.options, ...lifted];
+			return checkboxGroup({ ...groupProps, options });
 		}
 		case 'radio-group': {
 			const groupProps = node as RadioGroupProps;
 			const lifted = optionsFromChildren('radio-group', children);
-			if (lifted !== undefined && groupProps.options !== undefined) {
-				throw new Error('radio-group takes an options prop or option children, never both');
-			}
-			return radioGroup(lifted !== undefined ? { ...groupProps, options: lifted } : groupProps);
+			if (lifted === undefined) return radioGroup(groupProps);
+			const options = groupProps.options === undefined ? lifted : [...groupProps.options, ...lifted];
+			return radioGroup({ ...groupProps, options });
 		}
 		case 'hr':
 			return hr(hrProps(node));

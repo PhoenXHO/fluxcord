@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 // Aliased: the compiler auto-imports jsx/Fragment from the runtime for tags;
 // these bindings exist for the direct factory calls below.
 import { jsx as factory, Fragment as FragmentTag } from '../jsx-runtime.js';
-import { button, entitySelect, input, link, optionSelect, text, view } from '../builders.js';
+import { button, checkboxGroup, entitySelect, input, link, optionSelect, radioGroup, text, view } from '../builders.js';
 import { kitFor } from '../kit.js';
 import { validateTree } from '../validate.js';
 import type { ComponentResult } from '../jsx-runtime.js';
@@ -189,13 +189,23 @@ describe('jsx modal form controls', () => {
 		}));
 	});
 
-	it('an options prop and option children together throw', () => {
+	it('option children append onto an options prop on the modal fields, same as a select', () => {
 		const options = [{ label: 'A', value: 'a' }];
-		expect(() => (
+		expect(
 			<modal-select id="p" label="Pick" options={options}>
 				<option value="b">B</option>
-			</modal-select>
-		)).toThrow(/never both/);
+			</modal-select>,
+		).toEqual(optionSelect({ id: 'p', label: 'Pick', options: [...options, { label: 'B', value: 'b' }] }));
+		expect(
+			<checkbox-group id="g" label="G" options={options}>
+				<option value="b">B</option>
+			</checkbox-group>,
+		).toEqual(checkboxGroup({ id: 'g', label: 'G', options: [...options, { label: 'B', value: 'b' }] }));
+		expect(
+			<radio-group id="r" label="R" options={options}>
+				<option value="b">B</option>
+			</radio-group>,
+		).toEqual(radioGroup({ id: 'r', label: 'R', options: [...options, { label: 'B', value: 'b' }] }));
 	});
 
 	it('a checkbox-group carries its lifted options', () => {
