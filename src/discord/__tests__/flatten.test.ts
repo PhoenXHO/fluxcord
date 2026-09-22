@@ -90,6 +90,10 @@ describe('flattenInteraction', () => {
 				fields: new Map([
 					['amount', { value: '10' }],
 					['note', { value: 'hi' }],
+					['lucky', { value: true }],
+					['skipped', { value: false }],
+					['picks', { values: ['red', 'blue'] }],
+					['empty', { values: [] }],
 					['broken', { value: undefined }],
 				]),
 			},
@@ -97,8 +101,14 @@ describe('flattenInteraction', () => {
 
 		const event = flattenInteraction(interaction as UiComponentInteraction);
 
-		// Non-string field values are dropped, not coerced.
-		expect(event).toMatchObject({ kind: 'modal-submit', inputs: { amount: '10', note: 'hi' } });
+		// Every wire answer lands as a string: booleans become 'true'/'false',
+		// multi-picks comma-join, nullish answers are dropped.
+		expect(event).toMatchObject({
+			kind: 'modal-submit',
+			inputs: { amount: '10', note: 'hi', lucky: 'true', skipped: 'false', picks: 'red,blue' },
+		});
+		expect(event?.inputs).not.toHaveProperty('empty');
+		expect(event?.inputs).not.toHaveProperty('broken');
 	});
 
 	it('returns undefined for a modal submit with no backing message (command-fired)', () => {
