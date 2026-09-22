@@ -178,7 +178,7 @@ export function createBot(options: CreateBotOptions): Bot {
 			if (command !== undefined) await command.execute(interaction);
 			return;
 		}
-		if (interaction.isMessageComponent()) {
+		if (interaction.isMessageComponent() || interaction.isModalSubmit()) {
 			await bridge.dispatch(interaction, runtime.dispatch);
 		}
 	};
