@@ -113,6 +113,12 @@ describe('renderV2Message - select', () => {
 		}]);
 	});
 
+	it('rejects a row that mixes a select with other controls', () => {
+		const select = optionSelect({ onSelect: go, options: [{ label: 'A', value: 'a' }] });
+		const mixed = row({}, select, button({ onClick: go, label: 'Go' }));
+		expect(() => render(view({}, mixed))).toThrow(/row with a select must have exactly one child, got 2/);
+	});
+
 	it('spreads placeholder and value bounds onto the wire', () => {
 		const select = optionSelect({
 			onSelect: go,

@@ -280,6 +280,11 @@ function renderControl(node: ControlNode, path: string, sessionId: string, scree
 
 /** Renders a row into an `ActionRow`, the platform's only legal parent for buttons and selects. */
 function renderRow(node: RowNode, path: string, sessionId: string, screenKey: string, stampOf: StampLookup): APIActionRowComponent<APIComponentInMessageActionRow> {
+	if (node.children.some((child) => child.kind === NodeKind.select) && node.children.length !== 1) {
+		// the platform rejects a mixed row; normalize already gave bare selects
+		// their own row, so reaching this point means an authored row mixes them
+		throw new RenderError(path, `row with a select must have exactly one child, got ${node.children.length}`);
+	}
 	return {
 		type: ComponentType.ActionRow,
 		components: node.children.map((child, index) => renderControl(child, `${path}/${kindOf(child)}[${index}]`, sessionId, screenKey, stampOf)),

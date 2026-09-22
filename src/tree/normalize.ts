@@ -10,13 +10,18 @@
  * has something to draw, instead of failing silently in the commit phase.
  * 
  * Illegal view children are caught in the tree validator, not here. The TSX
- * union is too broad to narrow here.
+ * union is too broad to narrow here. One shape is forgiven here: a bare
+ * control (a select, button, or link) gets its own synthetic row, because
+ * the platform only hosts controls inside action rows and the fix is
+ * unambiguous. Each control gets its own row; an author who wants controls
+ * to share a row wraps them in one explicitly.
  *
  * @module tree/normalize
  */
 
-import { view } from './builders.js';
-import type { ComponentResult, ModalNode, TreeNode, ViewChild, ViewNode } from './types.js';
+import { container, row, view } from './builders.js';
+import type { ComponentResult, ContainerChild, ModalNode, TreeNode, ViewChild, ViewNode } from './types.js';
+import { NodeKind } from './vocab.js';
 
 /**
  * Coerces one children value into a flat node list: drop true/false/null/undefined,
@@ -65,12 +70,49 @@ export function normalizeViewRoot(rendered: ComponentResult): ViewNode {
 		throw new Error('view returned nothing; a root `{cond && <view/>}` drops when cond is false; keep the root unconditional');
 	}
 	if (isNodeList(rendered)) {
-		return view({}, ...(coerceChildren(rendered) as readonly ViewChild[]));
+		return wrapBareControls(view({}, ...(coerceChildren(rendered) as readonly ViewChild[])));
 	}
 	if (typeof rendered === 'object' && rendered.kind === 'view') {
-		return rendered;
+		return wrapBareControls(rendered);
 	}
-	return view({}, rendered as ViewChild);
+	return wrapBareControls(view({}, rendered as ViewChild));
+}
+
+/**
+ * Wraps bare control nodes in synthetic rows: the platform only accepts a
+ * select, button, or link inside an action row, so one dropped straight into
+ * a view or container gets its own row. Manual wrapping keeps working, and a
+ * row that mixes a select with other controls is left for the renderer to
+ * reject rather than rewritten here.
+ *
+ * Returns the original node when nothing needed wrapping so unchanged screens
+ * keep their identity.
+ */
+function wrapBareControls(root: ViewNode): ViewNode {
+	const children = wrapControlChildren(root.children);
+	if (children === root.children) return root;
+	return view({ ...(root.title !== undefined ? { title: root.title } : {}) }, ...(children as readonly ViewChild[]));
+}
+
+function wrapControlChildren(children: readonly TreeNode[]): readonly TreeNode[] {
+	let changed = false;
+	const next = children.map((child) => {
+		if (child.kind === NodeKind.select || child.kind === NodeKind.button || child.kind === NodeKind.link) {
+			changed = true;
+			return row({}, child);
+		}
+		if (child.kind === NodeKind.container) {
+			const inner = wrapControlChildren(child.children);
+			if (inner === child.children) return child;
+			changed = true;
+			return container(
+				{ ...(child.color !== undefined ? { color: child.color } : {}) },
+				...(inner as readonly ContainerChild[]),
+			);
+		}
+		return child;
+	});
+	return changed ? next : children;
 }
 
 /**

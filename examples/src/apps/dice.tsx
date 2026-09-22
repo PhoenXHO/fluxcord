@@ -1,14 +1,51 @@
-// The guide's navigation panel: a hub-and-spoke flow where go pops back
-// to the menu and Back rides the session's history. Rolling waits for the
-// state chapter.
-import { command, flow, mounts, screen } from 'fluxcord';
+// The guide's dice panel: navigation (go pops back to the menu, Back
+// rides the history stack), state (a click mutates session data, the
+// panel redraws), and controls (the select takes your call, values
+// arrive as strings).
+import { action, command, flow, mounts, screen } from 'fluxcord';
 
-const menuScreen = screen()((_data, { Button, Back }) => (
+interface DiceData {
+	call?: number;
+	roll?: number;
+}
+
+const roll = action<DiceData>()(e => {
+	e.mutate(d => {
+		d.roll = 1 + Math.floor(Math.random() * 6);
+	});
+});
+
+const call = action<DiceData>()(e => {
+	const pick = e.values?.[0];
+	if (pick === undefined) return;
+	e.mutate(d => {
+		d.call = Number(pick);
+	});
+});
+
+const calls = [1, 2, 3, 4, 5, 6].map(n => ({
+	label: String(n),
+	value: String(n),
+}));
+
+function headline({ call, roll }: DiceData): string {
+	if (roll === undefined) {
+		return call === undefined
+			? 'Call a number, then roll.'
+			: `You called ${call}. Now roll.`;
+	}
+	return roll === call
+		? `You called ${call} and rolled ${roll}. You win the round!`
+		: `You called ${call} and rolled ${roll}. The die wins.`;
+}
+
+const menuScreen = screen<DiceData>()((_data, { Button, Back }) => (
 	<view>
 		<text>Dice: one die, one roll, no house edge. Where to?</text>
 		<row>
-			<Button onClick={(event) => event.ui.go('rules')} label="Rules" />
-			<Button onClick={(event) => event.ui.go('about')} label="About" />
+			<Button onClick={e => e.ui.go('roll')} label="Roll" />
+			<Button onClick={e => e.ui.go('rules')} label="Rules" />
+			<Button onClick={e => e.ui.go('about')} label="About" />
 		</row>
 		<row>
 			<Back />
@@ -16,7 +53,27 @@ const menuScreen = screen()((_data, { Button, Back }) => (
 	</view>
 ));
 
-const rulesScreen = screen()((_data, { Back }) => (
+const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
+	<view>
+		<text>{headline(data)}</text>
+		<Select
+			placeholder="Call a number"
+			options={calls}
+			onSelect={call}
+		/>
+		<row>
+			<Button
+				onClick={roll}
+				label="Roll"
+				disabled={data.call === undefined}
+				success={data.call !== undefined ? true : undefined}
+			/>
+			<Back />
+		</row>
+	</view>
+));
+
+const rulesScreen = screen<DiceData>()((_data, { Back }) => (
 	<view>
 		<text>Call a number from one to six, then roll. Guess right and you win the round; guess wrong and the die wins.</text>
 		<row>
@@ -25,17 +82,17 @@ const rulesScreen = screen()((_data, { Back }) => (
 	</view>
 ));
 
-const aboutScreen = screen()((_data, { Back }) => (
+const aboutScreen = screen<DiceData>()((_data, { Back }) => (
 	<view>
-		<text>Dice is the guide's example panel. Today it demonstrates screens and navigation; rolling arrives with the state chapter.</text>
+		<text>Dice is the guide's example panel.</text>
 		<row>
 			<Back />
 		</row>
 	</view>
 ));
 
-export const diceFlow = flow('dice', {
-	screens: { menu: menuScreen, rules: rulesScreen, about: aboutScreen },
+export const diceFlow = flow<DiceData>('dice', {
+	screens: { menu: menuScreen, roll: rollScreen, rules: rulesScreen, about: aboutScreen },
 	first: 'menu',
 });
 

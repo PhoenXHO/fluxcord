@@ -148,7 +148,11 @@ export function kitFor(session: Pick<ViewSession, 'history'>): ScreenKit {
 			delete rest.channels;
 			delete rest.mentionable;
 			if (lifted !== undefined) {
-				rest.options = lifted;
+				// Children append to the prop list rather than replacing it, so a
+				// generated list can carry pinned `<option>` extras.
+				rest.options = rest.options === undefined
+					? lifted
+					: [...(rest.options as readonly SelectOption[]), ...lifted];
 			}
 			return optionSelect(rest as OptionSelectProps);
 		},
