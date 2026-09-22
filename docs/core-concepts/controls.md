@@ -1,30 +1,45 @@
 # Controls
 
-Although the dice panel has state and navigation now, its controls are still the plain blurple buttons we started with. We'll round out the panel's control surface in this chapter by introducing button style flags along with the select menu that finally makes the rules screen's promise real. Checkboxes and forms exist as well, but those are covered in the [Modals](modals.md) chapter because they're modal-specific material.
+Even though our dice panel now handles state and navigation, its controls are still the plain blurple buttons we started with. In this chapter, we'll expand what it can accept by adding button style flags alongside a select menu that brings the rules screen to life. Because checkboxes and text inputs belong in modal dialogs, we'll cover those separately in the [Modals](modals.md) chapter. We'll wrap up by wiring a reset button to the round, since a data bag this easy to change deserves an equally straightforward way to clear it out.
 
 ## Button styles
 
-Every button renders in one of Discord's four faces, which you pick by passing a style flag: `primary` (blurple), `secondary` (gray), `success` (green), or `danger` (red). We've been using these without explicitly naming them; for instance, the counter's minus button wore `secondary` because a cancel-adjacent action reads much better in gray. A button without a style flag defaults to `primary`, and passing any other flag overrides it.
+Every button renders in one of Discord's four faces, which you choose by passing a style flag: `primary` (blurple), `secondary` (gray), `success` (green), or `danger` (red). We've already been using these without naming them directly; for example, the counter's minus button used `secondary` because cancel-adjacent actions read much clearer in gray. Buttons default to `primary` when you don't specify a flag, so passing any other flag overrides that baseline.
 
-To render a green button, for example, you can pass its style flag directly:
+To render a green button, pass the `success` flag:
 
 ```tsx
 <Button label="Click me" success />
 ```
 
 > [!IMPORTANT]
-> The style flags are literal-`true` markers rather than standard booleans. We designed them this way so that a typo like `suceess` fails at compile time instead of silently failing at runtime. The flip side is that a conditional face must pass `undefined` to switch the flag off:
+> Because these style flags are literal-`true` markers rather than standard booleans, a typo like `suceess` fails immediately at compile time instead of failing silently at runtime. The flip side is that conditional styling requires passing `undefined` to switch the flag off:
 >
 > ```tsx
 > // green while the roll is available; undefined is what switches the flag back off
 > <Button label="Roll" disabled={!canRoll} success={canRoll ? true : undefined} />
 > ```
 
-Since style flags are plain props, a button's face can depend on anything the screen can see; we'll put that flexibility to work later in this chapter once our roll screen has state to react to.
+Since style flags are plain props, a button's appearance can react dynamically to session state; we'll put that flexibility to work later in this chapter once our roll screen has state to respond to.
+
+## Rows
+
+Because Discord arranges interactive elements into horizontal action rows, fluxcord mirrors that structure directly in markup by placing controls like buttons and selects inside a `<row>`, which can hold up to five items. You've already encountered this convention, since the counter's minus and plus buttons shared a row to keep related actions paired together.
+
+fluxcord forgives lone controls, though; dropping a button straight into a view automatically allocates it a dedicated row at render time, which is why a lone `Back` button never needed any wrapping boilerplate in our previous screens:
+
+```tsx
+<view>
+	<text>Are you sure?</text>
+	<Back />
+</view>
+```
+
+Since both spellings produce identical layouts, writing an explicit `<row>` acts as a design statement rather than pure mechanics: controls only share horizontal space when you deliberately group them.
 
 ## Calling a number
 
-Ever since the navigation chapter, the rules screen has promised a simple game where you call a number from one to six and roll to see if they match. Now that selects are on the table, the roll screen can finally deliver on that promise. To support this, we'll expand our data bag with a `call` field and use a small array to describe the available choices:
+Our rules screen promised a game where you pick a number between one and six before rolling the die to check for a match, and now that selects are available, the roll screen can deliver on that promise. We'll start by expanding our data bag with a `call` field and mapping an array to describe the available choices:
 
 ```tsx
 interface DiceData {
@@ -40,7 +55,7 @@ const calls = [1, 2, 3, 4, 5, 6].map(n => ({
 
 Every option requires a `label` to show the user and a `value` for your handler to receive; we separate these because labels act as user-facing copy while values serve as stable identifiers for your code. Since they coincide in this particular case, we can derive both from the same number.
 
-We'll destructure the `Select` component from the screen kit and write a handler that looks like any other action; you can view the complete implementation in the finished app at [`examples/src/apps/dice.tsx`](../../../examples/src/apps/dice.tsx):
+We'll destructure the `Select` component from the screen kit and write a handler that looks like any other action; you can find the complete implementation in the finished app at [`examples/src/apps/dice.tsx`](../../../examples/src/apps/dice.tsx):
 
 ```tsx
 const call = action<DiceData>()(e => {
@@ -52,9 +67,13 @@ const call = action<DiceData>()(e => {
 });
 ```
 
-Because Discord selects can be configured to accept multiple choices at once, as we'll see below, any pick arrives through `event.values` as an array of selected value strings. The TypeScript types are honest about this possibility; since button clicks carry no values, the `values` array is optional on the event, which is why our handler uses optional chaining to grab the first pick and safely returns if that array is empty. Although a default select configuration always guarantees at least one pick, this small guard is a cheap way to keep our data bag clean.
+Because Discord selects can accept multiple choices simultaneously, any selection arrives through `event.values` as an array of strings. Since this event payload is shared across all control types, that `values` array remains optional; using `e.values?.[0]` lets your handler safely read the first selection when no selection arrived.
 
-The list itself can arrive in one of two spellings. The `options` prop accepts any array, which is why we derive `calls` with `.map` rather than writing out six tags by hand; `<option>` elements are the other spelling, and they read best for a few fixed entries. Each element takes the same `label` and `value` as an array entry, plus an optional `description` that Discord renders in smaller text beneath the label:
+The guard clause (`if (pick === undefined) return;`) keeps your data bag intact if an empty selection slips through. While Discord typically prevents users from submitting a required select without choosing an item, guarding the branch remains good practice because it keeps unexpected payloads from silently corrupting state.
+
+## The options list
+
+You can provide options in two ways depending on what fits your data best. While passing an array to the `options` prop works well for computed collections like our `.map`-derived `calls`, explicit `<option>` child elements read much better when declaring a few fixed choices. Each element accepts the same `label` and `value` fields as an array item, alongside an optional `description` that Discord renders in smaller text beneath the label:
 
 ```tsx
 <Select placeholder="Call a number" onSelect={call}>
@@ -63,9 +82,9 @@ The list itself can arrive in one of two spellings. The `options` prop accepts a
 </Select>
 ```
 
-The two spellings can also share a select, because `<option>` children append to whatever the `options` prop brought. That makes them a convenient way to pin a fixed entry onto a generated list.
+You can even combine both formats within the same component, since any `<option>` children will append directly to whatever array the `options` prop supplies, making it easy to pin fixed choices onto a generated list.
 
-Now we can assemble these pieces into our screen layout:
+With those primitives ready, we can assemble our complete screen layout:
 
 ```tsx
 const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
@@ -75,12 +94,13 @@ const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
 			placeholder="Call a number"
 			options={calls}
 			onSelect={call}
+			disabled={data.roll !== undefined}
 		/>
 		<row>
 			<Button
 				onClick={roll}
 				label="Roll"
-				disabled={data.call === undefined}
+				disabled={data.call === undefined || data.roll !== undefined}
 				success={data.call !== undefined ? true : undefined}
 			/>
 			<Back />
@@ -89,9 +109,24 @@ const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
 ));
 ```
 
-Notice how the select sits directly in the view without a `<row>` while Roll and Back share one; we'll examine both approaches in the next section.
+Notice that our select sits directly in the `<view>` without an enclosing `<row>`, whereas Roll and Back are grouped together. This takes advantage of the single-control shorthand we saw earlier: fluxcord wraps the select in its own row automatically, while leaving the buttons paired inside an explicit row because they belong together.
 
-The button's conditional flags do something quite powerful; since its visual presentation now directly depends on the session's data, the face turns green once a number is called while the `disabled` prop keeps it unpressable before then. The screen was already a function of our data bag, and now the controls are part of that same function too. The `placeholder` prop, meanwhile, controls the text displayed inside the select before a user makes a choice.
+> [!IMPORTANT]
+> Even though a single row accommodates up to five buttons, Discord forbids mixing buttons and selects in the same row; fluxcord will reject any layout containing that combination as soon as it builds:
+>
+> ```tsx
+> // throws: row with a select must have exactly one child, got 2
+> <row>
+> 	<Button onClick={roll} label="Roll" />
+> 	<Select placeholder="Call a number" options={calls} onSelect={call} />
+> </row>
+> ```
+>
+> You can only have one select per row without any other controls, or up to five buttons.
+
+Conditional styling makes this layout expressive: every prop reads straight from the data bag, so the controls join the same reactive cycle the screen already rides. The Roll button stays unclickable until you pick a number, then turns green while it waits for the click. The `placeholder` prop sets the preview text shown before you choose an option.
+
+Selects accept the same `disabled` prop as buttons, and our roll screen puts it to work: once the die has landed, the menu greys out and the Roll button locks right along with it, so the finished round can't be tampered with. Everything stays locked until the reset button at the end of this chapter reopens the table.
 
 We'll define the headline as a plain TypeScript function right above the screen. We don't need any framework magic here because views are just standard TypeScript; this means any complex text formatting can live in a dedicated helper function where you can test and maintain it easily:
 
@@ -108,43 +143,15 @@ function headline({ call, roll }: DiceData): string {
 }
 ```
 
-Once you rebuild and restart the bot, you can trigger `/dice` to test out a full round. After you pick a number, you'll see the Roll button turn green so that you can roll and see who won.
+Once you rebuild and restart your bot, run `/dice` to test a complete round. After picking a number, you should see the Roll button turn green so you can roll and resolve the match.
 
-## Rows
+## Multi-select
 
-Rows are where controls live: because Discord arranges interactive elements into action rows, fluxcord automatically wraps any bare control in a dedicated row during rendering. That's why the roll screen can place its select straight into the view without an enclosing tag, and the menu, rules, and about screens do the same with their lone `Back` button. Each control gets its own row this way, so controls share horizontal space only when you group them in an explicit `<row>`, exactly as we did for Roll and Back. Both spellings produce identical layouts, so wrapping a control manually is simply a way to make your design intent clear in the markup.
+While our dice game only needs a single choice, selects accept two optional props that enable multi-selection when required. By configuring `minSelected` and `maxSelected`, you can let users choose multiple items before submitting; for example, setting `maxSelected={3}` caps their selection at three entries. Discord allows these bounds anywhere from 0 to 25. The component defaults to expecting exactly one item if you omit both properties.
 
-> [!IMPORTANT]
-> Although a single row can hold up to five buttons, Discord forbids mixing buttons and selects in the same row; fluxcord will therefore reject any row that pairs a select with another control when building the layout:
->
-> ```tsx
-> // throws: row with a select must have exactly one child, got 2
-> <row>
-> 	<Button onClick={roll} label="Roll" />
-> 	<Select placeholder="Call a number" options={calls} onSelect={call} />
-> </row>
-> ```
+## Preselecting options
 
-## Multi-select and entity selects
-
-Although the dice panel doesn't need them, selects support two additional props that open up more advanced use cases. Passing `minSelected` and `maxSelected` transforms a standard select into a multi-select interface; for example, setting `maxSelected={3}` allows users to select up to three items before they send their choice. Discord limits these selections to a maximum of twenty-five options, though they default to exactly one choice if you leave these props unspecified.
-
-A select can also skip the static list and pull its options straight from Discord. The following entity flags are available for this purpose:
-
-- `users` for server members
-- `roles` for server roles
-- `channels` for server channels
-- `mentionable` for members and roles
-
-Example:
-
-```tsx
-<Select placeholder="Pick a member to promote" users onSelect={promote} />
-```
-
-Since Discord returns these selections as entity IDs inside `event.values`, your handler can consume them directly while `minSelected` and `maxSelected` continue to enforce your quantity limits.
-
-Either type of select can be initialized with an existing selection. With a static list, you mark an option with the `default` flag:
+A select can also open with choices already highlighted, which you set up in static markup by marking each target entry with the `default` flag; you can add this flag to any number of options as long as the total count stays within the selection cap:
 
 ```tsx
 <Select placeholder="Pick a number" onSelect={setNumber}>
@@ -153,22 +160,39 @@ Either type of select can be initialized with an existing selection. With a stat
 </Select>
 ```
 
-A `default` flag is baked into the list at authoring time, so it can't follow your session's data. You'll run into this exact limitation in the dice panel: when you pick a number and roll, the redrawn panel forgets your choice and drops back to its placeholder, even though the headline still reports the call. To make the preselection react to data, pass the `values` prop; it takes an array of values to mark on every draw, and because entries may be `undefined`, your data-bag field can ride in directly:
+Because that flag is authoring-time markup, the same entries light up on every render, whatever the session is doing. Our dice panel would feel that immediately: after you pick a number and roll, the redrawn menu snaps straight back to its placeholder even though the headline still remembers your call. If you want the selection to travel with session state, you'll need the `values` prop instead; it expects the plain `value` strings of the options to highlight (not indices or IDs). Since our builders clean up after you by dropping nullish entries and stringifying the rest, a data-bag field can ride along directly:
 
 ```tsx
 <Select placeholder="Call a number" options={calls} onSelect={call} values={[data.call]} />
 ```
 
-Before your first pick, `data.call` is `undefined`, so nothing is preselected and the placeholder shows as usual. Once you make a choice, though, the matching option stays marked across every redraw because the select is now a function of the data bag, just like the buttons. Any values that don't match an option are simply ignored; when `values` does yield a match, it takes precedence over any `default` flags: the live pick replaces the static fallback.
+Before your first pick, `data.call` is `undefined`, so nothing matches and the placeholder shows as usual; once you pick a number, though, the matching entry stays highlighted across every redraw because the menu now reads straight from the data bag. Whenever at least one entry matches, `values` takes over the selection entirely while the `default` flags sit that render out, since current state always beats static fallbacks. Any entries that don't match an option are dropped, and if nothing matches at all, those `default` flags step back in to take charge. If you overshoot the selection cap through `values`, fluxcord will throw as soon as the panel draws.
 
-Entity selects rely on the `defaultIds` prop instead, which accepts an array of Discord IDs. To pre-select the server's default role, for example, pass its ID in that array:
+## Entity selects
+
+Entity selects leave fixed lists behind by querying Discord directly rather than using authored options. One of four flags chooses what the picker lists:
+
+- `users` for server members
+- `roles` for server roles
+- `channels` for server channels
+- `mentionable` for members and roles
+
+```tsx
+<Select users placeholder="Pick a member to promote" onSelect={promote} />
+```
+
+The picks arrive the same way as before: `event.values` carries the chosen entries' Discord IDs as strings, so your handler can store or act on them directly.
+
+Preselection doesn't use a `default` flag here because there isn't any markup to flag, as the entries come straight from Discord at render time. Instead, the `defaultIds` prop takes an array of Discord IDs; since it's an ordinary prop that gets re-evaluated on every draw, entity preselection tracks session state natively without needing a `values`-style companion:
 
 ```tsx
 <Select placeholder="Pick a role" roles onSelect={setRole} defaultIds={[role.id]} />
 ```
 
+One variant rejects preselection entirely: mentionable selects do not accept `defaultIds`, because their entries mix users and roles together and a bare ID doesn't indicate which entity type it represents.
+
 > [!IMPORTANT]
-> `defaultIds` works only on entity selects, whereas static lists preselect through the `default` flag or the `values` prop instead.
+> Remember that `defaultIds` applies only to entity selects; static menus must preselect through the `default` flag or the `values` prop instead.
 
 <!-- -->
 
@@ -182,8 +206,27 @@ Entity selects rely on the `defaultIds` prop instead, which accepts an array of 
 > 	onSelect={promote}
 > />
 > ```
-> An option list and an entity flag are mutually exclusive. fluxcord has no way to merge a hand-written list with a live Discord picker, so the combination fails the moment the select is built.
+> An option list and an entity flag are mutually exclusive. Because fluxcord cannot combine a static options array with Discord's dynamic directory search, attempting to supply both will fail when building the component.
+
+## Resetting the round
+
+Every game needs a clean restart mechanism, which is where treating state as plain data really pays off. Because our data bag is an ordinary object, clearing it only requires writing a simple action to reset the round's fields and binding that handler to a button:
+
+```tsx
+const reset = action<DiceData>()(e => {
+	e.mutate(d => {
+		d.call = undefined;
+		d.roll = undefined;
+	});
+});
+```
+
+```tsx
+<Button onClick={reset} label="New round" secondary />
+```
+
+We don't need a specialized reset API because `mutate` already exposes the underlying state bag; once you reset those properties, fluxcord triggers a fresh redraw automatically. You can drop this button directly into the roll screen's action row and rebuild your project so players can start over whenever a round finishes.
 
 ## Next
 
-While our panel can now receive rich user input, its visual presentation remains limited to flat rows of text and basic controls. In [Layout and content](layout-and-content.md), we'll introduce structure to the dice panel by using sections and headers along with the other native layout elements Discord offers.
+Even though our panel now handles user input smoothly, its visual presentation is still confined to flat rows of text and basic controls. In [Layout and content](layout-and-content.md), we'll give the panel a real structure: a page heading, separators, and a painted container panel, along with the text-level dressings that come with them.
