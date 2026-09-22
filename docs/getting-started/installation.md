@@ -32,7 +32,10 @@ This generates a `package.json` with sensible defaults. Open it and add `"type":
 }
 ```
 
-Setting `"type": "module"` tells Node to process your `.js` files as modern ES modules instead of CommonJS. Since fluxcord is published as an ESM package, omitting this line will lead to a `SyntaxError: Cannot use import statement outside a module` when you try to launch your bot.
+Setting `"type": "module"` tells Node to process your `.js` files as modern ES modules instead of CommonJS, and fluxcord is published as an ESM package.
+
+> [!WARNING]
+> Without that line, launching your bot fails with `SyntaxError: Cannot use import statement outside a module`.
 
 ## Install fluxcord
 
@@ -42,7 +45,10 @@ Now install fluxcord itself:
 npm install fluxcord
 ```
 
-This installs fluxcord along with discord.js, which is declared as a peer dependency. Because npm 7 and newer install peer dependencies automatically, you don't need to add `discord.js` manually.
+This installs fluxcord along with discord.js, which is declared as a peer dependency.
+
+> [!NOTE]
+> npm 7 and newer install peer dependencies automatically, so you don't need to add `discord.js` manually.
 
 You'll also want TypeScript and the Node type definitions as dev dependencies:
 
@@ -74,7 +80,8 @@ Create a `tsconfig.json` file in your project's root folder:
 
 Two of these options are what make fluxcord work. `jsx: "react-jsx"` tells TypeScript to compile JSX through a runtime function rather than expecting React to be installed, and `jsxImportSource: "fluxcord"` names fluxcord as that runtime. Together they let you write panels in TSX without pulling in a UI library.
 
-It's equally important to keep `moduleResolution` on `Node16` or `NodeNext`, since those are the modes that read package export maps. With the older default, `import 'fluxcord/discord'` won't resolve.
+> [!IMPORTANT]
+> Keep `moduleResolution` on `Node16` or `NodeNext`. Those are the modes that read package export maps; with the older default, `import 'fluxcord/discord'` won't resolve.
 
 The rest of the file is a standard strict-mode setup. While strict mode isn't strictly enforced by fluxcord, its type inference works best when it is enabled.
 

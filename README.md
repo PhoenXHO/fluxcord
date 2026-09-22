@@ -25,6 +25,8 @@
 [![GitHub issues](https://img.shields.io/github/issues/PhoenXHO/fluxcord?style=for-the-badge)](https://github.com/PhoenXHO/fluxcord/issues)
 [![last commit](https://img.shields.io/github/last-commit/PhoenXHO/fluxcord?style=for-the-badge)](https://github.com/PhoenXHO/fluxcord/commits/main)
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/PhoenXHO)
+
 </div>
 
 Stateful, multi-screen Discord UIs in TSX. Built on discord.js v14
@@ -159,5 +161,7 @@ notable changes are tracked in [CHANGELOG.md](./CHANGELOG.md).
 <img src=".github/assets/mark-dark.png" alt="The fluxcord mark" width="72" />
 
 Released under the [MIT](./LICENSE) license.
+
+Support the project on [GitHub Sponsors](https://github.com/sponsors/PhoenXHO).
 
 </div>

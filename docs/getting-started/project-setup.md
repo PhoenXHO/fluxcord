@@ -26,7 +26,10 @@ mkdir src
 
 ## Storing the token safely
 
-Your bot authenticates with Discord using a token, and because tokens are sensitive credentials, they should never be hardcoded into source files or committed to source control.
+Your bot authenticates with Discord using a token.
+
+> [!WARNING]
+> Tokens are sensitive credentials. Never hardcode them into source files or commit them to source control.
 
 Create a `.env` file in the root of your project:
 
@@ -62,7 +65,7 @@ Reading `process.env.DISCORD_TOKEN` is how the bot will reach the value from `.e
 
 ## Build and run
 
-TypeScript needs to be compiled before Node can run it, so add two scripts to `package.json`:
+TypeScript needs to be compiled before Node can run it, so add three scripts to `package.json`:
 
 `/package.json`
 ```json
@@ -72,12 +75,23 @@ TypeScript needs to be compiled before Node can run it, so add two scripts to `p
 	"type": "module",
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"start": "node --env-file=.env dist/index.js"
+		"start": "node --env-file=.env dist/index.js",
+		"dev": "node --watch --env-file=.env dist/index.js"
 	}
 }
 ```
 
-Running `npm run build` compiles everything in `src/` to JavaScript inside `dist/`, while `npm run start` executes the built output. The `--env-file=.env` flag is built right into Node 22+, so there's no need to install third-party packages like `dotenv`.
+Running `npm run build` compiles everything in `src/` to JavaScript inside `dist/`, while `npm run start` executes the built output. During development, rebuilding and restarting by hand after every change wears thin fast, so the `dev` script runs the bot under Node's built-in `--watch` mode, which restarts it whenever the compiled output in `dist/` changes. The compiled output still needs producing, so the watch workflow is two terminals:
+
+```bash
+npx tsc --watch
+npm run dev
+```
+
+TypeScript recompiles on every save in the first, Node restarts the bot in the second, and together they turn the edit loop into save and wait, with nothing to install.
+
+> [!TIP]
+> The `--env-file=.env` flag is built right into Node 22+, so there's no need to install third-party packages like `dotenv`.
 
 Now test the build pipeline:
 

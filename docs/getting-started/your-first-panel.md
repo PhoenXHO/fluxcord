@@ -33,7 +33,10 @@ const aboutScreen = makeScreen(() => (
 
 `screen()` is the framework's screen factory. Since the screen is stateless, the factory call stays empty; a stateful screen would use it to declare its data type, as we'll see later. With no data to read, the view function takes no arguments either — there is simply no session state to pass down.
 
-The parentheses around the JSX are plain JavaScript, not part of the tag vocabulary: they bundle the multi-line element into the single expression the arrow function returns. After a `return` keyword they even become required, because JavaScript ends a bare `return` at the line break.
+The parentheses around the JSX are plain JavaScript, not part of the tag vocabulary: they bundle the multi-line element into the single expression the arrow function returns.
+
+> [!NOTE]
+> After a `return` keyword the parentheses become required, because JavaScript ends a bare `return` at the line break.
 
 The lowercase elements make up fluxcord's built-in layout vocabulary:
 - `<view>` is the panel root
@@ -72,7 +75,10 @@ export const aboutCommand = command('about', 'Open the about panel', {
 
 The first argument of `command()` is the command name, which is what users type in Discord to execute it (e.g. `/about`). The second is the command description, which is what Discord shows next to the command name. And the third is the command definition.
 
-The `mount: mounts(aboutFlow)` part is the most interesting: it tells fluxcord to spawn a fresh session of `aboutFlow` whenever the command is executed. Note that a command isn't the only way a panel can open: the bot also exposes a `mount` function for starting flows programmatically, which we'll come back to in a later chapter.
+The `mount: mounts(aboutFlow)` part is the most interesting: it tells fluxcord to spawn a fresh session of `aboutFlow` whenever the command is executed.
+
+> [!NOTE]
+> A command isn't the only way a panel can open. The bot also exposes a `mount` function for starting flows programmatically; we'll come back to it in a later chapter.
 
 Keep in mind that the command definition is a pure declaration: it doesn't touch the bot's state, and it doesn't reach Discord on its own. We still need to register it with our bot instance.
 

@@ -8,14 +8,15 @@ This chapter covers both sides of that setup: setting up the **Discord Developer
 
 Bots live inside applications on Discord's side, so head over to the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**. Pick a name for your bot (can be changed later) and confirm.
 
-Once the application is created, you need to get its token. Select the **Bot** tab  on the left sidebar and click **Reset Token**, then copy the generated string (click the copy icon) and paste it into your `.env` file (replace the placeholder from [Project setup](project-setup.md)):
+Once the application is created, you need to get its token. Select the **Bot** tab on the left sidebar and click **Reset Token**, then copy the generated string (click the copy icon) and paste it into your `.env` file (replace the placeholder from [Project setup](project-setup.md)):
 
 `/.env`
 ```
 DISCORD_TOKEN=your-real-token
 ```
 
-Treat this token like a password, because that's exactly what it is: whoever holds it can use it to log in as your bot and do anything with it. If it ever leaks, hit **Reset Token** again to invalidate the old one.
+> [!WARNING]
+> Treat this token like a password, because that's exactly what it is: whoever holds it can log in as your bot and do anything with it. If it ever leaks, hit **Reset Token** again to invalidate the old one.
 
 If you've used discord.js before, you may have seen a slightly more involved setup when configuring client options, listeners, intents, and permissions. As you'll see later in this chapter, fluxcord makes this much simpler. For instance, you won't need to enable any privileged gateway intents most of the time, because fluxcord's UI panels work entirely on the default `Guilds` intent.
 
@@ -28,7 +29,8 @@ Next, you'll need to generate an invite link to bring the bot into your Discord 
 3. Leave the **Bot permissions** checkboxes unchecked for now, since basic text permissions in your server are enough, and granting that with server roles is more flexible than baking it into the invite anyway.
 4. Copy the generated URL at the bottom of the page, open it in a browser, and add the bot to a server of your choice (your test server for example).
 
-Note: without the `applications.commands` scope, the bot would not be able to register slash commands, and the `/about` command would not appear in the picker nor would you be able to invoke it.
+> [!NOTE]
+> Without the `applications.commands` scope, the bot cannot register slash commands: the `/about` command would neither appear in the picker nor be invocable.
 
 ## Wiring it together
 
@@ -58,7 +60,8 @@ Also note that there is no token anywhere in sight. That's because `createBot` r
 
 ### Instant command registration with a guild ID
 
-Global slash commands can take up to an hour to propagate, so it's recommended to register them with a guild ID during development. All you need to do is set the `DISCORD_GUILD_ID` environment variable in your `.env` file:
+> [!TIP]
+> Global slash commands can take up to an hour to propagate, so register them with a guild ID during development. Setting the `DISCORD_GUILD_ID` environment variable is all it takes:
 
 `/.env`
 ```
