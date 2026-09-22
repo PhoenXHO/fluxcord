@@ -47,9 +47,7 @@ const menuScreen = screen<DiceData>()((_data, { Button, Back }) => (
 			<Button onClick={e => e.ui.go('rules')} label="Rules" />
 			<Button onClick={e => e.ui.go('about')} label="About" />
 		</row>
-		<row>
-			<Back />
-		</row>
+		<Back />
 	</view>
 ));
 
@@ -60,6 +58,7 @@ const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
 			placeholder="Call a number"
 			options={calls}
 			onSelect={call}
+			values={[data.call]}
 		/>
 		<row>
 			<Button
@@ -76,18 +75,14 @@ const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
 const rulesScreen = screen<DiceData>()((_data, { Back }) => (
 	<view>
 		<text>Call a number from one to six, then roll. Guess right and you win the round; guess wrong and the die wins.</text>
-		<row>
-			<Back />
-		</row>
+		<Back />
 	</view>
 ));
 
 const aboutScreen = screen<DiceData>()((_data, { Back }) => (
 	<view>
 		<text>Dice is the guide's example panel.</text>
-		<row>
-			<Back />
-		</row>
+		<Back />
 	</view>
 ));
 

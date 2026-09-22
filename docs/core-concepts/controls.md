@@ -153,6 +153,14 @@ Either type of select can be initialized with an existing selection. With a stat
 </Select>
 ```
 
+A `default` flag is baked into the list at authoring time, so it can't follow your session's data. You'll run into this exact limitation in the dice panel: when you pick a number and roll, the redrawn panel forgets your choice and drops back to its placeholder, even though the headline still reports the call. To make the preselection react to data, pass the `values` prop; it takes an array of values to mark on every draw, and because entries may be `undefined`, your data-bag field can ride in directly:
+
+```tsx
+<Select placeholder="Call a number" options={calls} onSelect={call} values={[data.call]} />
+```
+
+Before your first pick, `data.call` is `undefined`, so nothing is preselected and the placeholder shows as usual. Once you make a choice, though, the matching option stays marked across every redraw because the select is now a function of the data bag, just like the buttons. Any values that don't match an option are simply ignored; when `values` does yield a match, it takes precedence over any `default` flags: the live pick replaces the static fallback.
+
 Entity selects rely on the `defaultIds` prop instead, which accepts an array of Discord IDs. To pre-select the server's default role, for example, pass its ID in that array:
 
 ```tsx
@@ -160,7 +168,7 @@ Entity selects rely on the `defaultIds` prop instead, which accepts an array of 
 ```
 
 > [!IMPORTANT]
-> `defaultIds` works only on entity selects, whereas static lists must use the `default` flag on individual options instead.
+> `defaultIds` works only on entity selects, whereas static lists preselect through the `default` flag or the `values` prop instead.
 
 <!-- -->
 

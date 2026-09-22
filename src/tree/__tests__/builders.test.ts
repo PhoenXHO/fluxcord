@@ -108,6 +108,17 @@ describe('builders', () => {
 		expect(entity.options).toBeUndefined();
 	});
 
+	it('optionSelect normalizes the forgiving values array onto the node', () => {
+		const mixed = optionSelect({ onSelect: go, options: [{ label: 'A', value: 'a' }], values: [1, undefined, null, 'b'] });
+		expect(mixed.values).toEqual(['1', 'b']);
+
+		const allNullish = optionSelect({ onSelect: go, options: [{ label: 'A', value: 'a' }], values: [undefined, null] });
+		expect(allNullish).not.toHaveProperty('values');
+
+		const clean = optionSelect({ onSelect: go, options: [{ label: 'A', value: 'a' }], values: ['a'] });
+		expect(clean.values).toEqual(['a']);
+	});
+
 	it('entity flags resolve to the entity union and never ride along', () => {
 		const node = entitySelect({ onSelect: go, mentionable: true });
 		expect(node.entity).toBe('mentionable');

@@ -203,13 +203,18 @@ function inputStyle(node: InputNode, path: string): TextInputStyle {
 	return style;
 }
 
-/** One option's wire shape, shared by string selects, checkbox groups and radio groups: label, value, optional description and preselection. */
-function wireOption(option: SelectOption): APISelectMenuOption {
+/**
+ * One option's wire shape, shared by string selects, checkbox groups and
+ * radio groups: label, value, optional description and preselection. When
+ * `preselect` is passed (the live `values` matches of a string select) it
+ * replaces the authored `default` flag; without it the flag decides alone.
+ */
+function wireOption(option: SelectOption, preselect?: ReadonlySet<string>): APISelectMenuOption {
 	return {
 		label: option.label,
 		value: option.value,
 		...(option.description !== undefined ? { description: option.description } : {}),
-		...(option.default === true ? { default: true } : {}),
+		...((preselect !== undefined ? preselect.has(option.value) : option.default === true) ? { default: true } : {}),
 	};
 }
 
@@ -219,11 +224,29 @@ function selectBase(node: SelectNode, path: string, customId: string): APISelect
 		// rule 8 has slipped through
 		throw new RenderError(path, 'select has both options and entity');
 	}
+	if (node.entity !== undefined && node.values !== undefined) {
+		// rule 36 has slipped through
+		throw new RenderError(path, 'select values belongs to a static options list, not an entity select');
+	}
 	if (node.options !== undefined) {
+		// The live `values` preselection rides the option-level `default` flag
+		// (the platform's only preselect channel for string selects). A
+		// non-empty match replaces the authored `default` flags, unmatched
+		// entries fall back to them, and more matches than the selection cap
+		// throws here instead of 400ing at Discord.
+		const live = node.values !== undefined && node.values.length > 0 ? new Set(node.values) : undefined;
+		const matched = live === undefined ? undefined : node.options.filter((option) => live.has(option.value));
+		if (matched !== undefined) {
+			const cap = node.maxSelected ?? 1;
+			if (matched.length > cap) {
+				throw new RenderError(path, `select preselects ${matched.length} options, more than the selection cap (${cap})`);
+			}
+		}
+		const preselect = matched !== undefined && matched.length > 0 ? live : undefined;
 		return {
 			type: ComponentType.StringSelect,
 			custom_id: customId,
-			options: node.options.map(wireOption),
+			options: node.options.map((option) => wireOption(option, preselect)),
 		};
 	}
 	if (node.entity !== undefined) {
@@ -466,7 +489,7 @@ function renderModalCheckboxGroup(node: CheckboxGroupNode): APILabelComponent {
 		component: {
 			type: ComponentType.CheckboxGroup,
 			custom_id: node.id,
-			options: node.options.map(wireOption),
+			options: node.options.map((option) => wireOption(option)),
 			...(node.minSelected !== undefined ? { min_values: node.minSelected } : {}),
 			...(node.maxSelected !== undefined ? { max_values: node.maxSelected } : {}),
 			required: node.required ?? true,
@@ -483,7 +506,7 @@ function renderModalRadioGroup(node: RadioGroupNode): APILabelComponent {
 		component: {
 			type: ComponentType.RadioGroup,
 			custom_id: node.id,
-			options: node.options.map(wireOption),
+			options: node.options.map((option) => wireOption(option)),
 			required: node.required ?? true,
 		},
 	};

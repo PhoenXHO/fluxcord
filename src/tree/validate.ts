@@ -322,7 +322,8 @@ function validateHr(node: HrNode, path: string, violations: Violation[]): void {
  * a static options list holds at most 25 entries with unique non-empty
  * labels and values of at most 100 chars each. Preselected options
  * (`default: true`) and entity preselections (`defaultIds`) must fit
- * the selection cap; `defaultIds` belongs to entity selects only.
+ * the selection cap; `defaultIds` belongs to entity selects only, and the
+ * live `values` preselection belongs to static lists only (rule 36).
  *
  * The context rules split the two lives of the node: in a modal it is a
  * form field and needs its `id` and `label` (rule 30); in a message it
@@ -420,6 +421,13 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[],
 				message: `select preselects ${node.defaultIds.length} entities, more than the selection cap (${cap})`,
 			});
 		}
+	}
+	if (node.values !== undefined && node.entity !== undefined) {
+		violations.push({
+			path,
+			rule: 36,
+			message: 'select values belongs to a static options list, not an entity select',
+		});
 	}
 	if (node.options) {
 		const options = node.options;

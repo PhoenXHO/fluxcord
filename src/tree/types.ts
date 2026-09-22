@@ -169,6 +169,17 @@ export interface SelectNode {
 	 */
 	readonly defaultIds?: readonly string[];
 
+	/**
+	 * Live preselection for a static options list, symmetric with the
+	 * `values` a select event carries. The select builders filter nullish
+	 * entries out and stringify the rest, so a data-bag value can be passed
+	 * directly (`values={[data.pick]}` compiles with an optional field). A
+	 * non-empty match takes precedence over the options' `default` flags;
+	 * unmatched entries are ignored. Entity selects preselect through
+	 * `defaultIds` instead. Must fit the selection cap.
+	 */
+	readonly values?: readonly string[];
+
 	readonly placeholder?: string;
 	/**
 	 * Minimum number of options that must be selected. If not specified, defaults to 1.

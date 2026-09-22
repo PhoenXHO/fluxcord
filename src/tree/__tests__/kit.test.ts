@@ -51,6 +51,40 @@ describe('kitFor Back - draw', () => {
 	});
 });
 
+describe('kitFor Select - construction', () => {
+	it('option children append to an options prop', () => {
+		const node = kitFor({ history: [] }).Select({
+			placeholder: 'Pick',
+			options: [{ label: '1', value: '1' }],
+			onSelect: () => {},
+			children: [{ label: '7', value: '7' }],
+		} as never);
+		expect(node.options).toEqual([
+			{ label: '1', value: '1' },
+			{ label: '7', value: '7' },
+		]);
+	});
+
+	it('option children alone become the list', () => {
+		const node = kitFor({ history: [] }).Select({
+			placeholder: 'Pick',
+			onSelect: () => {},
+			children: { label: '7', value: '7' },
+		} as never);
+		expect(node.options).toEqual([{ label: '7', value: '7' }]);
+	});
+
+	it('values accepts data-bag entries and normalizes onto the node', () => {
+		const node = kitFor({ history: [] }).Select({
+			placeholder: 'Pick',
+			options: [{ label: '1', value: '1' }],
+			onSelect: () => {},
+			values: [3, undefined, null],
+		} as never);
+		expect(node.values).toEqual(['3']);
+	});
+});
+
 describe('kitFor Back - the generated handler', () => {
 	it('runs onLeave before the pop', async () => {
 		const order: string[] = [];

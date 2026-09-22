@@ -140,6 +140,81 @@ describe('renderV2Message - select', () => {
 		}]);
 	});
 
+	it('renders live values preselections through the option default flag', () => {
+		const select = optionSelect({
+			onSelect: go,
+			options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }],
+			values: ['b', 7],
+		});
+		expect(render(view({}, row({}, select))).components).toEqual([{
+			type: 1,
+			components: [{
+				type: 3,
+				custom_id: CUSTOM_ID,
+				options: [
+					{ label: 'A', value: 'a' },
+					{ label: 'B', value: 'b', default: true },
+				],
+			}],
+		}]);
+	});
+
+	it('a non-empty values match replaces authored default flags; unmatched entries fall back to them', () => {
+		const replaced = optionSelect({
+			onSelect: go,
+			options: [{ label: 'A', value: 'a', default: true }, { label: 'B', value: 'b' }],
+			values: ['b'],
+		});
+		const replacedWire = render(view({}, row({}, replaced))).components[0].components as unknown as [{
+			options: { value: string; default?: boolean }[];
+		}];
+		expect(replacedWire[0].options).toEqual([
+			{ label: 'A', value: 'a' },
+			{ label: 'B', value: 'b', default: true },
+		]);
+
+		const fallback = optionSelect({
+			onSelect: go,
+			options: [{ label: 'A', value: 'a', default: true }],
+			values: ['zz'],
+		});
+		const fallbackWire = render(view({}, row({}, fallback))).components[0].components as unknown as [{
+			options: { value: string; default?: boolean }[];
+		}];
+		expect(fallbackWire[0].options).toEqual([{ label: 'A', value: 'a', default: true }]);
+	});
+
+	it('preselects every matched value on a multi-select', () => {
+		const select = optionSelect({
+			onSelect: go,
+			options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }, { label: 'C', value: 'c' }],
+			values: ['a', 'c'],
+			maxSelected: 2,
+		});
+		const wire = render(view({}, row({}, select))).components[0].components as unknown as [{
+			options: { value: string; default?: boolean }[];
+		}];
+		expect(wire[0].options).toEqual([
+			{ label: 'A', value: 'a', default: true },
+			{ label: 'B', value: 'b' },
+			{ label: 'C', value: 'c', default: true },
+		]);
+	});
+
+	it('throws when live values exceed the selection cap', () => {
+		const select = optionSelect({
+			onSelect: go,
+			options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }],
+			values: ['a', 'b'],
+		});
+		expect(() => render(view({}, row({}, select)))).toThrow(/more than the selection cap \(1\)/);
+	});
+
+	it('loudly rejects values on an entity select', () => {
+		const sneaky = force<ControlNode>({ kind: 'select', onSelect: go, entity: 'roles', values: ['r1'] });
+		expect(() => render(view({}, row({}, sneaky)))).toThrow(/values belongs to a static options list/);
+	});
+
 	it('maps every entity source to its platform select type', () => {
 		for (const [entity, wire] of [
 			['users', 5],

@@ -213,6 +213,15 @@ describe('validateTree - value & bounds rules', () => {
 		expect(rulesOf(withSelect(node))).toContain(8);
 	});
 
+	it('rule 36: values rejected on an entity select (cast arrivals)', () => {
+		const sneaky = entitySelect({ onSelect: handler, roles: true });
+		const node = { ...sneaky, values: ['1'] } as unknown as SelectNode;
+		expect(rulesOf(withSelect(node))).toContain(36);
+
+		const plain = optionSelect({ onSelect: handler, options: [{ label: 'A', value: 'a' }], values: ['a'] });
+		expect(rulesOf(withSelect(plain))).toEqual([]);
+	});
+
 	it('rule 13: input length bounds and ordering', () => {
 		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', minLength: -1 })))).toContain(13);
 		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', maxLength: 4001 })))).toContain(13);

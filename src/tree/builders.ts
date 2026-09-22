@@ -42,8 +42,9 @@ import type {
 // field, which makes passing both a compile error. The tree validator still
 // checks the rule at runtime for trees that arrive through casts. defaultIds
 // rides the entity side only; a static options list preselects through each
-// option's `default` flag. The entity side is spelled through bare flags
-// (`roles: true`), resolved to the node's entity union by the builder.
+// option's `default` flag or the live `values` prop, which the builder
+// normalizes to clean strings on the node. The entity side is spelled through
+// bare flags (`roles: true`), resolved to the node's entity union by the builder.
 
 export type ViewProps = Omit<ViewNode, 'kind' | 'children'>;
 /** Text props: an optional title. The body is the children, folded at build time. */
@@ -66,7 +67,13 @@ export type ButtonStyleFlags = {
 export type ButtonProps = Omit<ButtonNode, 'kind' | 'style' | 'label'> & ButtonStyleFlags & { readonly label?: string };
 /** Link props: the label rides the `label` prop or the children. */
 export type LinkProps = Omit<LinkNode, 'kind' | 'label'> & { readonly label?: string };
-export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity' | 'defaultIds'> & { readonly options: readonly SelectOption[] };
+/**
+ * The forgiving entry type of a select's `values` prop: a data-bag field can
+ * ride directly because undefined and null are accepted entries; the builder
+ * filters nullish entries out and stringifies the rest.
+ */
+export type SelectValues = readonly (string | number | undefined | null)[];
+export type OptionSelectProps = Omit<SelectNode, 'kind' | 'entity' | 'defaultIds' | 'values'> & { readonly options: readonly SelectOption[] } & { readonly values?: SelectValues };
 /**
  * The entity-source flags: each takes no value and is spelled bare
  * (`<Select roles />` / `roles: true`). At most one may be set.
@@ -84,7 +91,7 @@ export type EntitySelectSource =
 	| { readonly channels: true }
 	| { readonly mentionable: true };
 /** A select whose options come from a Discord entity source, spelled through one {@link SelectEntityFlags} flag. */
-export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options' | 'entity'> & SelectEntityFlags & EntitySelectSource;
+export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options' | 'entity' | 'values'> & SelectEntityFlags & EntitySelectSource;
 /**
  * The modal-select tag's props: a select as a modal form field, handler
  * off the surface. The source rides the {@link SelectEntityFlags} flags or
@@ -384,9 +391,23 @@ export function link(props: LinkProps, ...children: readonly TextChild[]): LinkN
 	});
 }
 
-/** A select whose options are a static list. */
+/**
+ * Filters nullish entries out of a forgiving `values` array and stringifies
+ * the rest; an empty result collapses to undefined so no preselection rides
+ * the node.
+ */
+function normalizeValues(values: SelectValues | undefined): readonly string[] | undefined {
+	const live = (values ?? [])
+		.filter((entry): entry is string | number => entry !== undefined && entry !== null)
+		.map(String);
+	return live.length > 0 ? live : undefined;
+}
+
+/** A select whose options are a static list. The live `values` preselection arrives in the forgiving {@link SelectValues} spelling and is normalized to clean strings here. */
 export function optionSelect(props: OptionSelectProps): SelectNode {
-	return deepFreeze({ kind: NodeKind.select, ...props });
+	const { values, ...rest } = props;
+	const live = normalizeValues(values);
+	return deepFreeze({ kind: NodeKind.select, ...rest, ...(live !== undefined ? { values: live } : {}) });
 }
 
 /**

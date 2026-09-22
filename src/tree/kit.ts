@@ -44,7 +44,7 @@ type KitOptionSelectProps<TData, TKeys extends string> = Omit<OptionSelectProps,
  * `never` here, so `<Select roles><option/></Select>` is a compile error:
  * an entity select has no static options to lift.
  */
-type KitEntitySelectProps<TData, TKeys extends string> = Omit<SelectNode, 'kind' | 'options' | 'entity' | 'onSelect'>
+type KitEntitySelectProps<TData, TKeys extends string> = Omit<SelectNode, 'kind' | 'options' | 'entity' | 'onSelect' | 'values'>
 	& SelectEntityFlags & EntitySelectSource
 	& { readonly onSelect: ActionHandler<TData, TKeys>; readonly children?: never };
 
