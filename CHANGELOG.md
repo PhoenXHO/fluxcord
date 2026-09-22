@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2026-09-11
+## [0.1.0] - 2026-09-22
 
 Initial release.
 
@@ -14,8 +14,8 @@ Initial release.
 - Session model: per-flow TTL via `ttlMs`, a `remount` policy for what a repeat mount does (`replace` or `coexist`), the `Expiry` component with the `expiryEpoch` helper, `onSessionStart` / `onSessionEnd` hooks, `close-with-view` final views (including from expiry), custom parting screens via `command` hint, `note`, or a full `view`, and rehydration from a `RehydrateStore` after restarts.
 - TSX authoring: the JSX runtime (`fluxcord/jsx-runtime`), fragments that splice flat, and the unified screen kit (`kitFor`: `Button`, `Select`, `Back`, `go` / `push` / `back` navigation), with plain builder functions as the non-TSX path.
 - Layout and content tags: `view`, `row`, `container`, `text`, `code`, `codeblock`, `hr` with padding flags, the `error` / `warning` / `info` callouts, and children-as-content on the text-like tags.
-- Controls: buttons with style flags, links, required selects with min/max values, `checkbox` / `checkbox-group` / `radio-group`, and modal forms built from `input` and `modal-select`. `<option>` children append to a select's `options` prop, so a generated list can carry pinned fixed entries.
-- Modal submissions land in `event.inputs` as strings whatever the wire sent: text inputs pass through, a checkbox's boolean becomes `'true'` / `'false'`, and multi-pick fields (checkbox groups, modal selects) comma-join their picks, so authored option values must stay comma-free. A radio group's empty answer and an empty pick list are omitted entirely.
+- Controls: buttons with style flags, links, required selects with min/max values, `checkbox` / `checkbox-group` / `radio-group`, and modal forms built from `input` and `modal-select`. `<option>` children append to the `options` prop of a select and of the modal fields (`modal-select`, `checkbox-group`, `radio-group`), so a generated list can carry pinned fixed entries.
+- Modal submissions land in `event.inputs` keyed by field id, each value in its field's natural shape: text inputs and radio answers arrive as strings, a checkbox as a boolean, and multi-pick fields (checkbox groups, modal selects) as arrays of their picks in pick order. An empty pick list and an unanswered radio group are omitted entirely.
 - Entity selects render preselected ids (`defaultIds`) through the platform's `default_values`, so redrawn panels show the current selection highlighted.
 - Static selects take a `values` prop for live preselection: entries may be strings, numbers, undefined, or null, nullish entries are filtered out and the rest stringified, so a data-bag field can ride in directly (`values={[data.pick]}`), and the matching options render preselected on every draw, which keeps a user's pick highlighted across redraws. A non-empty match takes precedence over the options' `default` flags, and passing `values` on an entity select fails with `select values belongs to a static options list, not an entity select`.
 - Bare controls forgive their missing row: a select, button, or link dropped straight into a view or container gets its own synthetic row at render (controls share a row only when the author wraps them in one explicitly), while a row that mixes a select with other controls fails loudly with `row with a select must have exactly one child` instead of reaching the Discord API.
