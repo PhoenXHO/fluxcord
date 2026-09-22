@@ -101,11 +101,11 @@ describe('flattenInteraction', () => {
 
 		const event = flattenInteraction(interaction as UiComponentInteraction);
 
-		// Every wire answer lands as a string: booleans become 'true'/'false',
-		// multi-picks comma-join, nullish answers are dropped.
+		// Each value keeps its field's shape: booleans stay boolean, pick
+		// lists arrive as arrays, nullish answers are dropped.
 		expect(event).toMatchObject({
 			kind: 'modal-submit',
-			inputs: { amount: '10', note: 'hi', lucky: 'true', skipped: 'false', picks: 'red,blue' },
+			inputs: { amount: '10', note: 'hi', lucky: true, skipped: false, picks: ['red', 'blue'] },
 		});
 		expect(event?.inputs).not.toHaveProperty('empty');
 		expect(event?.inputs).not.toHaveProperty('broken');

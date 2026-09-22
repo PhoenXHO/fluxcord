@@ -54,8 +54,8 @@ export interface IncomingEvent {
 	readonly messageId: string;
 	/** Select choices, in pick order. */
 	readonly values?: readonly string[];
-	/** Modal field values, keyed by input node id exactly as authored. */
-	readonly inputs?: Readonly<Record<string, string>>;
+	/** Modal field values, keyed by input node id; each value keeps its field's shape (string, boolean, or pick array). */
+	readonly inputs?: Readonly<Record<string, string | boolean | readonly string[]>>;
 }
 
 /**
@@ -112,8 +112,8 @@ export interface ActionEvent<TData = unknown, TKeys extends string = string> {
 	readonly session: Session<TData>;
 	/** Select choices, in pick order; set on select events. */
 	readonly values?: readonly string[];
-	/** Modal field values, keyed by input node id exactly as authored; set on modal-submit events. */
-	readonly inputs?: Readonly<Record<string, string>>;
+	/** Modal field values, keyed by input node id in each field's natural shape (string, boolean, or pick array); set on modal-submit events. */
+	readonly inputs?: Readonly<Record<string, string | boolean | readonly string[]>>;
 	/** The effects toolkit for this event: navigation, `close`, `showModal`. */
 	readonly ui: UiToolkit<TKeys>;
 	/**

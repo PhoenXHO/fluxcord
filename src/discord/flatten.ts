@@ -36,25 +36,23 @@ export type UiComponentInteraction =
 
 /**
  * Modal field values keyed by input id, read defensively off the flat field
- * collection. Every answer lands as a string, whatever the wire sent: text
- * inputs pass through, the bare checkbox's boolean becomes 'true'/'false',
- * and multi-pick fields (checkbox groups, modal selects) comma-join their
- * picks, which is why authored option values must stay comma-free. A radio
- * group's null answer (nothing picked) is omitted entirely.
+ * collection. The value shape rides the field kind: text inputs pass through
+ * as strings, the bare checkbox arrives as a boolean, a radio group's answer
+ * is a string, and the pick-list fields (checkbox groups, modal selects)
+ * arrive as arrays of their picks in pick order. A radio group's null answer
+ * (nothing picked) is omitted entirely.
  */
-function modalInputs(interaction: ModalSubmitInteraction): Record<string, string> {
-	const inputs: Record<string, string> = {};
+function modalInputs(interaction: ModalSubmitInteraction): Record<string, string | boolean | readonly string[]> {
+	const inputs: Record<string, string | boolean | readonly string[]> = {};
 	// The payload was authored by the framework's own renderer; the cast read
 	// keeps extraction independent of d.js typing drift on field components.
 	for (const [id, field] of interaction.fields.fields) {
 		const f = field as { value?: unknown; values?: unknown };
-		if (typeof f.value === 'string') {
+		if (typeof f.value === 'string' || typeof f.value === 'boolean') {
 			inputs[id] = f.value;
-		} else if (typeof f.value === 'boolean') {
-			inputs[id] = f.value ? 'true' : 'false';
 		} else if (Array.isArray(f.values)) {
 			const picks = f.values.filter((entry): entry is string => typeof entry === 'string');
-			if (picks.length > 0) inputs[id] = picks.join(',');
+			if (picks.length > 0) inputs[id] = picks;
 		}
 	}
 	return inputs;
