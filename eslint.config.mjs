@@ -66,6 +66,6 @@ export default defineConfig([
 		},
 	},
 	{
-		ignores: ['eslint.config.mjs', 'dist/**', 'node_modules/**'],
+		ignores: ['eslint.config.mjs', 'dist/**', 'coverage/**', 'examples/dist/**', 'node_modules/**'],
 	},
 ]);
