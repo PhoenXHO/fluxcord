@@ -20,8 +20,8 @@ Rather than dumping disconnected code snippets, this guide builds a real bot ste
 - [Screens and navigation](core-concepts/screens-and-navigation.md) — Manage multi-screen flows and transition between them.
 - [State and actions](core-concepts/state-and-actions.md) — Handle session data and write click handlers.
 - [Controls](core-concepts/controls.md) — Buttons, selects, and the values handlers receive.
-- Layout and content — Structure your panels using views, rows, sections, and text.
-- Modals — Pop up modal dialogs to collect user input.
+- [Layout and content](core-concepts/layout-and-content.md) — Structure your panels with headings, separators, containers, and text dressings.
+- [Modals](core-concepts/modals.md) — Pop up modal dialogs to collect user input.
 - Subflows — Nest UI flows inside parent flows for modular layouts.
 - Commands and mounting — Attach flows to slash commands, including subcommands and permission knobs.
 - Permission gates — Control who can interact with specific components.

@@ -38,7 +38,11 @@ the message, so you never touch edits or component ids yourself. fluxcord
 was extracted from a production Discord bot, where it runs every admin
 panel today.
 
-<!--![Two screens of a dice panel, rolling and paging through history](.github/assets/demo.gif)-->
+<div align="center">
+
+![A taco order panel: building an order, checking out, and starting a new one](.github/assets/fluxcord-intro.gif)
+
+</div>
 
 ## Features
 
