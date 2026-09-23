@@ -15,7 +15,7 @@
 
 import type { ActionEvent, ActionHandler } from './types.js';
 
-export function action<TData>(): <TKeys extends string = string>(
+export function action<TData = unknown>(): <TKeys extends string = string>(
 	run: (event: ActionEvent<TData, TKeys>) => void | Promise<void>,
 ) => ActionHandler<TData, TKeys> {
 	return (run) => {
