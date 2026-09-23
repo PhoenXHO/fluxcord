@@ -4,12 +4,14 @@ import { createBot } from 'fluxcord/discord';
 import { aboutCommand } from './apps/about.js';
 import { counterCommand } from './apps/counter.js';
 import { diceCommand } from './apps/dice.js';
+import { orderCommand } from './apps/order/index.js';
 
 const bot = createBot({
 	modules: [
 		{ name: 'about', commands: [aboutCommand] },
 		{ name: 'counter', commands: [counterCommand] },
 		{ name: 'dice', commands: [diceCommand] },
+		{ name: 'order', commands: [orderCommand] },
 	],
 });
 
