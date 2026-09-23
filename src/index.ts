@@ -32,6 +32,7 @@ export * from './state/store.js'; // createSessionStore, SessionStore (advanced)
 
 // Seams: the vocabulary crossing host boundaries.
 export * from './pipeline/types.js'; // EventKind, ErrorSource, policy vocab, ports
+export * from './pipeline/policy.js'; // isOwner, hasRole, hasAnyRole
 export * from './pipeline/dispatch.js'; // defaultOnError, DEFAULT_ERROR_MESSAGE, createDispatch
 export * from './state/types.js'; // Session, MessageRef, EndReason
 export * from './render/v2.js'; // V2MessagePayload, V2ModalPayload, RenderError

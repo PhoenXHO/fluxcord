@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Policy request helpers: `isOwner`, `hasRole`, and `hasAnyRole` as free functions over `PolicyRequest`, so a policy engine stops hand-writing identity checks. The request stays plain data and the port stays one question.
+
 ### Changed
 
 - `action()` now defaults its data type to `unknown`, so stateless handlers (nav-only buttons, module-state pickers) can drop the explicit `action<unknown>()` and write bare `action()`.
