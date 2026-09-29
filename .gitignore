@@ -4,3 +4,5 @@ coverage/
 *.log
 *.tgz
 .env
+examples/rehydrate-rows.json
+examples/campfire.json

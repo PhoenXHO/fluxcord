@@ -1,9 +1,14 @@
 // Shared vocabulary for the taco stand: the order bag and the menu lists.
+import type { DeliveryData } from './delivery.flow.js';
+
 export interface OrderData {
 	size?: string;
 	toppings: readonly string[];
 	name?: string;
 	napkins?: boolean;
+	// The delivery subflow's slot: seeded empty, filled by the subflow's
+	// own screens through the lens.
+	delivery: DeliveryData;
 }
 
 export const SIZES = [
