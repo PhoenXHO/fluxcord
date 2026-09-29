@@ -132,7 +132,7 @@ one of them, `event.mutate` applies the change, and the framework handles
 the re-render and the message edit. Buttons bind to handlers by identity
 instead of through id strings, so there is nothing to parse and nothing
 that can drift out of sync, and the state lives in a session the framework
-tracks rather than in a `Map` you babysit.
+tracks rather than in a `Map` you manage yourself.
 
 <p align="center">
 	<img src=".github/assets/fluxcord-example-counter.gif" alt="The counter panel from the example, with the count climbing as +1 is clicked" width="480" />
