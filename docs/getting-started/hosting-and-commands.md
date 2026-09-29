@@ -1,17 +1,17 @@
 # Hosting and commands
 
-Up to this point, our mini-app only exists on your local machine. To actually run it, we need to register an application with Discord and replace our placeholder entry point with a call to `createBot`.
+Up to this point, our code only exists on your local machine. To actually run it, we need to register an application with Discord and replace our placeholder entry point with a call to `createBot`.
 
-This chapter covers both sides of that setup: setting up the **Discord Developer** Portal and connecting it to your codebase.
+This chapter covers both sides of that setup: setting up the **Discord Developer Portal** and connecting it to your codebase.
 
 ## Creating the application
 
 Bots live inside applications on Discord's side, so head over to the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**. Pick a name for your bot (can be changed later) and confirm.
 
-Once the application is created, you need to get its token. Select the **Bot** tab on the left sidebar and click **Reset Token**, then copy the generated string (click the copy icon) and paste it into your `.env` file (replace the placeholder from [Project setup](project-setup.md)):
+Once the application is created, you need to get its token. Select the **Bot** tab on the left sidebar and click **Reset Token**, then copy the generated string with the copy icon and paste it into your `.env` file. This replaces the placeholder from [Project setup](project-setup.md).
 
 `/.env`
-```
+```text
 DISCORD_TOKEN=your-real-token
 ```
 
@@ -30,7 +30,7 @@ Next, you'll need to generate an invite link to bring the bot into your Discord 
 4. Copy the generated URL at the bottom of the page, open it in a browser, and add the bot to a server of your choice (your test server for example).
 
 > [!NOTE]
-> Without the `applications.commands` scope, the bot cannot register slash commands: the `/about` command would neither appear in the picker nor be invocable.
+> Without the `applications.commands` scope, the bot cannot register slash commands: the `/about` command would not show up in the picker and could not be run.
 
 ## Wiring it together
 
@@ -41,10 +41,10 @@ The imports come first: along with your command, the Discord host itself comes f
 `/src/index.ts`
 ```ts
 import { createBot } from 'fluxcord/discord';
-import { aboutCommand } from './apps/about.js';
+import { aboutCommand } from './modules/about.js';
 ```
 
-Notice the `fluxcord/discord` import path; the Discord host adapter lives behind its own export so that the framework core stays independent of any particular platform. Also, the relative import for `./apps/about.js` uses the `.js` extension even though the source file is `.tsx`. This is required by TypeScript's `Node16` module resolution from your tsconfig that requires imports to reflect the compiled output files, and it's a good habit to get into.
+Notice the `fluxcord/discord` import path; the Discord host adapter lives behind its own export so that the framework core stays independent of any particular platform. Also, the relative import for `./modules/about.js` uses the `.js` extension even though the source file is `.tsx`. This is required by TypeScript's `Node16` module resolution, which needs imports to use the extension of the compiled output.
 
 With the imports in place, everything else collapses into a single call. This is the entire file:
 
@@ -56,7 +56,7 @@ const bot = createBot({
 
 The `modules` array is where your declarations meet the host, and each module is a named bundle of command definitions. The commands are automatically registered with Discord by fluxcord, so you don't need to do anything else.
 
-Also note that there is no token anywhere in sight. That's because `createBot` reads the conventional `DISCORD_TOKEN` environment variable which you've set in your `.env` file so you don't have to wire it up manually. If it is missing, the bot fails at boot and prints a readable error to remind you that you need to set it. In the rare case where the credential comes from somewhere else, you can pass it instead as the `token` option.
+Also note that there is no token anywhere in sight. That's because `createBot` reads the conventional `DISCORD_TOKEN` environment variable from your `.env` file, so you don't have to wire it up manually. If it is missing, the bot fails at boot and prints a readable error to remind you that you need to set it. In the rare case where the credential comes from somewhere else, you can pass it instead as the `token` option.
 
 ### Instant command registration with a guild ID
 
@@ -64,7 +64,7 @@ Also note that there is no token anywhere in sight. That's because `createBot` r
 > Global slash commands can take up to an hour to propagate, so register them with a guild ID during development. Setting the `DISCORD_GUILD_ID` environment variable is all it takes:
 
 `/.env`
-```
+```text
 DISCORD_TOKEN=your-real-token
 DISCORD_GUILD_ID=your-server-id
 ```
@@ -80,9 +80,9 @@ The last missing piece of the entry point is the `start` call:
 void bot.start();
 ```
 
-This function starts the bot and logs it in. The `void` type annotation is intentional because we're not awaiting the promise; if the login fails, Node's unhandled-rejection handling stops the process and prints the reason, which is the right outcome for a boot script. The moment the login succeeds, fluxcord posts your derived commands to Discord and starts listening for interactions — nothing else is needed.
+This function starts the bot and logs it in. The `void` type annotation is intentional because we're not awaiting the promise; if the login fails, Node's unhandled-rejection handling stops the process and prints the reason, which is the right outcome for a boot script. The moment the login succeeds, fluxcord posts your derived commands to Discord and starts listening for interactions; nothing else is needed.
 
-For the curious: `createBot` takes more seams than the one field shown here, including a custom permission engine and a `registerCommands` callback that replaces the built-in registration entirely. Check out the [API reference](../reference/README.md) for more details.
+`createBot` takes more seams than the one field shown here: a custom permission engine and a `registerCommands` callback that replaces the built-in registration. The JSDoc on `createBot` covers both, and the [API Reference](../reference/README.md) collects the guide-level notes.
 
 ## Seeing it live
 
@@ -98,6 +98,6 @@ Once the terminal confirms that the bot is running, go to your test server and t
 
 If the command doesn't show up in the picker, double-check the `applications.commands` scope when inviting the bot and that your `DISCORD_GUILD_ID` matches your server's ID.
 
-## Next
+## Next steps
 
-That completes the getting started section! Now that you have a working development workflow, you can move on to the [Core concepts](../core-concepts/README.md) section to learn how state, navigation, custom controls, and modals work.
+That completes the getting-started section. Now that you have a working development workflow, you can move on to the [Core concepts](../core-concepts/README.md) section to learn how state, navigation, custom controls, and modals work.

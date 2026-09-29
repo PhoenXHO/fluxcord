@@ -6,14 +6,14 @@ Because Discord's Components V2 provides these visual surfaces natively, fluxcor
 
 ## The page heading
 
-The `<view>` component is the root surface for every screen, and its direct children stack vertically from top to bottom. A view accepts four kinds of children:
+The `<view>` tag is the root surface for every screen, and its direct children stack vertically from top to bottom. A view accepts four kinds of children:
 
 - `<text>` blocks for copy
 - `<row>` groups for controls
 - `<hr>` separators
 - `<container>` card panels
 
-Because `<view>` represents the whole message, it's the natural place for a page heading. When you pass the `title` prop, fluxcord automatically renders it as a markdown heading above everything else in the panel. We've carried "Dice:" in our body copy since the navigation chapter as a workaround for not having a dedicated heading, but now we can move it where it belongs:
+Because `<view>` represents the whole message, it's the natural place for a page heading. When you pass the `title` prop, fluxcord automatically renders it as a markdown heading above everything else in the panel. We've carried "Dice:" in our body copy since the [Screens and navigation](screens-and-navigation.md) chapter as a workaround for not having a dedicated heading, but now we can move it where it belongs:
 
 ```tsx
 <view title="Dice">
@@ -27,7 +27,7 @@ Because `<view>` represents the whole message, it's the natural place for a page
 </view>
 ```
 
-Discord itself has no native heading component, so fluxcord folds the title under the hood into a text block whose body starts with `# Dice`. You won't ever need to write that markdown manually, though, since the prop provides the whole interface.
+Discord itself has no native heading component, so fluxcord builds the title into a text block whose body starts with `# Dice`. You won't ever need to write that markdown manually, though, since the prop provides the whole interface.
 
 ## Separators
 
@@ -43,9 +43,9 @@ To signal that adjacent sections play different roles, you can separate them wit
 </view>
 ```
 
-While the tag's defaults usually give you what you want, you can customize the spacing through two optional flags:
+While the tag's defaults usually give you what you want, it takes three optional flags:
 
-- `p-large` swaps the small padding for large
+- `p-small` and `p-large` pick the padding size, with small as the default
 - `no-divider` keeps the padding but skips the visible line, so the hr becomes pure spacing
 
 ## The container panel
@@ -63,13 +63,13 @@ const rulesScreen = screen<DiceData>()((_data, { Back }) => (
 ));
 ```
 
-Containers can hold text blocks, action rows, and separators, but you can't nest one container inside another — the type checker rejects that before the panel ever builds, and it's a Discord limitation. Omitting the `color` prop simply renders a neutral panel.
+Containers can hold text blocks, action rows, and separators, but you can't nest one container inside another. That's a Discord limitation, and fluxcord enforces it the moment the panel draws: an illegal nesting throws there rather than at compile time, because the TSX layer type-checks each tag's props but leaves child positions to the validator. Omitting the `color` prop simply renders a neutral panel.
 
 Notice the bare `<Back />` at the bottom of the panel. Containers share the view's layout behavior here: any control dropped straight into a container automatically receives its own row, exactly as the [Controls](controls.md) chapter describes for bare controls in a view.
 
 ## Text dressings and callouts
 
-The `<text>` tag folds everything you place inside it into a single markdown body, and you can style it further using specific props and formatting tags.
+The `<text>` tag folds the copy you place inside it into a single markdown body, and you can style it further using specific props and formatting tags.
 
 Setting the `title` prop on a text block adds a bold line directly above the body. While the view's main title names the overall screen, a text title is ideal for labeling an individual block within it, such as the "House rules" header in our rules card.
 
@@ -93,9 +93,9 @@ const aboutScreen = screen<DiceData>()((_data, { Back }) => (
 
 ## Fragments
 
-Our remaining layout tool isn't a custom tag at all, but rather JSX fragment syntax (`<></>`). Fragments group children in your source and splice them flat into whatever container holds them; arrays splice the exact same way, so a helper that constructs several blocks can simply return a plain array. Because a fragment is purely an authoring convenience, nothing about it survives into the built tree.
+The last layout tool is plain JSX fragment syntax (`<></>`), not a custom tag. Fragments group children in your source and splice them flat into whatever container holds them; arrays splice the exact same way, so a helper that constructs several blocks can simply return a plain array. Because a fragment is purely an authoring convenience, nothing about it survives into the built tree.
 
-This grouping behavior makes fragments especially handy for conditional blocks, since the JSX drop rules apply to the whole group:
+This grouping behavior makes fragments especially handy for conditional blocks, since the JSX drop rules apply to the whole group. Say we sketched a hint shown only for some rounds:
 
 ```tsx
 <view title="Dice">
@@ -110,7 +110,15 @@ This grouping behavior makes fragments especially handy for conditional blocks, 
 </view>
 ```
 
-One trick to keep in mind is that when you return a fragment as a screen's root instead of `<view>...</view>`, fluxcord automatically wraps it in a synthetic `<view>` so the fragment's children nest inside the view's body. This only applies to views, though; modals get no such leeway, since their root must be an actual `<modal>` element.
+> [!NOTE]
+> Screens don't actually require a `<view>` at the top: you can return a single control or group items under a bare `<container>` or a fragment. Whenever you do, fluxcord wraps whatever came back in a synthetic `<view>` before the panel renders, because that wrapper is what turns the message into a component message. Returning a fragment reads especially naturally since its children land directly in the view's body; the only thing you give up by skipping the wrapper is its `title` prop, which draws a heading line at the top of the panel. Because a JSX function can only return a single value, you'll still need some grouping when a screen has multiple children, though fragments, arrays, `<view>` elements, and `<container>` elements all do that job with the same wrapped result.
+
+<!-- -->
+
+> [!IMPORTANT]
+> Modals don't get this leeway; a modal's root must be an actual `<modal>` element.
+
+<!-- -->
 
 > [!CAUTION]
 > ```tsx
@@ -120,6 +128,6 @@ One trick to keep in mind is that when you return a fragment as a screen's root 
 > </>
 > ```
 
-## Next
+## Next steps
 
-While the dice panel finally looks the part, everything it does still lives inside one message. In [Modals](modals.md), we'll pop a dialog up over the panel to collect input that deserves its own surface, which is also where checkboxes and forms have been waiting.
+While the dice panel finally looks the part, everything it does still lives inside one message. In [Modals](modals.md), we'll pop a dialog up over the panel to collect input that deserves its own surface, and it also covers checkboxes and forms.

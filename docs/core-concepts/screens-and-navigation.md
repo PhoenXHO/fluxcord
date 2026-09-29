@@ -1,12 +1,12 @@
 # Screens and navigation
 
-A single screen worked fine for our about panel, but most interactive panels outgrow a single view pretty quickly. Users need menus to explore different options and straightforward ways to get back where they started. In this chapter, we will start building the dice panel (our main ongoing example throughout the guide) by laying out a simple menu and a couple of destination screens.
+A single screen worked fine for our about panel, but most interactive panels outgrow a single view quickly. Users need menus to explore different options and straightforward ways to get back where they started. In this chapter, we will start building the dice panel (our main ongoing example throughout the guide) by laying out a simple menu and a couple of destination screens.
 
-We will place this code in `src/apps/dice.tsx`, which will match [`examples/src/apps/dice.tsx`](../../../examples/src/apps/dice.tsx) once finished. Much like the about panel, we are not adding session data just yet. Navigation itself is stateless, so we will save state management for the next chapter when we wire up the actual rolling logic.
+We will place this code in `src/modules/dice.tsx`, which will match [`examples/src/modules/dice.tsx`](../../examples/src/modules/dice.tsx) once finished. Like the about panel, the dice panel gets no session data yet. Navigation needs no session data of its own, so we will save state management for the next chapter when we wire up the actual rolling logic.
 
 ## The menu screen
 
-Open up `src/apps/dice.tsx` and define the landing screen:
+Open up `src/modules/dice.tsx` and define the landing screen:
 
 ```tsx
 const menuScreen = screen()((_data, { Button, Back }) => (
@@ -23,15 +23,15 @@ const menuScreen = screen()((_data, { Button, Back }) => (
 ));
 ```
 
-Every screen receives two arguments: session state and the screen kit. We skipped both in the about panel because it did not need them. The first parameter holds session data, which we are prefixing with an underscore (`_data`) for now because we will put it to work in the next chapter. The second argument supplies the screen kit, giving you access to fluxcord's context-aware UI components.
+Every screen receives three arguments: session state, the screen kit, and a read-only session snapshot. The about panel skipped all three because it did not need them. The first parameter holds session data, which we are prefixing with an underscore (`_data`) for now because we will use it in the next chapter. The second argument supplies the screen kit, giving you access to fluxcord's context-aware UI components. The third argument is a read-only view of the session itself, and it waits for the [Sessions and expiry](sessions-and-expiry.md) chapter to explain how it works.
 
-Unlike the standard layout elements we used earlier, the `Button` component comes from the kit rather than the standard tag vocabulary because of its `onClick` prop. This is because kit component handlers are strongly typed against their parent flow, meaning the received event knows all valid screens in that flow to keep navigation calls safe. Inside the handler, `e.ui` is the panel's steering wheel, and `e.ui.go('rules')` transitions the session to the screen registered under the `rules` key in the flow definition below.
+Unlike the standard layout elements we used earlier, the `Button` component comes from the kit rather than the standard tag vocabulary, and its handlers are strongly typed against the parent flow, meaning the received event knows all valid screens in that flow to keep navigation calls safe. Inside the handler, `e.ui` is the panel's navigation toolkit, and `e.ui.go('rules')` transitions the session to the screen registered under the `rules` key in the flow definition below.
 
-_The `e` parameter is the click event, which is an [ActionEvent](../reference/README.md)._
+_The `e` parameter is the click event, which is an `ActionEvent`._
 
 ## The back button
 
-A menu is only half of navigation because destinations require a way back home. Here is the rules screen:
+Destinations need a way back, so the rules screen gets a `Back` button. Here is the rules screen:
 
 ```tsx
 const rulesScreen = screen()((_data, { Back }) => (
@@ -51,11 +51,11 @@ Similar to the `Button` component, the `Back` component comes from the screen ki
 
 ## Navigation verbs: `go`, `push`, and `back`
 
-The screen kit provides three navigation verbs, though `go` is usually the one you'll reach for most. Here's how they work:
+The event's `ui` toolkit provides three navigation verbs, though `go` is the one you'll reach for most. Here's how they work:
 
 - `back` pops exactly one entry without naming a target, which is what the `Back` button invokes internally. If the stack is empty, the `back` method performs no action.
-- `push` always appends to the history, which suits linear workflows where revisiting means a fresh step, such as a wizard's next page.
-- `go` is the combination of the two: it checks if the target screen already sits in the session's history. If so, it pops back to it and discards everything above it; otherwise, it pushes the screen on top. This keeps menu loops clean so users can bounce between multiple screens without growing a long tail of duplicated screens.
+- `push` always appends to the history, which suits linear workflows where revisiting means a fresh step, such as a wizard's next page. Pushing the screen you are already on does nothing.
+- `go` is the combination of the two: it checks if the target screen already sits in the session's history. If so, it pops back to it and discards everything above it; otherwise, it pushes the screen on top. Like `push`, it does nothing when the target is the screen you are already on. This keeps menu loops clean so users can move between screens without the stack filling with duplicates.
 
 ## The flow
 
@@ -93,6 +93,6 @@ const bot = createBot({
 
 Rebuild and restart your bot, then run `/dice`. Try navigating between the menu and the other screens to see how the history stack updates in real time.
 
-## Next
+## Next steps
 
 Now that navigation is working, the dice panel is ready for interactive logic. In [State and actions](state-and-actions.md), we will add session data and click handlers to make rolling the die work.

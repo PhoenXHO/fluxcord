@@ -6,11 +6,11 @@ We will start with a minimal counter panel to make the core mechanics clear, the
 
 ## The counter panel
 
-The counter is the hello world of stateful UIs, representing a simple number on screen alongside buttons that increment or decrement it. Small as it is, it exercises the full loop we're focusing on in this chapter because a click has to change the underlying data so that the screen can redraw with the updated value.
+The counter is the hello world of stateful UIs, representing a simple number on screen alongside buttons that increment or decrement it. It is small, but it exercises the full loop we're focusing on in this chapter because a click has to change the underlying data so that the screen can redraw with the updated value.
 
-The panel lives in `src/apps/counter.tsx`, which mirrors [`examples/src/apps/counter.tsx`](../../../examples/src/apps/counter.tsx). As always, we start with the data shape because the structure of the data dictates how everything else is built:
+The panel lives in `src/modules/counter.tsx`, which mirrors [`examples/src/modules/counter.tsx`](../../examples/src/modules/counter.tsx). As always, we start with the data shape because the structure of the data dictates how everything else is built:
 
-`/src/apps/counter.tsx`
+`/src/modules/counter.tsx`
 ```tsx
 import { action, command, flow, mounts, screen } from 'fluxcord';
 
@@ -19,7 +19,7 @@ interface CounterData {
 }
 ```
 
-Every flow holds a single bag of data for its entire lifecycle. The `CounterData` describes what our counter flow's bag looks like, which in this case consists of a single number.
+Every session holds a single bag of data for its entire lifecycle. The `CounterData` interface gives the bag its shape: a single number.
 
 Next, we'll write the two handlers, which are worth reading closely since the pattern here establishes the standard shape for every handler you'll write in fluxcord:
 
@@ -37,10 +37,11 @@ const minus = action<CounterData>()((event) => {
 });
 ```
 
-Just like `screen`, action handlers use the `action` factory, which uses a two-step function signature to stamp the handler with the data type it works on. The first call, `action<CounterData>()`, binds the handler to our specific data type for strict typechecking. The second call takes the actual handler callback that runs whenever a user interacts with the control that the action is bound to. Inside this callback, `event.mutate` hands you a mutable reference to the session's data so that you can change it like an ordinary object and fluxcord automatically handles the rest by re-rendering the current screen so that users see the updated count without you ever having to touch the message yourself.
+Like `screen()`, the `action` factory takes two calls. The first, `action<CounterData>()`, binds the data type for strict typechecking; the second takes the handler callback that runs whenever a user interacts with the control that the action is bound to. Inside this callback, `event.mutate` hands you a mutable reference to the session's data so that you can change it like an ordinary object, and fluxcord automatically handles the rest by redrawing the current screen so that users see the updated count without you ever having to touch the message yourself.
 
-Why go through `mutate` instead of writing to the session's data directly?  
-Because `mutate` is how fluxcord notices that data changed. The moment you call it, the redraw is scheduled, so the screen cannot drift out of sync with your handler. The call also splits a handler into two phases: anything fallible, such as an API call or a database write, belongs before the mutation. If that work fails after you've already mutated, the user is left looking at a state the failure contradicts. The event's `task` helper puts this rule into practice; it runs a promise for you, and it throws if a mutate has already happened. Wrapping fallible work in `task` is what places it under that guard. The [Errors](errors.md) chapter goes into more detail on this.
+Why go through `mutate` instead of writing to the session's data directly?
+
+Every successful handler is followed by one automatic redraw that renders the bag as it stands, so even a bare write reaches the screen. What `mutate` adds is discipline: it applies your change immediately and marks the event as mutated, which is what the `task` guard checks. That guard matters because a handler that throws never redraws; the message keeps its last good render while the bag already contains the change, leaving the two out of sync. Anything fallible, such as an API call or a database write, therefore belongs before the mutation. If that work fails after you've already mutated, the bag is ahead of what the user sees. The event's `task` helper puts this rule into practice; it runs a promise for you, and it throws if a mutate has already happened. Wrapping fallible work in `task` is what places it under that guard. The [Errors](errors.md) chapter goes into more detail on this.
 
 Both phases in one handler:
 
@@ -64,7 +65,7 @@ const save = action<SettingsData>()(async e => {
 > ```
 > Every `task` call after a mutate dies with an error. Always do the fallible work first inside `task`.
 
-Flows that nest inside other flows give `mutate` a second job: in [Subflows](subflows.md), a nested screen's `mutate` writes to its own slice of the parent's data, while a bare write to `event.session.data` skips that path and corrupts the outer flow's bag.
+In [Subflows](subflows.md), flows nest inside other flows, and the lens slices automatically: on a nested screen, `event.session.data` already is the parent's slot, so even a bare write lands in the right place. A bare write just never sets the mutated mark, and only that mark makes `task` throw.
 
 Now, with our handlers defined, the screen can read from `data` and bind those handlers directly to buttons:
 
@@ -80,7 +81,7 @@ const counterScreen = screen<CounterData>()((data, { Button }) => (
 ));
 ```
 
-Two specific details stand out here. First, the screen receives the data bag as its first argument (the one we underscored and ignored in the previous chapter), but inside the view that bag is strictly read-only, which means TypeScript will reject any attempt to write to `data.count` there. We maintain this deliberate split because views should only render while handlers handle mutations; keeping these responsibilities separate allows the framework to know exactly when a redraw is necessary.
+Two specific details stand out here. First, the screen receives the data bag as its first argument (the one we underscored and ignored in the previous chapter), but inside the view that bag is strictly read-only, which means TypeScript will reject any attempt to write to `data.count` there. We maintain this deliberate split because views should only render while handlers handle mutations; the split means the redraw shows whatever the bag holds once your handler finishes.
 
 _The `secondary` prop on the minus button renders Discord's gray style, though we'll explore the rest of the available styles in the next chapter._
 
@@ -117,13 +118,13 @@ const bot = createBot({
 });
 ```
 
-Once you rebuild and restart your bot, you can run `/counter` and click the buttons to watch the count move; since every click triggers your handler to mutate the bag, the screen redraws automatically to reflect the update.
+Once you rebuild and restart your bot, you can run `/counter` and click the buttons to watch the count move, and fluxcord redraws the screen each time, as before.
 
 ## Rolling the die
 
 Now that the mechanics are in place, we can make the dice panel remember rolls by setting up a data interface along with a roll action to update it.
 
-After opening `src/apps/dice.tsx` (finished version lives at [`examples/src/apps/dice.tsx`](../../../examples/src/apps/dice.tsx)), we'll define the shared bag first; because every screen in a flow shares a single data type, we declare the interface at the top of the file:
+After opening `src/modules/dice.tsx` (finished version lives at [`examples/src/modules/dice.tsx`](../../examples/src/modules/dice.tsx)), we'll define the shared bag first; because every screen here works on the same bag, we declare the interface at the top of the file:
 
 ```tsx
 interface DiceData {
@@ -131,14 +132,14 @@ interface DiceData {
 }
 ```
 
-The `roll` field is optional because a fresh panel doesn't have a roll to show yet. Since we're omitting `initialData` this time, every session starts from an empty bag where `data.roll` is `undefined` until the first click lands. Both forms are perfectly valid, so you should pick whichever matches the flow's needs; a flow with a meaningful starting state declares it while one without can simply skip the ceremony.
+The `roll` field is optional because a fresh panel doesn't have a roll to show yet. Since we're omitting `initialData` this time, every session starts from an empty bag where `data.roll` is `undefined` until the first click lands. Both forms are perfectly valid, so you should pick whichever matches the flow's needs; a flow with a meaningful starting state declares it while one without can omit it.
 
 Next, we'll place the action above the screens that bind it so that it's available during definition:
 
 ```tsx
 const roll = action<DiceData>()(e => {
 	e.mutate(d => {
-		d.roll = 1 + Math.floor(Math.random() * 6);  // roll a number from 1 to 6
+		d.roll = 1 + Math.floor(Math.random() * 6);
 	});
 });
 ```
@@ -161,7 +162,7 @@ const rollScreen = screen<DiceData>()((data, { Button, Back }) => (
 ));
 ```
 
-The ternary expression handles this by picking the text based on whether a roll exists yet; because the action mutates the bag after each click, fluxcord automatically redraws this same screen with the new number so that repeated clicks will simply re-roll.
+The ternary expression picks the text based on whether a roll exists yet, and fluxcord redraws the screen after each click, so repeated clicks simply re-roll.
 
 To link this up, the menu's button row gains an entry pointing directly at the new screen:
 
@@ -169,7 +170,21 @@ To link this up, the menu's button row gains an entry pointing directly at the n
 <Button onClick={e => e.ui.go('roll')} label="Roll" />
 ```
 
-And finally, register `rollScreen` in the flow. Since the flow now states its bag type explicitly, TypeScript can use that definition to check every screen in the map; as a result, any screen that doesn't accept `DiceData` will fail to compile:
+And finally, register `rollScreen` in the flow. Since the flow now states its bag type explicitly, TypeScript can use that definition to check every screen in the map; as a result, any screen that doesn't accept `DiceData` will fail to compile. That check includes the three screens we wrote in the previous chapter, so each gets a small retype first: they were plain `screen()` calls when they had no data to work with, and now they become `screen<DiceData>()`, with `_data` staying underscored exactly as it was:
+
+```tsx
+const menuScreen = screen<DiceData>()((_data, { Button, Back }) => (
+	// ...unchanged from the previous chapter
+));
+
+const rulesScreen = screen<DiceData>()((_data, { Back }) => (
+	// ...unchanged from the previous chapter
+));
+
+const aboutScreen = screen<DiceData>()((_data, { Back }) => (
+	// ...unchanged from the previous chapter
+));
+```
 
 ```tsx
 export const diceFlow = flow<DiceData>('dice', {
@@ -178,8 +193,8 @@ export const diceFlow = flow<DiceData>('dice', {
 });
 ```
 
-Once you rebuild and restart, you can run `/dice` to roll a few times and then try leaving to the menu and coming back; you'll find that your last result is still on the screen because the bag belongs to the session, meaning navigation only changes which screen renders it. State outlives navigation.
+Once you rebuild and restart, you can run `/dice` to roll a few times and then try leaving to the menu and coming back; you'll find that your last result is still on the screen because the bag belongs to the session, which navigation doesn't touch.
 
-## Next
+## Next steps
 
 Although the dice panel now has both halves of navigation and state, its controls are still limited to plain buttons. In [Controls](controls.md), we'll widen our vocabulary by introducing button style flags and the select menu.

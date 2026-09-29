@@ -7,10 +7,10 @@ The getting-started chapters left you with a small but complete bot. The core-co
 - [Controls](controls.md) — Buttons, selects, and the values handlers receive.
 - [Layout and content](layout-and-content.md) — Structure your panels with headings, separators, containers, and text dressings.
 - [Modals](modals.md) — Pop up modal dialogs to collect user input.
-- Subflows — Nest UI flows inside parent flows for modular layouts.
-- Commands and mounting — Attach flows to slash commands, including subcommands and permission knobs.
-- Permission gates — Control who can interact with specific components.
-- Sessions and expiry — Manage panel lifecycles and clean up inactive sessions.
-- Errors — Decide what users see when a handler fails.
-- Live panels — Hook into external events to trigger real-time panel updates.
-- Persistence — Save and restore active sessions across bot restarts.
+- [Subflows](subflows.md) — Nest UI flows inside parent flows for modular layouts.
+- [Commands and mounting](commands-and-mounting.md) — Attach flows to slash commands, including subcommands and permission knobs.
+- [Permission gates](permission-gates.md) — Control who can interact with specific components.
+- [Sessions and expiry](sessions-and-expiry.md) — Manage panel lifecycles and clean up inactive sessions.
+- [Errors](errors.md) — Decide what users see when a handler fails.
+- [Live panels](live-panels.md) — Hook into external events to trigger real-time panel updates.
+- [Persistence](persistence.md) — Save and restore active sessions across bot restarts.

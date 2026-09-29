@@ -1,12 +1,12 @@
 # Your first panel
 
-Now that the project is structured, let's build your first interactive element: a simple "about" panel containing a line of text and a link button. We're keeping this initial panel stateless on purpose. Since panels don't actually require state to exist, skipping it for now keeps things lean. We'll introduce state in a later chapter when there's a practical reason to use it.
+Now that the project is structured, let's build your first interactive element: a simple "about" panel containing a line of text and a link button. We're keeping this initial panel stateless on purpose. Since panels don't actually require state to exist, skipping it for now keeps the example small. We'll introduce state in a later chapter when there's a practical reason to use it.
 
-If you caught the example in the README, you might have seen a slightly more involved setup; a counter with buttons and dynamic state. Here, we're taking a step back to build things up from the absolute basics. Everything we write in this chapter lives in `src/apps/about.tsx`, which will match the completed file in [`examples/src/apps/about.tsx`](../../../examples/src/apps/about.tsx) by the end.
+If you caught the example in the README, you might have seen a slightly more involved setup; a counter with buttons and dynamic state. Here, we're taking a step back to build things up from the absolute basics. Everything we write in this chapter lives in `src/modules/about.tsx`, which will match the completed file in [`examples/src/modules/about.tsx`](../../examples/src/modules/about.tsx) by the end.
 
 ## The screen
 
-A panel's layout is defined inside a screen, which is essentially just a function that returns TSX. To get started, open `src/apps/about.tsx` and define the screen layout:
+A panel's layout is defined inside a screen, which is a function that returns TSX. To get started, open `src/modules/about.tsx` and define the screen layout:
 
 ```tsx
 const aboutScreen = screen()(() => (
@@ -31,7 +31,7 @@ const aboutScreen = makeScreen(() => (
 )); // ...and that function receives the view
 ```
 
-`screen()` is the framework's screen factory. Since the screen is stateless, the factory call stays empty; a stateful screen would use it to declare its data type, as we'll see later. With no data to read, the view function takes no arguments either — there is simply no session state to pass down.
+`screen()` is the framework's screen factory. Since the screen is stateless, the factory call stays empty; a stateful screen would use it to declare its data type, as we'll see later. With no data to read, the view function takes no arguments either, since there is no session state to pass down.
 
 The parentheses around the JSX are plain JavaScript, not part of the tag vocabulary: they bundle the multi-line element into the single expression the arrow function returns.
 
@@ -57,7 +57,7 @@ export const aboutFlow = flow('about', {
 });
 ```
 
-The first argument sets the flow's unique ID within your bot. The `screens` object maps out the available views, and `first` specifies which screen renders when the panel opens. Because this flow doesn't track any custom data, there's no state to declare — fluxcord initializes it with an empty state object automatically.
+The first argument sets the flow's unique ID within your bot. The `screens` object maps out the available views, and `first` specifies which screen renders when the panel opens. Because this flow doesn't track any custom data, there's no state to declare; fluxcord initializes an empty state object automatically.
 
 ## The command
 
@@ -82,6 +82,6 @@ The `mount: mounts(aboutFlow)` part is the most interesting: it tells fluxcord t
 
 Keep in mind that the command definition is a pure declaration: it doesn't touch the bot's state, and it doesn't reach Discord on its own. We still need to register it with our bot instance.
 
-## Next
+## Next steps
 
-At this point, you have a complete mini-app composed of a screen, a flow, and a mounting command. Your file should now match the reference example `examples/src/apps/about.tsx`. Head over to [Hosting and commands](hosting-and-commands.md) to wire this up using `createBot` and see it live!
+At this point, you have a complete, working panel: a screen, a flow, and a mounting command that opens it. Your file should now match the reference example `examples/src/modules/about.tsx`. Head over to [Hosting and commands](hosting-and-commands.md) to wire this up using `createBot` and see it running.

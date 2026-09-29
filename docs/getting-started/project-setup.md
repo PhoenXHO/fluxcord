@@ -8,7 +8,7 @@ Everything we write lives under the `src/` directory. The entry point sits direc
 
 By the end of this chapter the project looks like this:
 
-```
+```text
 my-bot/
 ├── .env
 ├── .gitignore
@@ -34,7 +34,7 @@ Your bot authenticates with Discord using a token.
 Create a `.env` file in the root of your project:
 
 `/.env`
-```
+```text
 DISCORD_TOKEN=your-token-here
 ```
 
@@ -43,7 +43,7 @@ We'll replace this placeholder with a real token in the [Hosting and commands](h
 If you're using git, create a `.gitignore` file as well so the token and the build output never get committed:
 
 `/.gitignore`
-```
+```text
 node_modules/
 dist/
 .env
@@ -81,14 +81,14 @@ TypeScript needs to be compiled before Node can run it, so add three scripts to 
 }
 ```
 
-Running `npm run build` compiles everything in `src/` to JavaScript inside `dist/`, while `npm run start` executes the built output. During development, rebuilding and restarting by hand after every change wears thin fast, so the `dev` script runs the bot under Node's built-in `--watch` mode, which restarts it whenever the compiled output in `dist/` changes. The compiled output still needs producing, so the watch workflow is two terminals:
+Running `npm run build` compiles everything in `src/` to JavaScript inside `dist/`, while `npm run start` executes the built output. During development, rebuilding and restarting by hand after every change gets tedious fast, so the `dev` script runs the bot under Node's built-in `--watch` mode, which restarts it whenever the compiled output in `dist/` changes. The compiled output still needs producing, so the watch workflow is two terminals:
 
 ```bash
 npx tsc --watch
 npm run dev
 ```
 
-TypeScript recompiles on every save in the first, Node restarts the bot in the second, and together they turn the edit loop into save and wait, with nothing to install.
+TypeScript recompiles on every save in the first, Node restarts the bot in the second, so the edit loop is: save, then wait, with nothing to install.
 
 > [!TIP]
 > The `--env-file=.env` flag is built right into Node 22+, so there's no need to install third-party packages like `dotenv`.
@@ -101,6 +101,6 @@ npm run build && npm run start
 
 If everything is configured correctly, you should see `DISCORD_TOKEN is set` printed in your terminal. This confirms that TypeScript compiles cleanly, Node runs the output, and your environment variables are loaded properly.
 
-## Next
+## Next steps
 
 With your build toolchain and environment fully configured, you're ready to write real code. In [Your first panel](your-first-panel.md) you'll write a quick, stateless about panel.

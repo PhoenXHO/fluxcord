@@ -4,9 +4,9 @@
 
 Before getting started, make sure you have the following ready:
 
-- **Node.js 22 or newer.** Older Node lines are end-of-life, and fluxcord is tested on 22 and 24.
-- **A Discord bot token.** If you don't have one yet, the [Hosting and commands](hosting-and-commands.md) page walks you through creating the application and inviting the bot.
-- **TypeScript.** Panels are written as TSX views, so the project needs to be TypeScript.
+- Node.js 22 or newer: Older Node lines are end-of-life, and fluxcord is tested on 22 and 24.
+- A Discord bot token: If you don't have one yet, the [Hosting and commands](hosting-and-commands.md) chapter walks you through creating the application and inviting the bot.
+- TypeScript: Panels are written as TSX views, so the project needs to be TypeScript.
 
 ## Create the project
 
@@ -83,8 +83,8 @@ Two of these options are what make fluxcord work. `jsx: "react-jsx"` tells TypeS
 > [!IMPORTANT]
 > Keep `moduleResolution` on `Node16` or `NodeNext`. Those are the modes that read package export maps; with the older default, `import 'fluxcord/discord'` won't resolve.
 
-The rest of the file is a standard strict-mode setup. While strict mode isn't strictly enforced by fluxcord, its type inference works best when it is enabled.
+The rest of the file is a standard strict-mode setup. fluxcord doesn't require strict mode, but its type inference works best with it on.
 
-## Next
+## Next steps
 
 With the project in place, head over to [Project setup](project-setup.md) to set up your directory structure, entry point, and build scripts.

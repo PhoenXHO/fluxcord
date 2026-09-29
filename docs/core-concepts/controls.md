@@ -1,10 +1,10 @@
 # Controls
 
-Even though our dice panel now handles state and navigation, its controls are still the plain blurple buttons we started with. In this chapter, we'll expand what it can accept by adding button style flags alongside a select menu that brings the rules screen to life. Because checkboxes and text inputs belong in modal dialogs, we'll cover those separately in the [Modals](modals.md) chapter. We'll wrap up by wiring a reset button to the round, since a data bag this easy to change deserves an equally straightforward way to clear it out.
+Even though our dice panel now handles state and navigation, its controls are still the plain blurple buttons we started with. In this chapter, we'll expand what it can accept by adding button style flags alongside a select menu that lets the roll screen deliver on the rules screen's promise. Because checkboxes and text inputs belong in modal dialogs, we'll cover those separately in the [Modals](modals.md) chapter. We'll wrap up by wiring a reset button, since the round needs a simple way to reset.
 
 ## Button styles
 
-Every button renders in one of Discord's four faces, which you choose by passing a style flag: `primary` (blurple), `secondary` (gray), `success` (green), or `danger` (red). We've already been using these without naming them directly; for example, the counter's minus button used `secondary` because cancel-adjacent actions read much clearer in gray. Buttons default to `primary` when you don't specify a flag, so passing any other flag overrides that baseline.
+Every button renders in one of Discord's four button styles, which you choose by passing a style flag: `primary` (blurple), `secondary` (gray), `success` (green), or `danger` (red). We've already used one of these; the counter's minus button took `secondary` because actions next to cancel read more clearly in gray. Buttons default to `primary` when you don't specify a flag, so passing any other flag overrides that baseline.
 
 To render a green button, pass the `success` flag:
 
@@ -26,7 +26,7 @@ Since style flags are plain props, a button's appearance can react dynamically t
 
 Because Discord arranges interactive elements into horizontal action rows, fluxcord mirrors that structure directly in markup by placing controls like buttons and selects inside a `<row>`, which can hold up to five items. You've already encountered this convention, since the counter's minus and plus buttons shared a row to keep related actions paired together.
 
-fluxcord forgives lone controls, though; dropping a button straight into a view automatically allocates it a dedicated row at render time, which is why a lone `Back` button never needed any wrapping boilerplate in our previous screens:
+fluxcord also accepts a lone control; it gets its own row at render time, which is why a lone `Back` button never needed any wrapping boilerplate in our previous screens:
 
 ```tsx
 <view>
@@ -35,7 +35,7 @@ fluxcord forgives lone controls, though; dropping a button straight into a view 
 </view>
 ```
 
-Since both spellings produce identical layouts, writing an explicit `<row>` acts as a design statement rather than pure mechanics: controls only share horizontal space when you deliberately group them.
+Since both spellings produce identical layouts, writing an explicit `<row>` says the controls belong together; a bare control gets its own row either way (unless it's already inside a `<row>`).
 
 ## Calling a number
 
@@ -55,19 +55,19 @@ const calls = [1, 2, 3, 4, 5, 6].map(n => ({
 
 Every option requires a `label` to show the user and a `value` for your handler to receive; we separate these because labels act as user-facing copy while values serve as stable identifiers for your code. Since they coincide in this particular case, we can derive both from the same number.
 
-We'll destructure the `Select` component from the screen kit and write a handler that looks like any other action; you can find the complete implementation in the finished app at [`examples/src/apps/dice.tsx`](../../../examples/src/apps/dice.tsx):
+We'll destructure the `Select` component from the screen kit and write a handler that looks like any other action; you can find the complete implementation in the finished module at [`examples/src/modules/dice.tsx`](../../examples/src/modules/dice.tsx):
 
 ```tsx
 const call = action<DiceData>()(e => {
-	const pick = e.values?.[0];  // event.values can be undefined, so we guard first before indexing
-	if (pick === undefined) return;  // no-op if the user didn't pick anything
+	const pick = e.values?.[0];
+	if (pick === undefined) return;
 	e.mutate(d => {
 		d.call = Number(pick);
 	});
 });
 ```
 
-Because Discord selects can accept multiple choices simultaneously, any selection arrives through `event.values` as an array of strings. Since this event payload is shared across all control types, that `values` array remains optional; using `e.values?.[0]` lets your handler safely read the first selection when no selection arrived.
+Because Discord selects can accept multiple choices simultaneously, any selection arrives through `event.values` as an array of strings. Since this event payload is shared across all control types, that `values` array remains optional; using `e.values?.[0]` lets your handler safely read the first selection even when no selection arrived.
 
 The guard clause (`if (pick === undefined) return;`) keeps your data bag intact if an empty selection slips through. While Discord typically prevents users from submitting a required select without choosing an item, guarding the branch remains good practice because it keeps unexpected payloads from silently corrupting state.
 
@@ -112,7 +112,7 @@ const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
 Notice that our select sits directly in the `<view>` without an enclosing `<row>`, whereas Roll and Back are grouped together. This takes advantage of the single-control shorthand we saw earlier: fluxcord wraps the select in its own row automatically, while leaving the buttons paired inside an explicit row because they belong together.
 
 > [!IMPORTANT]
-> Even though a single row accommodates up to five buttons, Discord forbids mixing buttons and selects in the same row; fluxcord will reject any layout containing that combination as soon as it builds:
+> Even though a single row accommodates up to five buttons, Discord forbids mixing buttons and selects in the same row; fluxcord will reject any layout containing that combination as soon as the panel draws:
 >
 > ```tsx
 > // throws: row with a select must have exactly one child, got 2
@@ -124,11 +124,11 @@ Notice that our select sits directly in the `<view>` without an enclosing `<row>
 >
 > You can only have one select per row without any other controls, or up to five buttons.
 
-Conditional styling makes this layout expressive: every prop reads straight from the data bag, so the controls join the same reactive cycle the screen already rides. The Roll button stays unclickable until you pick a number, then turns green while it waits for the click. The `placeholder` prop sets the preview text shown before you choose an option.
+Conditional styling makes this layout expressive: every prop reads straight from the data bag, so every redraw updates the controls along with the text. The Roll button stays unclickable until you pick a number, then turns green while it waits for the click. The `placeholder` prop sets the preview text shown before you choose an option.
 
-Selects accept the same `disabled` prop as buttons, and our roll screen puts it to work: once the die has landed, the menu greys out and the Roll button locks right along with it, so the finished round can't be tampered with. Everything stays locked until the reset button at the end of this chapter reopens the table.
+Selects accept the same `disabled` prop as buttons, and our roll screen puts it to work: once the die has landed, the select grays out and the Roll button locks right along with it, so the finished round can't be tampered with. Everything stays locked until the reset button at the end of this chapter reopens the table.
 
-We'll define the headline as a plain TypeScript function right above the screen. We don't need any framework magic here because views are just standard TypeScript; this means any complex text formatting can live in a dedicated helper function where you can test and maintain it easily:
+We'll define the headline as a plain TypeScript function right above the screen. Views are plain TypeScript, so the formatting can live in a helper function you can test directly:
 
 ```tsx
 function headline({ call, roll }: DiceData): string {
@@ -147,11 +147,11 @@ Once you rebuild and restart your bot, run `/dice` to test a complete round. Aft
 
 ## Multi-select
 
-While our dice game only needs a single choice, selects accept two optional props that enable multi-selection when required. By configuring `minSelected` and `maxSelected`, you can let users choose multiple items before submitting; for example, setting `maxSelected={3}` caps their selection at three entries. Discord allows these bounds anywhere from 0 to 25. The component defaults to expecting exactly one item if you omit both properties.
+While our dice game only needs a single choice, selects accept two optional props that enable multi-selection when required. By configuring `minSelected` and `maxSelected`, you can let users choose multiple items before submitting; for example, setting `maxSelected={3}` caps their selection at three entries. `minSelected` can be 0, while `maxSelected` starts at 1; both cap at 25. The component defaults to exactly one item if you omit both properties.
 
 ## Preselecting options
 
-A select can also open with choices already highlighted, which you set up in static markup by marking each target entry with the `default` flag; you can add this flag to any number of options as long as the total count stays within the selection cap:
+A select can also open with choices already selected, which you set up in static markup by marking each target entry with the `default` flag; you can add this flag to any number of options as long as the total count stays within the selection cap:
 
 ```tsx
 <Select placeholder="Pick a number" onSelect={setNumber}>
@@ -160,13 +160,13 @@ A select can also open with choices already highlighted, which you set up in sta
 </Select>
 ```
 
-Because that flag is authoring-time markup, the same entries light up on every render, whatever the session is doing. Our dice panel would feel that immediately: after you pick a number and roll, the redrawn menu snaps straight back to its placeholder even though the headline still remembers your call. If you want the selection to travel with session state, you'll need the `values` prop instead; it expects the plain `value` strings of the options to highlight (not indices or IDs). Since our builders clean up after you by dropping nullish entries and stringifying the rest, a data-bag field can ride along directly:
+Because that flag is authoring-time markup, the same entries stay selected on every render, whatever the session is doing. Our dice panel would run into that immediately: after you pick a number and roll, the redrawn select is back at its placeholder even though the headline still shows your call. If you want the selection to travel with session state, you'll need the `values` prop instead; it expects the plain `value` strings of the options to highlight (not indices or IDs). Since our builders clean up after you by dropping nullish entries and stringifying the rest, a data-bag field can ride along directly:
 
 ```tsx
 <Select placeholder="Call a number" options={calls} onSelect={call} values={[data.call]} />
 ```
 
-Before your first pick, `data.call` is `undefined`, so nothing matches and the placeholder shows as usual; once you pick a number, though, the matching entry stays highlighted across every redraw because the menu now reads straight from the data bag. Whenever at least one entry matches, `values` takes over the selection entirely while the `default` flags sit that render out, since current state always beats static fallbacks. Any entries that don't match an option are dropped, and if nothing matches at all, those `default` flags step back in to take charge. If you overshoot the selection cap through `values`, fluxcord will throw as soon as the panel draws.
+Before your first pick, `data.call` is `undefined`, so nothing matches and the placeholder shows as usual; once you pick a number, the matching entry stays selected on every redraw because the selection reads from the data bag. When at least one entry matches, `values` replaces the `default` flags for that render; any entries that don't match an option are dropped, and if nothing matches at all, the `default` flags apply again. If you overshoot the selection cap through `values`, fluxcord will throw as soon as the panel draws.
 
 ## Entity selects
 
@@ -192,7 +192,7 @@ Preselection doesn't use a `default` flag here because there isn't any markup to
 One variant rejects preselection entirely: mentionable selects do not accept `defaultIds`, because their entries mix users and roles together and a bare ID doesn't indicate which entity type it represents.
 
 > [!IMPORTANT]
-> Remember that `defaultIds` applies only to entity selects; static menus must preselect through the `default` flag or the `values` prop instead.
+> Remember that `defaultIds` applies only to entity selects; static selects must preselect through the `default` flag or the `values` prop instead.
 
 <!-- -->
 
@@ -210,7 +210,7 @@ One variant rejects preselection entirely: mentionable selects do not accept `de
 
 ## Resetting the round
 
-Every game needs a clean restart mechanism, which is where treating state as plain data really pays off. Because our data bag is an ordinary object, clearing it only requires writing a simple action to reset the round's fields and binding that handler to a button:
+Every game needs a clean restart mechanism, and treating state as plain data makes it simple. Because our data bag is an ordinary object, clearing it only requires writing a simple action to reset the round's fields and binding that handler to a button:
 
 ```tsx
 const reset = action<DiceData>()(e => {
@@ -227,6 +227,6 @@ const reset = action<DiceData>()(e => {
 
 We don't need a specialized reset API because `mutate` already exposes the underlying state bag; once you reset those properties, fluxcord triggers a fresh redraw automatically. You can drop this button directly into the roll screen's action row and rebuild your project so players can start over whenever a round finishes.
 
-## Next
+## Next steps
 
 Even though our panel now handles user input smoothly, its visual presentation is still confined to flat rows of text and basic controls. In [Layout and content](layout-and-content.md), we'll give the panel a real structure: a page heading, separators, and a painted container panel, along with the text-level dressings that come with them.

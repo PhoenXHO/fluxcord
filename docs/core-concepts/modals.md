@@ -4,7 +4,7 @@ So far, every piece of input our dice panel accepts lives directly inside the me
 
 ## Opening a dialog
 
-Because every modal requires a launcher, we'll place a "Set a wager" button inside the roll screen's action row and attach it to an action called `setWager`. This action actually leads two lives: the initial click triggers the dialog, whereas the subsequent submission re-invokes the same action with all the populated fields in tow. We differentiate between the two phases by inspecting the event's kind:
+Because every modal requires a launcher, we'll place a "Set a wager" button inside the roll screen's action row and attach it to an action called `setWager`. This action runs in two phases: the click opens the dialog, and the submit re-invokes the same action with the filled fields. We differentiate between the two phases by inspecting the event's kind:
 
 ```tsx
 const setWager = action<DiceData>()(e => {
@@ -31,7 +31,6 @@ const setWager = action<DiceData>()(e => {
 		return;
 	}
 	e.mutate(d => {
-		// the checkbox arrives as a boolean
 		const amount = Number(e.inputs?.wager);
 		d.wager = Number.isFinite(amount) && amount > 0 ? amount : undefined;
 		d.lucky = e.inputs?.lucky === true;
@@ -45,20 +44,48 @@ If a user closes the dialog without submitting, Discord sends no network payload
 
 To prefill the form controls, the action pulls existing values straight from `e.session.data` while constructing the dialog; we'll see how both fields ride session state in a moment.
 
+Here is the finished roll screen with its launcher in place; the new button slots into the action row the [Controls](controls.md) chapter assembled:
+
+```tsx
+const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
+	<view>
+		<text>{headline(data)}</text>
+		<Select
+			placeholder="Call a number"
+			options={calls}
+			onSelect={call}
+			values={[data.call]}
+			disabled={data.roll !== undefined}
+		/>
+		<row>
+			<Button
+				onClick={roll}
+				label="Roll"
+				disabled={data.call === undefined || data.roll !== undefined}
+				success={data.call !== undefined ? true : undefined}
+			/>
+			<Button onClick={setWager} label="Set a wager" />
+			<Button onClick={reset} label="New round" secondary />
+			<Back />
+		</row>
+	</view>
+));
+```
+
 ## The modal markup
 
 Every dialog begins with a root `<modal>` tag and a `title` prop, which Discord displays in the title bar and which must stay between 1 and 45 characters. Within that root, child elements provide copy and inputs: you'll use `<text>` for plain descriptions alongside individual form controls stacked one per row.
 
-The `<input>` tag defines a text entry whose `id` determines the key used when returning submitted values, while its `label` appears as bold header text directly over the field. To ensure players enter a stake, `required` forces Discord to hold submission until something's typed; you can also specify `placeholder` for sample text and `maxLength` to constrain input length. Passing a `value` prop will prefill the box. If `value` evaluates to `undefined`, the field opens empty.
+The `<input>` tag defines a text entry whose `id` determines the key used when returning submitted values, while its `label` appears as bold header text directly over the field. To ensure players enter a stake, `required` forces Discord to hold submission until the user types something; you can also specify `placeholder` for sample text and `maxLength` to constrain input length. Passing a `value` prop will prefill the box. If `value` evaluates to `undefined`, the field opens empty.
 
-For binary options, the `<checkbox>` tag provides a yes/no switch that accepts both an `id` and a `label`, along with an optional `description` that renders as subdued helper text beneath. Its `checked` prop decides whether the box starts ticked, and because the prop is evaluated when the dialog opens, the checkbox remembers lucky mode across reopenings the same way the input remembers its amount with the `value` prop.
+For binary options, the `<checkbox>` tag provides a yes/no switch that accepts both an `id` and a `label`, along with an optional `description` that renders as subdued helper text beneath. Its `checked` prop decides whether the box starts ticked, and because the prop is evaluated when the dialog opens, the checkbox comes back ticked across reopenings, just as `value` keeps the amount in the field.
 
 > [!IMPORTANT]
 > While a screen root can be a fragment because fluxcord wraps it in a synthetic view, modals don't share that flexibility: `showModal` strictly expects a concrete `<modal>` element and throws immediately if you pass a fragment instead.
 
 ## Receiving the submit
 
-Once someone hits submit, fluxcord invokes your action a second time with `e.kind` set to `EventKind.ModalSubmit` and populates `e.inputs`. This payload maps your authored field identifiers to their submitted values, and each value keeps its field's natural shape: text inputs and radio answers arrive as strings, the checkbox arrives as a boolean, and the pick-list fields arrive as arrays of their picks.
+Once someone hits submit, fluxcord invokes your action a second time with `e.kind` set to `EventKind.ModalSubmit` and populates `e.inputs`. This payload maps your authored field identifiers to their submitted values, and each value keeps its field's natural shape: text inputs and radio answers arrive as strings, the checkbox arrives as a boolean, and the pick-list fields arrive as arrays of their picks. One wrinkle: a required checkbox rides the wire as a single-option checkbox group, since the platform cannot require a bare checkbox, so a required box's answer arrives as `['on']` rather than a plain `true` (will be fixed in a future version).
 
 Since the wager rides a text field, the submit branch parses it before trusting it:
 
@@ -70,7 +97,7 @@ e.mutate(d => {
 });
 ```
 
-We use `e.inputs?.wager` to safely access the submitted entry because `e.inputs` can be undefined on the event; any invalid number or non-positive value defaults to `undefined`, thereby clearing the stake. Similarly, the lucky flag compares against `true`, which is exactly what the checkbox delivers. Once `mutate` applies, the panel redraws and the headline announces the stake alongside the call, so the round now plays out for coins.
+We use `e.inputs?.wager` to safely access the submitted entry because `e.inputs` can be undefined on the event; any invalid number or non-positive value defaults to `undefined`, which clears the stake. Similarly, the lucky flag compares against `true`, which is exactly what the checkbox delivers. Once `mutate` applies, the panel redraws and the headline announces the stake alongside the call, so the round now plays out for coins.
 
 ## The rest of the form kit
 
@@ -84,12 +111,12 @@ Pick lists arrive as arrays of option values in pick order, so a handler reads i
 
 ## The fine print
 
-To prevent Discord from rejecting malformed requests at runtime, fluxcord validates modal constraints right as the component tree builds. A dialog holds at most five children, and field ids must be unique within it. Furthermore, field labels cannot exceed 45 characters, whereas descriptions top out at 100.
+To catch malformed requests on your side, fluxcord validates modal constraints every time a panel draws, so a rule violation throws locally instead of coming back as an API rejection. A dialog holds at most five children, and field ids must be unique within it. Furthermore, field labels cannot exceed 45 characters, whereas descriptions top out at 100.
 
-Two platform behaviors are especially worth noting. First, Discord implements a `required` checkbox as a single-item checkbox group so that submission stays locked until checked; that makes `<checkbox required>` ideal whenever you need an explicit consent gate before a user continues. Second, fluxcord stamps a fresh internal ID every time a modal opens, so an abandoned half-typed draft can never bleed into your pre-filled values on the next open.
+Two platform behaviors are especially worth noting. First, Discord implements a `required` checkbox as a single-item checkbox group so that submission stays locked until checked; that makes `<checkbox required>` ideal whenever you need an explicit consent gate before a user continues. Note the shape wrinkle from the submit section: a consent check reads the `['on']` array rather than comparing against `true`. Second, fluxcord stamps a fresh internal ID every time a modal opens, so an abandoned half-typed draft can never bleed into your pre-filled values on the next open.
 
 Submissions also inherit authorization context automatically: fluxcord routes the submit through whichever policy gate protected the launcher button, ensuring an owner-only trigger produces an owner-only submit handler. The [Permission gates](permission-gates.md) chapter gives the full picture.
 
-## Next
+## Next steps
 
-Although our wager dialog overlays the main interface smoothly, the entire dice experience still lives within a single flow file. In [Subflows](subflows.md), we'll nest flows inside parent flows, so a complex panel can be assembled from smaller, self-contained pieces.
+The wager dialog works, but the whole dice game still lives in one flow file. In [Subflows](subflows.md), we'll nest flows inside parent flows, so a complex panel can be assembled from smaller, self-contained pieces.
