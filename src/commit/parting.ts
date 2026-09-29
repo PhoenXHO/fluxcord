@@ -17,7 +17,7 @@ import type { ViewNode } from '../tree/types.js';
  */
 export function partingView(commandHint?: string, note?: string): ViewNode {
 	const lines: string[] = ['This screen has expired.'];
-	if (commandHint !== undefined) lines.push('', `Run \`/${commandHint}\` to start a new one.`);
-	if (note !== undefined) lines.push('', note);
+	if (commandHint !== undefined) lines.push(`Run \`/${commandHint}\` to start a new one.`);
+	if (note !== undefined) lines.push(note);
 	return view({}, text(lines.join('\n')));
 }
