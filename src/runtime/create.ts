@@ -183,16 +183,23 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			throw new Error(`mount: flow '${flowId}' cannot rehydrate on an ephemeral mount (rerun the command to resume)`);
 		}
 
-		// The bag: the flow's own initialData, cloned per mount. Two sessions
-		// must never share mutable bag state (an in-place push on a nested
-		// array would leak across panels), and a non-cloneable bag (functions,
-		// class instances) throws here, loudly; plain JSON-ish data is the
+		// The bag. A rebind of a rehydratable flow (rehydrateRef given) asks
+		// the flow's restore callback first: its data becomes the bag, so a
+		// rebind panel keeps its state, and a decline (undefined) falls back
+		// to the seed. Every other mount starts from the flow's own
+		// initialData, cloned per mount. Two sessions must never share
+		// mutable bag state (an in-place push on a nested array would leak
+		// across panels), and a non-cloneable bag (functions, class
+		// instances) throws here, loudly; plain JSON-ish data is the
 		// contract. structuredClone gives the draft and the real session one
 		// shared object: the send renders from the draft, the store keeps it.
 		// (The unknown->TData assertion is the definition-boundary erase; the
 		// author's initialData was checked against TData at defineFlow time.)
 		// A stateless flow (initialData omitted) starts from an empty bag.
-		const data = structuredClone(def.initialData ?? {}) as TData;
+		const seeded = (): TData => structuredClone(def.initialData ?? {}) as TData;
+		const data = def.rehydrate !== undefined && mountOptions.rehydrateRef !== undefined
+			? (await def.rehydrate(mountOptions.rehydrateRef)) ?? seeded()
+			: seeded();
 
 		// Draft session: same shape the store will create, messageRef pending.
 		// It exists only so viewOf/wrap have a full session to read; it is

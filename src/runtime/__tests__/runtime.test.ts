@@ -352,6 +352,25 @@ describe('mount - rehydrate pairing (loud in every direction)', () => {
 		});
 	});
 
+	it('a rebind consults the restore callback: the first frame and the bag carry its data', async () => {
+		const w = world({ rehydratable: true });
+		const handle = await w.mount({ rehydrateRef: 'lotto:7' });
+
+		// The first payload rendered from restored state, not the seed.
+		expect(textBodies(w.sent[0].payload)).toContain('count 77');
+
+		// The live session's bag is the restored data.
+		await w.click(handle.sessionId, handle.messageId);
+		expect(w.handler.mock.calls[0][0].session.data).toEqual({ count: 77 });
+	});
+
+	it('a rebind where the restore declines falls back to the seed', async () => {
+		const w = world({ rehydratable: true });
+		await w.mount({ rehydrateRef: 'dead-ref' });
+
+		expect(textBodies(w.sent[0].payload)).toContain('count 3');
+	});
+
 	it('a failed row write degrades loudly but never fails the mount', async () => {
 		const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		const w = world({ rehydratable: true, failPut: true });

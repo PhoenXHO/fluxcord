@@ -208,12 +208,15 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 
 		findLive(flowId: string, ownerId: string): Session<unknown> | undefined {
 			const at = now();
+			// Newest live match wins: when a remount race leaves two live
+			// sessions of one flow+owner, the later birth is the successor.
+			let newest: Session<unknown> | undefined;
 			for (const session of sessions.values()) {
 				if (session.flowId === flowId && session.ownerId === ownerId && !isExpired(session, at)) {
-					return session;
+					if (newest === undefined || session.createdAt > newest.createdAt) newest = session;
 				}
 			}
-			return undefined;
+			return newest;
 		},
 
 		touch(id: string): boolean {

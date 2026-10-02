@@ -340,6 +340,16 @@ describe('findLive', () => {
 		c.advance(31 * MINUTE);
 		expect(store.findLive('lotto.host', 'user-1')).toBeUndefined();
 	});
+
+	it('two live matches: the newer birth wins', () => {
+		const c = clock();
+		const store = createSessionStore({ now: c.now });
+		store.create(input({ messageRef: { channelId: 'ch-1', messageId: 'msg-9' } }));
+		c.advance(1000);
+		const newer = store.create(input({ messageRef: { channelId: 'ch-1', messageId: 'msg-10' } }));
+
+		expect(store.findLive('lotto.host', 'user-1')).toBe(newer);
+	});
 });
 
 describe('defaults', () => {
