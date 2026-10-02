@@ -16,7 +16,7 @@ import { createSessionStore } from '../../state/store.js';
 import type { SessionStore } from '../../state/store.js';
 import type { Session } from '../../state/types.js';
 import { DEFAULT_TTL_MS } from '../../state/types.js';
-import { button, row, text, view } from '../../tree/builders.js';
+import { button, optionSelect, row, text, view } from '../../tree/builders.js';
 import type { ViewNode } from '../../tree/types.js';
 import { createCommit } from '../../commit/commit.js';
 import type { CommitPhase } from '../../commit/commit.js';
@@ -247,6 +247,30 @@ describe('the drawn session', () => {
 		// ...and the view drew from its read-only facts.
 		const drawn = tree.children.find((child) => child.kind === 'text');
 		expect(drawn).toMatchObject({ body: 'owner u1 on main' });
+	});
+
+	it('throws on an illegal tree at the draw seam instead of rendering it', () => {
+		const onPick = (): void => undefined;
+		const def = defineFlow<LottoData>({
+			screens: {
+				// A row mixing a select with a button is type-legal but breaks
+				// rule 22: only the validator can catch it.
+				main: { view: () => row({}, optionSelect({ onSelect: onPick, options: [{ label: 'A', value: 'a' }] }), button({ onClick: onPick, label: 'Go' })) },
+			},
+			first: 'main',
+			initialData: { count: 0, picker: { chosen: 'none' } },
+		});
+		const session = createSessionStore().create<LottoData>({
+			flowId: 'lotto',
+			moduleId: 'lotto',
+			ownerId: 'u1',
+			messageRef: { channelId: 'c1', messageId: 'm1' },
+			data: { count: 0, picker: { chosen: 'none' } },
+			screen: 'main',
+			ttlMs: DEFAULT_TTL_MS,
+			remount: 'coexist',
+		});
+		expect(() => viewOf(session, asScreenRegistry(screenEntries('lotto', def)))).toThrow(/rule 22/);
 	});
 });
 

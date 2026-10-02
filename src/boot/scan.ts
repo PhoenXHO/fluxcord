@@ -12,11 +12,13 @@
 import type { ViewSession } from '../flow/types.js';
 import { kitFor } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
+import { validateTree } from '../tree/validate.js';
 import type { FlowCatalog } from './build.js';
 
 /**
  * Renders every screen of every flow in the catalog against a clone of
- * its own initialData.
+ * its own initialData, reporting views that throw or fail tree
+ * validation.
  *
  * @returns One human-readable line per failing view; an empty array
  *   means every view rendered clean.
@@ -45,6 +47,11 @@ export function coverageScan(catalog: FlowCatalog): string[] {
 					ttlMs: def.ttlMs,
 				};
 				const tree = normalizeViewRoot(screen.view(structuredClone(def.initialData ?? {}) as never, kitFor(stub), stub));
+				const violation = validateTree(tree)[0];
+				if (violation !== undefined) {
+					lines.push(`${key}: illegal tree at ${violation.path} (rule ${violation.rule}): ${violation.message}`);
+					continue;
+				}
 				void tree;
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);

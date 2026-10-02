@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { button, row, text, view } from '../../tree/builders.js';
+import { button, optionSelect, row, text, view } from '../../tree/builders.js';
 import { defineFlow } from '../../flow/define.js';
 import { flow } from '../../flow/token.js';
 import type { Flow } from '../../flow/token.js';
@@ -130,6 +130,23 @@ describe('coverageScan', () => {
 		const findings = coverageScan(catalog);
 		expect(findings).toHaveLength(1);
 		expect(findings[0]).toContain('view threw on initialData');
+	});
+
+	it('reports a view that draws an illegal tree', () => {
+		const catalog = buildFlowCatalog([{
+			module: 'panel', flow: flow<PanelData>('host', {
+				screens: {
+					// A row mixing a select with a button is type-legal but breaks rule 22.
+					main: { view: () => row({}, optionSelect({ onSelect: join, options: [{ label: 'A', value: 'a' }] }), button({ onClick: join, label: 'Join' })) },
+				},
+				first: 'main',
+				initialData: { count: 0 },
+			})
+		}]);
+		const findings = coverageScan(catalog);
+		expect(findings).toHaveLength(1);
+		expect(findings[0]).toContain('illegal tree');
+		expect(findings[0]).toContain('rule 22');
 	});
 
 	it('ignores views that render clean off the declared initialData', () => {

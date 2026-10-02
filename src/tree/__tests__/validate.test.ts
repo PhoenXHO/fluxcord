@@ -385,9 +385,15 @@ describe('validateTree - modal form controls', () => {
 		expect(rulesOf(view({}, row({}, pick())))).toEqual([]);
 	});
 
-	it('rule 32: input and checkbox descriptions max 100 chars', () => {
+	it('rule 32: input, checkbox and modal select descriptions max 100 chars', () => {
 		expect(rulesOf(modal({ title: 'T' }, input({ id: 'f', label: 'L', description: 'x'.repeat(101) })))).toContain(32);
 		expect(rulesOf(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T', description: 'x'.repeat(101) })))).toContain(32);
+		expect(rulesOf(modal({ title: 'T' }, optionSelect({
+			id: 's',
+			label: 'S',
+			description: 'x'.repeat(101),
+			options: [{ label: 'A', value: 'a' }],
+		})))).toContain(32);
 	});
 
 	it('rule 33: checkbox label 1-45 chars and id 1-100 chars', () => {
@@ -447,5 +453,13 @@ describe('validateTree - modal form controls', () => {
 			radioGroup({ id: 'r', label: 'R', options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }] }),
 		))).toEqual([]);
 		expect(rulesOf(modal({ title: 'T' }, text('terms...')))).toEqual([]);
+	});
+});
+
+describe('validateTree - select bounds floor', () => {
+	it('rule 12: maxSelected floors at 1 (the platform rejects max_values 0)', () => {
+		expect(rulesOf(view({}, row({}, optionSelect({ onSelect: handler, options: [{ label: 'A', value: 'a' }], maxSelected: 0 }))))).toEqual([12]);
+		expect(rulesOf(view({}, row({}, optionSelect({ onSelect: handler, options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }, { label: 'C', value: 'c' }], maxSelected: 3 }))))).toEqual([]);
+		expect(rulesOf(view({}, row({}, optionSelect({ onSelect: handler, options: [{ label: 'A', value: 'a' }], minSelected: 0 }))))).toEqual([]);
 	});
 });

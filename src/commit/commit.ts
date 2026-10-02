@@ -27,6 +27,7 @@ import type { ButtonNode, SelectNode, ViewNode } from '../tree/types.js';
 import { kitFor } from '../tree/kit.js';
 import type { ScreenKit } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
+import { validateTree } from '../tree/validate.js';
 import type { ViewSession } from '../flow/types.js';
 import { getPath } from '../flow/lens.js';
 import { isSubflowDone } from '../flow/define.js';
@@ -101,11 +102,19 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 	}
 	const data = screen.slot === undefined ? session.data : getPath(session.data, screen.slot);
 	// Views return the element union (TSX roots type flat), folded to a
-	// view node here, one place; validateTree polices the walk next. Same
-	// for the composed wrap's result.
+	// view node here, one place; validateTree polices the result below.
+	// Same for the composed wrap's result.
 	let tree = normalizeViewRoot(screen.view(data, screen.slot === undefined ? kitFor(session) : screenKitAt(session, screen.slot), session));
 	if (screen.flow?.wrap !== undefined) {
 		tree = normalizeViewRoot(screen.flow.wrap(tree, session, screen.slot === undefined ? kitFor(session) : screenKitAt(session, [])));
+	}
+	// The pipeline's one validation point: redraws, the freeze, and mount's
+	// first frame all funnel through here, so an illegal tree fails loudly
+	// at the draw site with the rule and path, instead of passing locally
+	// and earning a bare Discord 400 at runtime.
+	const violation = validateTree(tree)[0];
+	if (violation !== undefined) {
+		throw new Error(`illegal tree in '${key}' at ${violation.path} (rule ${violation.rule}): ${violation.message}`);
 	}
 	return tree;
 }

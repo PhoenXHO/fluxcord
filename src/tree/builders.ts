@@ -94,11 +94,13 @@ export type EntitySelectSource =
 export type EntitySelectProps = Omit<SelectNode, 'kind' | 'options' | 'entity' | 'values'> & SelectEntityFlags & EntitySelectSource;
 /**
  * The modal-select tag's props: a select as a modal form field, handler
- * off the surface. The source rides the {@link SelectEntityFlags} flags or
- * an options list; setting both is a runtime throw here (the flat type
- * cannot spell the exclusion).
+ * off the surface. Message-only fields are omitted with it: a form field
+ * cannot be disabled (rule 30), carries no click policy, and never
+ * receives draw-time slot tags. The source rides the
+ * {@link SelectEntityFlags} flags or an options list; setting both is a
+ * runtime throw here (the flat type cannot spell the exclusion).
  */
-export type ModalSelectProps = Omit<SelectNode, 'kind' | 'onSelect' | 'entity'> & SelectEntityFlags;
+export type ModalSelectProps = Omit<SelectNode, 'kind' | 'onSelect' | 'entity' | 'disabled' | 'policy' | 'slot'> & SelectEntityFlags;
 /** Option props: the label rides the `label` prop or the children. */
 export type OptionProps = Omit<SelectOption, 'label'> & { readonly label?: string };
 export type ModalProps = Omit<ModalNode, 'kind' | 'children'>;

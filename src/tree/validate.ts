@@ -356,6 +356,11 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[],
 		} else if (node.label.length === 0 || node.label.length > 45) {
 			violations.push({ path, rule: 30, message: `modal select label must be 1-45 chars, got ${node.label.length}` });
 		}
+		if (node.description !== undefined && node.description.length > 100) {
+			// The types promise "Max 100 characters" for the modal helper line
+			// (rule 32, shared with the other form fields' descriptions).
+			violations.push({ path, rule: 32, message: `modal select description max 100 chars, got ${node.description.length}` });
+		}
 		if (node.disabled !== undefined) {
 			violations.push({ path, rule: 30, message: 'a modal select cannot be disabled' });
 		}
@@ -388,11 +393,14 @@ function validateSelect(node: SelectNode, path: string, violations: Violation[],
 	}
 	for (const bound of ['minSelected', 'maxSelected'] as const) {
 		const value = node[bound];
-		if (value !== undefined && (value < 0 || value > 25)) {
+		// maxSelected floors at 1: the platform's max_values lower bound is 1
+		// (only min_values reaches 0), so 0 would pass here and 400 on the wire.
+		const floor = bound === 'maxSelected' ? 1 : 0;
+		if (value !== undefined && (value < floor || value > 25)) {
 			violations.push({
 				path,
 				rule: 12,
-				message: `select ${bound} must be in 0-25, got ${value}`,
+				message: `select ${bound} must be in ${floor}-25, got ${value}`,
 			});
 		}
 	}
