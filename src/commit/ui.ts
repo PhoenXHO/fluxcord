@@ -13,8 +13,9 @@
  * registry: ui.go('pick') opens the plugged subflow at its first screen.
  * close routes through the store, whose onEnd wiring freezes the message.
  * showModal records the running handler as the submit's destination and
- * renders the modal with a nonce-stamped customId, so a stale draft from
- * an earlier view instance bounces.
+ * renders the modal with a fresh nonce-stamped customId per open, so a
+ * stale draft from an earlier view instance bounces and the client never
+ * serves an old draft back as prefill.
  *
  * The phase machine: task is the work phase and throws once any mutate has
  * run; mutate applies synchronous changes to the shared data and ends the
@@ -101,6 +102,20 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				options.store.close(session.id);
 			},
 			showModal(modal: ComponentResult): Promise<void> {
+				// A fresh nonce per open: the client keeps drafts per custom_id,
+				// so a reused id would serve an older unsubmitted draft back as
+				// prefill (renderV2Modal's contract says the same).
+				session.modalNonce = generateId();
+				const customId = `${encodeActionId({
+					sessionId: session.id,
+					screenKey: address.screenKey,
+					actionHash: address.actionHash,
+				})}~${session.modalNonce}`;
+				// Element roots fold to a modal node at this seam: anything
+				// else (fragment, dropped) throws loudly. Rendering runs before
+				// the opener record below, so a failed open leaves no pending
+				// submit destination behind.
+				const payload = renderV2Modal(normalizeModalRoot(modal), customId);
 				// Record the opener: the running handler, which the frame
 				// resolved (this click came through it). The submit runs this
 				// handler after the nonce check, so a ui.go() before showModal
@@ -110,14 +125,7 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				const opener = session.frame[address.actionHash];
 				session.modalHandler = opener?.handler;
 				session.modalPolicy = opener?.policy;
-				const customId = `${encodeActionId({
-					sessionId: session.id,
-					screenKey: address.screenKey,
-					actionHash: address.actionHash,
-				})}~${session.modalNonce}`;
-				// Element roots fold to a modal node at this seam: anything
-				// else (fragment, dropped) throws loudly.
-				return platform.showModal(renderV2Modal(normalizeModalRoot(modal), customId));
+				return platform.showModal(payload);
 			},
 		};
 

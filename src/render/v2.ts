@@ -463,7 +463,10 @@ function renderModalCheckbox(node: CheckboxNode): APILabelComponent {
 			required: true,
 			min_values: 1,
 			max_values: 1,
-			options: [{ label: node.label, value: 'on' }],
+			// A prefill survives the required rewrite: the authored tick
+			// becomes the replacement option's default, so the modal opens
+			// ticked exactly like the bare arm honors it.
+			options: [{ label: node.label, value: 'on', ...(node.checked === true ? { default: true } : {}) }],
 		}
 		: {
 			type: ComponentType.Checkbox,

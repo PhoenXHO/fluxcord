@@ -237,4 +237,30 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 
 		expect(w.session.modalPolicy).toBeUndefined();
 	});
+
+	it('stamps a fresh nonce per open, so a reopened modal gets a new custom_id', async () => {
+		const seen: string[] = [];
+		const CAPTURE = {
+			showModal: async (payload: { custom_id: string }): Promise<void> => { seen.push(payload.custom_id); },
+		} as unknown as PlatformPort;
+		const w = onScreen('menu', [], CAPTURE);
+
+		await w.ui.showModal(DIALOG);
+		await w.ui.showModal(DIALOG);
+
+		expect(seen).toHaveLength(2);
+		expect(seen[0]).not.toBe(seen[1]);
+		// The session's nonce matches the id just shown, so a submit from this
+		// modal passes the check.
+		expect(w.session.modalNonce).toBe(seen[1]!.split('~')[1]);
+	});
+
+	it('a failed open throws and records no submit destination', () => {
+		const w = onScreen('menu', [], SHOW);
+		w.session.frame = { h0: { handler: (): void => { }, label: 'open' } };
+
+		expect(() => w.ui.showModal(text('not a modal'))).toThrow(/needs a <modal> root/);
+		expect(w.session.modalHandler).toBeUndefined();
+		expect(w.session.modalPolicy).toBeUndefined();
+	});
 });
