@@ -93,6 +93,39 @@ const bot = createBot({
 
 Rebuild and restart your bot, then run `/dice`. Try navigating between the menu and the other screens to see how the history stack updates in real time.
 
+## Your own components
+
+Because every screen we've built so far repeats the closing shape of a text body followed by a row of controls, you can lift that layout into a custom component whenever the pattern spreads across screens, since any function returning a tree works directly as a TSX tag:
+
+```tsx
+import type { ComponentResult } from 'fluxcord';
+
+function PanelBody(props: { readonly intro: string; readonly children?: unknown }): ComponentResult {
+    return (
+        <view>
+            <text>{props.intro}</text>
+            <row>{props.children}</row>
+        </view>
+    );
+}
+
+const rulesScreen = screen()((_data, { Back }) => (
+    <PanelBody intro="Call a number from one to six, then roll. Guess right and you win the round; guess wrong and the die wins.">
+        <Back />
+    </PanelBody>
+));
+```
+
+The compiler transforms `<PanelBody>` into a call to the function itself while passing props as a plain object. Whatever the function returns splices directly into the tree where the tag stood, so the draw pipeline processes it as standard nodes without needing any special framework magic.
+
+Three rules to keep in mind:
+1. **Explicit dependencies:** Custom components receive only their props and children. No session, data bag, or screen kit is injected automatically. That is why `Back` rides in as a child from the screen where the kit is in scope, rather than being reached for inside `PanelBody`.
+2. **Pure layout functions:** Components act as pure functional helpers. They return TSX element trees without holding internal component state or lifecycle hooks, preserving the flow's state bag as the single source of truth.
+3. **View placement:** A component that stands in for the whole screen returns a `<view>`; one used inside a screen returns a fragment, since a view can never nest.
+
+> [!NOTE]
+> Unlike React, fluxcord does not use hooks because it stores state in the session's data bag so it can survive restarts and expiry, meaning whatever a hook would have tracked belongs there instead. React components are stateful, and hooks are a way to manage that state.
+
 ## Next steps
 
 Now that navigation is working, the dice panel is ready for interactive logic. In [State and actions](state-and-actions.md), we will add session data and click handlers to make rolling the die work.
