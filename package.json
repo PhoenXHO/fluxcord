@@ -1,6 +1,6 @@
 {
 	"name": "fluxcord",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Session-based Components V2 UI framework for Discord bots: flows, screens, TSX views.",
 	"keywords": [
 		"discord",

@@ -6,14 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-03
+
 ### Added
 
 - Policy request helpers: `isOwner`, `hasRole`, and `hasAnyRole` as free functions over `PolicyRequest`, so a policy engine stops hand-writing identity checks. The request stays plain data and the port stays one question.
+- Dev-only commands register in a dev guild instead of the public set: a `devGuildId` option (with a `DISCORD_DEV_GUILD_ID` env fallback) scopes them to a private guild, and without one they are dropped entirely. When both scopes land on the same guild, one registration call carries everything.
+- An unseeded subflow slot fails at the draw with the screen and slot path named, instead of letting the guest view die on its own error far from the cause.
 
 ### Changed
 
 - `action()` now defaults its data type to `unknown`, so stateless handlers (nav-only buttons, module-state pickers) can drop the explicit `action<unknown>()` and write bare `action()`.
 - Removed extra newlines from the default parting screen.
+
+### Fixed
+
+- A bare-mount leaf's own `description` overrides the command description in the command picker, as documented.
+- Trees are validated at the draw site: an illegal tree fails loudly with the rule and the path, on the first render, redraws, and the freeze alike, instead of passing locally and reaching Discord as a 400. A select's `maxSelected` below 1 is rejected, and modal selects follow the same description rules as message selects.
+- `showModal` stamps a fresh nonce per open, so Discord no longer serves an older unsubmitted draft back as prefill, and a failed open leaves no pending submit destination behind. A required checkbox's `checked` prefill survives the required rewrite, so the modal opens ticked.
+- Only accepted events slide the session's expiry window: denied, stale, and nonce-mismatched clicks no longer revive an idle session.
+- A custom `onError` unit that throws is contained: it is logged and the shipped default takes over, in dispatch and in the interaction listener alike. Framework failures reply with the copy the flow's error hook chose.
+- `findLive` returns the newest live session of a flow and owner, so a remount race yields to the actual successor.
+- Rebinding a rehydratable flow with a `rehydrateRef` consults the flow's restore callback first: the rebound panel keeps its state instead of restarting from the seed.
 
 ## [0.1.0] - 2026-09-22
 
