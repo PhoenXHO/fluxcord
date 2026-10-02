@@ -27,7 +27,7 @@ import { buildFlowCatalog } from '../boot/build.js';
 import { moduleFlowRegistrations } from '../command/harvest.js';
 import type { FlowSourceModule } from '../command/harvest.js';
 import type { Flow } from '../flow/token.js';
-import { defaultOnError } from '../pipeline/dispatch.js';
+import { DEFAULT_DENY_MESSAGE, defaultOnError } from '../pipeline/dispatch.js';
 import { ErrorSource } from '../pipeline/types.js';
 import type { ErrorHandler, PolicyPort } from '../pipeline/types.js';
 import type { RehydrateStore } from '../state/types.js';
@@ -113,7 +113,7 @@ const ownerOnlyPolicy: PolicyPort = {
 	authorize: (request) =>
 		request.actorId === request.ownerId
 			? Promise.resolve({ allowed: true })
-			: Promise.resolve({ allowed: false, denyMessage: 'You don\'t have the permission to do that.' }),
+			: Promise.resolve({ allowed: false, denyMessage: DEFAULT_DENY_MESSAGE }),
 };
 
 /**
@@ -184,14 +184,22 @@ export function createBot(options: CreateBotOptions): Bot {
 	};
 
 	// A listener rejection has no dispatch core around it (a failed mount
-	// send, say), so it lands in the same error unit the runtime uses.
+	// send, say), so it lands in the same error unit the runtime uses —
+	// with the same containment: a custom unit that throws falls back to
+	// the shipped one instead of escaping into the client's listener.
 	const runInteraction = (interaction: Interaction): Promise<void> =>
 		onInteraction(interaction).catch((error) => {
-			(options.onError ?? defaultOnError)({
+			const report = {
 				error,
 				source: ErrorSource.Framework,
 				reply: (): Promise<void> => Promise.resolve(),
-			});
+			};
+			try {
+				(options.onError ?? defaultOnError)(report);
+			} catch (unitError) {
+				console.error('[fluxcord] onError unit threw:', unitError);
+				defaultOnError(report);
+			}
 		});
 
 	client.on(Events.InteractionCreate, (interaction) => {

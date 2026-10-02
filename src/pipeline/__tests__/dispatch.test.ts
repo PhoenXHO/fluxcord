@@ -86,7 +86,7 @@ interface World {
 }
 
 /** The wired world: real store + one registered screen + recorded everything. */
-function world(options: { omitErrorHandler?: boolean } = {}): World {
+function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: boolean } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const store = createSessionStore({ now: () => clock.now });
 	const session = store.create<LottoData>({
@@ -138,7 +138,14 @@ function world(options: { omitErrorHandler?: boolean } = {}): World {
 		screens,
 		tryRevive,
 		makeUi: () => tools,
-		...(options.omitErrorHandler !== true ? { onError: (report: ErrorReport): void => { errors.push(report); } } : {}),
+		...(options.omitErrorHandler !== true
+			? {
+				onError: (report: ErrorReport): void => {
+					if (options.throwInErrorHandler === true) throw new Error('unit exploded');
+					errors.push(report);
+				},
+			}
+			: {}),
 		now: () => clock.now,
 	});
 
@@ -215,6 +222,59 @@ describe('dispatch - allow path', () => {
 		await w.click();
 
 		expect(w.session.lastActivityAt).toBe(w.clock.now);
+	});
+});
+
+describe('dispatch - touch only accepted events', () => {
+	it('a denied click leaves the TTL window alone', async () => {
+		const w = world();
+		w.policy.decide({ allowed: false });
+		const before = w.session.lastActivityAt;
+		w.clock.advance(10 * 60 * 1000);
+		await w.click();
+
+		expect(w.session.lastActivityAt).toBe(before);
+	});
+
+	it('a stale click (frame miss) leaves the TTL window alone', async () => {
+		const w = world();
+		w.session.frame = {};
+		const before = w.session.lastActivityAt;
+		w.clock.advance(10 * 60 * 1000);
+		await w.click();
+
+		expect(w.session.lastActivityAt).toBe(before);
+	});
+});
+
+describe('dispatch - the error socket', () => {
+	it('a custom error unit that throws is contained; the default copy still lands', async () => {
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const w = world({ throwInErrorHandler: true });
+		w.handler.mockRejectedValueOnce(new Error('boom'));
+		try {
+			await w.click();
+			expect(w.calls).toContain(`reply:${DEFAULT_ERROR_MESSAGE}`);
+		} finally {
+			errorSpy.mockRestore();
+		}
+	});
+
+	it('a framework failure with the flow\'s chosen copy replies with it', async () => {
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const w = world({ omitErrorHandler: true });
+		w.screens.resolve = (viewKey: string): RegisteredScreen | undefined => viewKey === 'lotto/main'
+			? { view: (): ViewNode => lottoView, flow: { onError: (): string => 'flow words' } }
+			: undefined;
+		w.policy.authorize = vi.fn(async (): Promise<PolicyDecision> => {
+			throw new Error('policy exploded');
+		});
+		try {
+			await w.click();
+			expect(w.calls).toContain('reply:flow words');
+		} finally {
+			errorSpy.mockRestore();
+		}
 	});
 });
 

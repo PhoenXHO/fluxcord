@@ -4,7 +4,9 @@
  *
  * Expiry is sliding and derived: a session is expired when
  * `now > lastActivityAt + ttlMs`, and every accepted event bumps
- * `lastActivityAt`, reviving the session for a full further window. A
+ * `lastActivityAt`, reviving the session for a full further window
+ * (the dispatch core touches only after its guards pass: a stale,
+ * forged or denied click leaves the window alone). A
  * session may also carry an absolute `expiresAt` ceiling (a wall-limited
  * surface such as an ephemeral line); that one never slides. An
  * expired-but-unswept session stays readable through `get`, because a

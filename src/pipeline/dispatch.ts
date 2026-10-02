@@ -5,7 +5,7 @@
  *
  * ```plaintext
  *   decode -> per-session line -> session lookup -> expiry -> revive-or-parting
- *   -> touch -> frame resolution -> authorize -> deny = actor reply -> handler
+ *   -> frame resolution -> authorize -> deny = actor reply -> touch -> handler
  *   -> auto-redraw (if the session still lives)
  * ```
  *
@@ -67,10 +67,11 @@ export const DEFAULT_DENY_MESSAGE = "You don't have permission to do that.";
 export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Try again; if it keeps failing, ping a host.';
 
 /**
- * The shipped error-unit default: log everything; for handler failures only,
- * reply to the clicker, with the failing flow's chosen copy when it decided
- * on one, generic copy otherwise (a failed redraw after a successful
- * handler gets no reply: 'try again' advice would rerun the action).
+ * The shipped error-unit default: log everything; reply to the clicker on
+ * handler failures (the failing flow's chosen copy when it decided on one,
+ * generic copy otherwise), and on framework failures only when the flow's
+ * copy hook decided words (generic 'try again' advice could rerun an
+ * action, so a framework failure with no chosen copy stays silent).
  * Replace wholesale via DispatchOptions.onError; compose by calling this
  * inside your own unit.
  *
@@ -80,6 +81,10 @@ export function defaultOnError(report: ErrorReport): void {
 	console.error(`[fluxcord] ${report.source} failure:`, report.error);
 	if (report.source === ErrorSource.Handler) {
 		report.reply(report.suggestedReply ?? DEFAULT_ERROR_MESSAGE).catch((error: unknown) => {
+			console.error('[fluxcord] error reply failed:', error);
+		});
+	} else if (report.suggestedReply !== undefined) {
+		report.reply(report.suggestedReply).catch((error: unknown) => {
 			console.error('[fluxcord] error reply failed:', error);
 		});
 	}
@@ -239,7 +244,15 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				console.error('[fluxcord] flow onError hook failed:', hookError);
 			}
 		}
-		handleError(suggestedReply !== undefined ? { ...report, suggestedReply } : report);
+		try {
+			handleError(suggestedReply !== undefined ? { ...report, suggestedReply } : report);
+		} catch (unitError) {
+			// A custom error unit that throws escapes no further: log it and
+			// fall back to the shipped unit, so the actor still gets whatever
+			// copy the flow decided on and dispatch itself never dies.
+			console.error('[fluxcord] onError unit threw:', unitError);
+			defaultOnError(suggestedReply !== undefined ? { ...report, suggestedReply } : report);
+		}
 	}
 
 	async function parting(incoming: IncomingEvent, address?: ActionAddress): Promise<void> {
@@ -282,8 +295,6 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				// same pixels twice.
 				await options.platform.redraw(session);
 			}
-			options.store.touch(session.id);
-
 			// Stale modal draft: the nonce identifies the view instance the
 			// modal was opened for. A mismatch means the draft is stale:
 			// run nothing.
@@ -339,6 +350,11 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				await options.platform.replyToActor(decision.denyMessage ?? DEFAULT_DENY_MESSAGE);
 				return;
 			}
+
+			// Every guard passed: the event is accepted, so the sliding window
+			// restarts here. Denied, stale and nonce-mismatched clicks never
+			// reach this line and leave the window alone.
+			options.store.touch(session.id);
 
 			const tools = options.makeUi(session, address, options.platform);
 			// Lensing follows ownership, not the screen: the draw phase tags
