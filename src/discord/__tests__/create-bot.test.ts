@@ -68,6 +68,12 @@ const counterFlow = flow('counter', {
 });
 const counterCommand = command('counter', 'Open the counter', { mount: mounts(counterFlow) });
 
+const devFlow = flow('dev-tool', {
+	screens: { dev: screen()(() => view({}, text('dev'))) },
+	first: 'dev',
+});
+const devCommand = command('dev-tool', 'Dev only tool', { devOnly: true, mount: mounts(devFlow) });
+
 describe('createBot - the registration seam', () => {
 	it('hands the callback the ready client and every command with its module, and skips the default set', async () => {
 		const set = vi.fn(async (_bodies: unknown, _guild?: string) => []);
@@ -146,6 +152,77 @@ describe('createBot - conventional env fallback', () => {
 			expect(() =>
 				createBot({ modules: [{ name: 'about', commands: [aboutCommand] }], sweeper: false }),
 			).toThrow(/DISCORD_TOKEN/);
+		});
+	});
+});
+
+describe('createBot - dev-only registration', () => {
+	it('dev-only commands are dropped when no dev guild is set', async () => {
+		await withEnv({ DISCORD_DEV_GUILD_ID: undefined }, async () => {
+			const set = vi.fn(async (_bodies: unknown, _guild?: string) => []);
+			createBot({
+				modules: [{ name: 'lab', commands: [aboutCommand, devCommand] }],
+				token: 't',
+				guildId: 'g1',
+				client: fakeReadyClient(set).client,
+				sweeper: false,
+			});
+			await flush();
+			expect(set).toHaveBeenCalledTimes(1);
+			const bodies = set.mock.calls[0][0] as { name: string }[];
+			expect(bodies.map((body) => body.name)).toEqual(['about']);
+		});
+	});
+
+	it('dev-only commands register in the dev guild alone', async () => {
+		const set = vi.fn(async (_bodies: unknown, _guild?: string) => []);
+		createBot({
+			modules: [{ name: 'lab', commands: [aboutCommand, devCommand] }],
+			token: 't',
+			guildId: 'g1',
+			devGuildId: 'dev1',
+			client: fakeReadyClient(set).client,
+			sweeper: false,
+		});
+		await flush();
+		expect(set).toHaveBeenCalledTimes(2);
+		const publicCall = set.mock.calls.find((call) => call[1] === 'g1');
+		const devCall = set.mock.calls.find((call) => call[1] === 'dev1');
+		expect((publicCall![0] as { name: string }[]).map((body) => body.name)).toEqual(['about']);
+		expect((devCall![0] as { name: string }[]).map((body) => body.name)).toEqual(['dev-tool']);
+	});
+
+	it('one guild for both scopes merges into a single registration call', async () => {
+		const set = vi.fn(async (_bodies: unknown, _guild?: string) => []);
+		createBot({
+			modules: [{ name: 'lab', commands: [aboutCommand, devCommand] }],
+			token: 't',
+			guildId: 'g1',
+			devGuildId: 'g1',
+			client: fakeReadyClient(set).client,
+			sweeper: false,
+		});
+		await flush();
+		expect(set).toHaveBeenCalledTimes(1);
+		expect(set.mock.calls[0][1]).toBe('g1');
+		const bodies = set.mock.calls[0][0] as { name: string }[];
+		expect(bodies.map((body) => body.name)).toEqual(['about', 'dev-tool']);
+	});
+
+	it('reads DISCORD_DEV_GUILD_ID when the option is omitted', async () => {
+		await withEnv({ DISCORD_DEV_GUILD_ID: 'dev-env' }, async () => {
+			const set = vi.fn(async (_bodies: unknown, _guild?: string) => []);
+			createBot({
+				modules: [{ name: 'lab', commands: [aboutCommand, devCommand] }],
+				token: 't',
+				guildId: 'g1',
+				client: fakeReadyClient(set).client,
+				sweeper: false,
+			});
+			await flush();
+			const devCall = set.mock.calls.find((call) => call[1] === 'dev-env');
+			expect(devCall).toBeDefined();
+			expect((devCall![0] as { name: string }[]).map((body) => body.name)).toEqual(['dev-tool']);
 		});
 	});
 });

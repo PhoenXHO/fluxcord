@@ -29,7 +29,8 @@ const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 export interface MountSpec {
 	/**
 	 * What the subcommand shows in the command picker. Required on
-	 * subcommand leaves; a bare leaf inherits the command's description.
+	 * subcommand leaves; a bare leaf may carry its own, which overrides
+	 * the command's.
 	 */
 	readonly description?: string;
 	/**
@@ -51,7 +52,8 @@ export interface MountLeaf {
 
 /**
  * Builds a mount leaf. Most leaves are just `mounts(flow)`; the spec
- * exists for subcommand descriptions.
+ * exists for descriptions: subcommand leaves need one, a bare leaf can
+ * override with one.
  */
 export function mounts<TData>(
 	flow: Flow<TData>,

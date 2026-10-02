@@ -77,6 +77,9 @@ export function deriveCommand(command: Command): DerivedCommand {
 
 	if (spec.mount !== undefined) {
 		const leaf = spec.mount;
+		// A bare leaf's own description wins when authored; the command's
+		// description (set above) stays the default.
+		if (leaf.description !== undefined) builder.setDescription(leaf.description);
 		return {
 			data: builder,
 			...derived,
@@ -89,8 +92,10 @@ export function deriveCommand(command: Command): DerivedCommand {
 	const leaves = spec.subcommands ?? {};
 	for (const [key, leaf] of Object.entries(leaves)) {
 		builder.addSubcommand((sub) => sub
+			// Subcommand descriptions are required at declare time; there is
+			// no fallback to fall back to.
 			.setName(key)
-			.setDescription(leaf.description ?? command.description));
+			.setDescription(leaf.description));
 	}
 	return {
 		data: builder,

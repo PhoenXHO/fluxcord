@@ -14,9 +14,9 @@
  * replaces it with any PolicyPort engine.
  *
  * The conventional environment variables spare the common host any
- * plumbing: an omitted `token` or `guildId` option falls back to
- * `DISCORD_TOKEN` / `DISCORD_GUILD_ID`, and the explicit option wins
- * when both exist.
+ * plumbing: an omitted `token`, `guildId` or `devGuildId` option falls
+ * back to `DISCORD_TOKEN` / `DISCORD_GUILD_ID` / `DISCORD_DEV_GUILD_ID`,
+ * and the explicit option wins when both exist.
  *
  * @module discord/create-bot
  */
@@ -68,6 +68,13 @@ export interface CreateBotOptions {
 	 * variable; the option wins when both exist.
 	 */
 	readonly guildId?: string;
+	/**
+	 * Where dev-only commands register: a private guild. Omit to read the
+	 * `DISCORD_DEV_GUILD_ID` environment variable; the option wins when
+	 * both exist. Dev-only commands never ride the public registration;
+	 * without a dev guild they are dropped entirely.
+	 */
+	readonly devGuildId?: string;
 	/**
 	 * Replaces the built-in registration wholesale: the ready client and
 	 * every derived command (with its source module) arrive here, and
@@ -132,6 +139,7 @@ export function createBot(options: CreateBotOptions): Bot {
 	}
 	// Guild scoping follows the same option-wins pattern.
 	const guildId = options.guildId ?? process.env.DISCORD_GUILD_ID;
+	const devGuildId = options.devGuildId ?? process.env.DISCORD_DEV_GUILD_ID;
 	const client = options.client ?? new Client({ intents: [...(options.intents ?? [GatewayIntentBits.Guilds])] });
 	const bridge = createUiBridge(client, {
 		...(options.logger !== undefined ? { logger: options.logger } : {}),
@@ -162,13 +170,26 @@ export function createBot(options: CreateBotOptions): Bot {
 			await options.registerCommands(ready, registrations);
 			return;
 		}
-		const bodies = commands.map((c) => c.data.toJSON());
+		// Dev-only commands never ride the public set: they are scoped to
+		// the dev guild when one is set, dropped entirely otherwise (dev
+		// tools are not global tools).
+		const publicBodies = commands.filter((c) => !c.devOnly).map((c) => c.data.toJSON());
+		const devCommands = commands.filter((c) => c.devOnly);
+		// Both scopes landing on one guild: a single set carries
+		// everything (two calls to one guild would clobber).
+		if (devGuildId !== undefined && devGuildId === guildId) {
+			await ready.application.commands.set(commands.map((c) => c.data.toJSON()), guildId);
+			return;
+		}
 		// Guild-scoped when a guild id is set, global otherwise. Two call
 		// sites, not one: the API overload refuses string | undefined.
 		if (guildId !== undefined) {
-			await ready.application.commands.set(bodies, guildId);
+			await ready.application.commands.set(publicBodies, guildId);
 		} else {
-			await ready.application.commands.set(bodies);
+			await ready.application.commands.set(publicBodies);
+		}
+		if (devGuildId !== undefined && devCommands.length > 0) {
+			await ready.application.commands.set(devCommands.map((c) => c.data.toJSON()), devGuildId);
 		}
 	};
 
