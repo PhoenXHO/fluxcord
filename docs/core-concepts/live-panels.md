@@ -10,7 +10,7 @@ In standard interactions, fluxcord handles redrawing automatically when an actio
 await handle.redraw(); // re-render the current screen from unchanged data
 
 await handle.redraw(d => { // mutate the data bag first, then re-render,
-	d.done = true;         // exactly like e.mutate inside an action handler
+    d.done = true;         // exactly like e.mutate inside an action handler
 });
 ```
 
@@ -24,22 +24,22 @@ Beyond their name and options, flows accept an optional third argument for regis
 
 ```tsx
 export const timerFlow = flow<TimerData>(
-	'timer',
-	{
-		screens: { clock: clockScreen },
-		first: 'clock',
-		initialData: { left: 30 },
-	},
-	{
-		// The start hook receives (handle, context). handle is the panel's
-		// remote control (sessionId plus redraw), the same object bot.mount
-		// returns. context is whatever the mounter passed when starting the
-		// panel.
-		// For example, the Discord host passes the slash-command invocation.
-		// This flow uses the handle and ignores the context.
-		onSessionStart: startCountdown,
-		onSessionEnd: end => stoppers.get(end.sessionId)?.(),
-	},
+    'timer',
+    {
+        screens: { clock: clockScreen },
+        first: 'clock',
+        initialData: { left: 30 },
+    },
+    {
+        // The start hook receives (handle, context). handle is the panel's
+        // remote control (sessionId plus redraw), the same object bot.mount
+        // returns. context is whatever the mounter passed when starting the
+        // panel.
+        // For example, the Discord host passes the slash-command invocation.
+        // This flow uses the handle and ignores the context.
+        onSessionStart: startCountdown,
+        onSessionEnd: end => stoppers.get(end.sessionId)?.(),
+    },
 );
 ```
 
@@ -47,11 +47,11 @@ When the panel mounts, `onSessionStart` receives the mount handle, the very same
 
 ```tsx
 const clockScreen = screen<TimerData>()(data => (
-	<container color={0xe67e22}>
-		<text title="Kitchen timer">
-			{data.left > 0 ? `Your tacos are on the clock: ${data.left} seconds left.` : 'Ding! Tacos are ready.'}
-		</text>
-	</container>
+    <container color={0xe67e22}>
+        <text title="Kitchen timer">
+            {data.left > 0 ? `Your tacos are on the clock: ${data.left} seconds left.` : 'Ding! Tacos are ready.'}
+        </text>
+    </container>
 ));
 ```
 
@@ -61,21 +61,21 @@ The countdown logic itself runs on a standard interval that pushes mutations eve
 const stoppers = new Map<string, () => void>();
 
 function startCountdown(handle: MountHandle<TimerData>): void {
-	let left = 30;
-	const tick = setInterval(() => {
-		left -= 1;
-		void handle.redraw(d => {
-			d.left = left;
-		});
-		if (left <= 0) {
-			clearInterval(tick);
-			stoppers.delete(handle.sessionId);
-		}
-	}, 1000);
-	stoppers.set(handle.sessionId, () => {
-		clearInterval(tick);
-		stoppers.delete(handle.sessionId);
-	});
+    let left = 30;
+    const tick = setInterval(() => {
+        left -= 1;
+        void handle.redraw(d => {
+            d.left = left;
+        });
+        if (left <= 0) {
+            clearInterval(tick);
+            stoppers.delete(handle.sessionId);
+        }
+    }, 1000);
+    stoppers.set(handle.sessionId, () => {
+        clearInterval(tick);
+        stoppers.delete(handle.sessionId);
+    });
 }
 ```
 

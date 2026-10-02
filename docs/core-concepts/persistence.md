@@ -12,9 +12,9 @@ On the storage side, a single three-method interface serves as the only place wh
 
 ```ts
 interface RehydrateStore {
-	put(row: RehydrateRow): Promise<void>;
-	get(messageId: string): Promise<RehydrateRow | undefined>;
-	delete(messageId: string): Promise<void>;
+    put(row: RehydrateRow): Promise<void>;
+    get(messageId: string): Promise<RehydrateRow | undefined>;
+    delete(messageId: string): Promise<void>;
 }
 ```
 
@@ -32,31 +32,31 @@ import type { RehydrateRow, RehydrateStore } from 'fluxcord';
 const ROWS_FILE = 'rehydrate-rows.json';
 
 async function readRows(): Promise<Record<string, RehydrateRow>> {
-	try {
-		return JSON.parse(await readFile(ROWS_FILE, 'utf8')) as Record<string, RehydrateRow>;
-	} catch {
-		return {};
-	}
+    try {
+        return JSON.parse(await readFile(ROWS_FILE, 'utf8')) as Record<string, RehydrateRow>;
+    } catch {
+        return {};
+    }
 }
 
 async function writeRows(rows: Record<string, RehydrateRow>): Promise<void> {
-	await writeFile(ROWS_FILE, JSON.stringify(rows, null, '\t'));
+    await writeFile(ROWS_FILE, JSON.stringify(rows, null, '\t'));
 }
 
 export const rehydrateStore: RehydrateStore = {
-	async put(row) {
-		const rows = await readRows();
-		rows[row.messageId] = row;
-		await writeRows(rows);
-	},
-	async get(messageId) {
-		return (await readRows())[messageId];
-	},
-	async delete(messageId) {
-		const rows = await readRows();
-		delete rows[messageId];
-		await writeRows(rows);
-	},
+    async put(row) {
+        const rows = await readRows();
+        rows[row.messageId] = row;
+        await writeRows(rows);
+    },
+    async get(messageId) {
+        return (await readRows())[messageId];
+    },
+    async delete(messageId) {
+        const rows = await readRows();
+        delete rows[messageId];
+        await writeRows(rows);
+    },
 };
 ```
 
@@ -73,23 +73,23 @@ The excerpt below shows the campfire's storage side first: the file that the ref
 import { readFile, writeFile } from 'node:fs/promises';
 
 interface CampfireData {
-	logs: number;
+    logs: number;
 }
 
 // The flow's own database: one fire -> one number
 const CAMPFIRE_FILE = 'campfire.json';
 
 async function readLogs(): Promise<number> {
-	try {
-		const campfire = JSON.parse(await readFile(CAMPFIRE_FILE, 'utf8')) as { logs: number };
-		return campfire.logs;
-	} catch {
-		return 0;
-	}
+    try {
+        const campfire = JSON.parse(await readFile(CAMPFIRE_FILE, 'utf8')) as { logs: number };
+        return campfire.logs;
+    } catch {
+        return 0;
+    }
 }
 
 async function writeLogs(logs: number): Promise<void> {
-	await writeFile(CAMPFIRE_FILE, JSON.stringify({ logs }, null, '\t'));
+    await writeFile(CAMPFIRE_FILE, JSON.stringify({ logs }, null, '\t'));
 }
 
 // Truth lands on disk inside the handler: the file, not the bag, is what
@@ -97,13 +97,13 @@ async function writeLogs(logs: number): Promise<void> {
 // write throws before any state changes and the panel and the file
 // never disagree.
 const addLog = action<CampfireData>()(async e => {
-	const next = e.session.data.logs + 1;
-	await writeLogs(next);
+    const next = e.session.data.logs + 1;
+    await writeLogs(next);
 
-	// Note that mutate runs *after* the write (fallible work; see the Errors chapter)
-	e.mutate(d => {
-		d.logs = next;
-	});
+    // Note that mutate runs *after* the write (fallible work; see the Errors chapter)
+    e.mutate(d => {
+        d.logs = next;
+    });
 });
 ```
 
@@ -111,13 +111,13 @@ To opt into revival, your flow defines a `rehydrate` callback that accepts the r
 
 ```tsx
 export const campfireFlow = flow<CampfireData>('campfire', {
-	screens: { fire: campfireScreen },
-	first: 'fire',
-	initialData: { logs: 0 },
-	// The ref would pick a fire in a real bot; this demo runs one, so the
-	// callback ignores it and reads the file. Returning undefined means
-	// the fire is gone, and the late click gets the parting screen.
-	rehydrate: async () => ({ logs: await readLogs() }),
+    screens: { fire: campfireScreen },
+    first: 'fire',
+    initialData: { logs: 0 },
+    // The ref would pick a fire in a real bot; this demo runs one, so the
+    // callback ignores it and reads the file. Returning undefined means
+    // the fire is gone, and the late click gets the parting screen.
+    rehydrate: async () => ({ logs: await readLogs() }),
 });
 ```
 
@@ -129,12 +129,12 @@ To activate persistence, pass your store instance to `createBot`:
 
 ```ts
 const bot = createBot({
-	policy: staffPolicy,
-	rehydrate: rehydrateStore,
-	modules: [
-		// ...every module from earlier chapters...
-		{ name: 'campfire', flows: [campfireFlow] },
-	],
+    policy: staffPolicy,
+    rehydrate: rehydrateStore,
+    modules: [
+        // ...every module from earlier chapters...
+        { name: 'campfire', flows: [campfireFlow] },
+    ],
 });
 ```
 
@@ -142,16 +142,16 @@ The campfire is not something a user summons, so its module registers the flow w
 
 ```ts
 async function main(): Promise<void> {
-	await bot.start();
-	const channel = process.env.CAMPFIRE_CHANNEL_ID;
-	const owner = process.env.CAMPFIRE_OWNER_ID;
-	if (channel !== undefined && owner !== undefined) {
-		await bot.mount(campfireFlow, {
-			to: { channel },
-			ownerId: owner,
-			rehydrateRef: 'campfire:main',
-		});
-	}
+    await bot.start();
+    const channel = process.env.CAMPFIRE_CHANNEL_ID;
+    const owner = process.env.CAMPFIRE_OWNER_ID;
+    if (channel !== undefined && owner !== undefined) {
+        await bot.mount(campfireFlow, {
+            to: { channel },
+            ownerId: owner,
+            rehydrateRef: 'campfire:main',
+        });
+    }
 }
 
 void main();
@@ -191,9 +191,9 @@ Revival waits for an interaction by default, which keeps background work minimal
 
 ```ts
 await bot.mount(campfireFlow, {
-	to: { existing: { channelId, messageId } },
-	ownerId: owner,
-	rehydrateRef: 'campfire:main',
+    to: { existing: { channelId, messageId } },
+    ownerId: owner,
+    rehydrateRef: 'campfire:main',
 });
 ```
 

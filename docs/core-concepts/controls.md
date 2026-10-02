@@ -30,8 +30,8 @@ fluxcord also accepts a lone control; it gets its own row at render time, which 
 
 ```tsx
 <view>
-	<text>Are you sure?</text>
-	<Back />
+    <text>Are you sure?</text>
+    <Back />
 </view>
 ```
 
@@ -43,13 +43,13 @@ Our rules screen promised a game where you pick a number between one and six bef
 
 ```tsx
 interface DiceData {
-	call?: number;
-	roll?: number;
+    call?: number;
+    roll?: number;
 }
 
 const calls = [1, 2, 3, 4, 5, 6].map(n => ({
-	label: String(n),
-	value: String(n),
+    label: String(n),
+    value: String(n),
 }));
 ```
 
@@ -59,11 +59,11 @@ We'll destructure the `Select` component from the screen kit and write a handler
 
 ```tsx
 const call = action<DiceData>()(e => {
-	const pick = e.values?.[0];
-	if (pick === undefined) return;
-	e.mutate(d => {
-		d.call = Number(pick);
-	});
+    const pick = e.values?.[0];
+    if (pick === undefined) return;
+    e.mutate(d => {
+        d.call = Number(pick);
+    });
 });
 ```
 
@@ -77,8 +77,8 @@ You can provide options in two ways depending on what fits your data best. While
 
 ```tsx
 <Select placeholder="Call a number" onSelect={call}>
-	<option value="1">1</option>
-	<option value="2" description="The lowest roll">2</option>
+    <option value="1">1</option>
+    <option value="2" description="The lowest roll">2</option>
 </Select>
 ```
 
@@ -88,24 +88,24 @@ With those primitives ready, we can assemble our complete screen layout:
 
 ```tsx
 const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
-	<view>
-		<text>{headline(data)}</text>
-		<Select
-			placeholder="Call a number"
-			options={calls}
-			onSelect={call}
-			disabled={data.roll !== undefined}
-		/>
-		<row>
-			<Button
-				onClick={roll}
-				label="Roll"
-				disabled={data.call === undefined || data.roll !== undefined}
-				success={data.call !== undefined ? true : undefined}
-			/>
-			<Back />
-		</row>
-	</view>
+    <view>
+        <text>{headline(data)}</text>
+        <Select
+            placeholder="Call a number"
+            options={calls}
+            onSelect={call}
+            disabled={data.roll !== undefined}
+        />
+        <row>
+            <Button
+                onClick={roll}
+                label="Roll"
+                disabled={data.call === undefined || data.roll !== undefined}
+                success={data.call !== undefined ? true : undefined}
+            />
+            <Back />
+        </row>
+    </view>
 ));
 ```
 
@@ -117,8 +117,8 @@ Notice that our select sits directly in the `<view>` without an enclosing `<row>
 > ```tsx
 > // throws: row with a select must have exactly one child, got 2
 > <row>
-> 	<Button onClick={roll} label="Roll" />
-> 	<Select placeholder="Call a number" options={calls} onSelect={call} />
+>     <Button onClick={roll} label="Roll" />
+>     <Select placeholder="Call a number" options={calls} onSelect={call} />
 > </row>
 > ```
 >
@@ -132,14 +132,14 @@ We'll define the headline as a plain TypeScript function right above the screen.
 
 ```tsx
 function headline({ call, roll }: DiceData): string {
-	if (roll === undefined) {
-		return call === undefined
-			? 'Call a number, then roll.'
-			: `You called ${call}. Now roll.`;
-	}
-	return roll === call
-		? `You called ${call} and rolled ${roll}. You win the round!`
-		: `You called ${call} and rolled ${roll}. The die wins.`;
+    if (roll === undefined) {
+        return call === undefined
+            ? 'Call a number, then roll.'
+            : `You called ${call}. Now roll.`;
+    }
+    return roll === call
+        ? `You called ${call} and rolled ${roll}. You win the round!`
+        : `You called ${call} and rolled ${roll}. The die wins.`;
 }
 ```
 
@@ -155,8 +155,8 @@ A select can also open with choices already selected, which you set up in static
 
 ```tsx
 <Select placeholder="Pick a number" onSelect={setNumber}>
-	<option value="1" default>1</option>
-	<option value="2">2</option>
+    <option value="1" default>1</option>
+    <option value="2">2</option>
 </Select>
 ```
 
@@ -200,10 +200,10 @@ One variant rejects preselection entirely: mentionable selects do not accept `de
 > ```tsx
 > // throws when the select builds: a select takes either options or entity, never both
 > <Select
-> 	placeholder="Pick a member to promote"
-> 	options={calls}
-> 	users
-> 	onSelect={promote}
+>     placeholder="Pick a member to promote"
+>     options={calls}
+>     users
+>     onSelect={promote}
 > />
 > ```
 > An option list and an entity flag are mutually exclusive. Because fluxcord cannot combine a static options array with Discord's dynamic directory search, attempting to supply both will fail when building the component.
@@ -214,10 +214,10 @@ Every game needs a clean restart mechanism, and treating state as plain data mak
 
 ```tsx
 const reset = action<DiceData>()(e => {
-	e.mutate(d => {
-		d.call = undefined;
-		d.roll = undefined;
-	});
+    e.mutate(d => {
+        d.call = undefined;
+        d.roll = undefined;
+    });
 });
 ```
 

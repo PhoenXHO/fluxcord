@@ -12,13 +12,13 @@ While the default TTL value is 30 minutes, you can configure a shorter idle wind
 
 ```tsx
 export const orderFlow = flow<OrderData>('order', {
-	screens: { menu: menuScreen, build: buildScreen, receipt: receiptScreen },
-	first: 'menu',
-	initialData: { toppings: [], delivery: {} },
-	// Ten idle minutes, not the default thirty: taco cravings are urgent.
-	ttlMs: 10 * 60 * 1000,
-	components: [deliveryBar(deliveryPlug)],
-	subflows: [deliveryPlug],
+    screens: { menu: menuScreen, build: buildScreen, receipt: receiptScreen },
+    first: 'menu',
+    initialData: { toppings: [], delivery: {} },
+    // Ten idle minutes, not the default thirty: taco cravings are urgent.
+    ttlMs: 10 * 60 * 1000,
+    components: [deliveryBar(deliveryPlug)],
+    subflows: [deliveryPlug],
 });
 ```
 
@@ -33,17 +33,17 @@ To ensure users know when a session will close, fluxcord provides an `<Expiry>` 
 
 ```tsx
 export const buildScreen = screen<OrderData>()((data, { Button, Select, Back }, session) => (
-	<container color={0x3498db}>
-		<text title="Build your order">{headline(data)}</text>
-		{/* picks */}
-		<hr />
-		<text title="So far">{summary(data)}</text>
-		{/* Discord ticks this countdown on its own. */}
-		<Expiry until={expiryEpoch(session)} />
-		<row>
-			{/* buttons */}
-		</row>
-	</container>
+    <container color={0x3498db}>
+        <text title="Build your order">{headline(data)}</text>
+        {/* picks */}
+        <hr />
+        <text title="So far">{summary(data)}</text>
+        {/* Discord ticks this countdown on its own. */}
+        <Expiry until={expiryEpoch(session)} />
+        <row>
+            {/* buttons */}
+        </row>
+    </container>
 ));
 ```
 
@@ -62,12 +62,12 @@ You don't have to write that line: the framework derives it from the command tha
 
 ```tsx
 export const orderFlow = flow<OrderData>('order', {
-	// screens, first, initialData as before
-	ttlMs: 10 * 60 * 1000,
-	// Adds a line under the framework's default expiry copy.
-	parting: { note: 'Nothing was saved: the next order starts from scratch.' },
-	components: [deliveryBar(deliveryPlug)],
-	subflows: [deliveryPlug],
+    // screens, first, initialData as before
+    ttlMs: 10 * 60 * 1000,
+    // Adds a line under the framework's default expiry copy.
+    parting: { note: 'Nothing was saved: the next order starts from scratch.' },
+    components: [deliveryBar(deliveryPlug)],
+    subflows: [deliveryPlug],
 });
 ```
 
@@ -87,11 +87,11 @@ Besides expiring abandoned sessions, you can close a panel deliberately by calli
 
 ```tsx
 const done = action<OrderData>()(e => {
-	e.ui.close(
-		<container color={0x2ecc71}>
-			<text title="Enjoy">Tacos inbound. Run /order whenever hunger strikes again.</text>
-		</container>,
-	);
+    e.ui.close(
+        <container color={0x2ecc71}>
+            <text title="Enjoy">Tacos inbound. Run /order whenever hunger strikes again.</text>
+        </container>,
+    );
 });
 ```
 
@@ -101,9 +101,9 @@ We can hook that action up by adding a Done button right alongside the existing 
 
 ```tsx
 <row>
-	<Button onClick={freshOrder} label="New order" success />
-	<Button onClick={done} label="Done" />
-	<Back />
+    <Button onClick={freshOrder} label="New order" success />
+    <Button onClick={done} label="Done" />
+    <Back />
 </row>
 ```
 

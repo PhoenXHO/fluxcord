@@ -8,33 +8,33 @@ Because every modal requires a launcher, we'll place a "Set a wager" button insi
 
 ```tsx
 const setWager = action<DiceData>()(e => {
-	if (e.kind !== EventKind.ModalSubmit) {
-		void e.ui.showModal(
-			<modal title="Set a wager">
-				<text>Stake some coins on the round. Lucky mode doubles the swing: a win pays double, a loss costs double.</text>
-				<input
-					id="wager"
-					label="Wager"
-					required
-					placeholder="Amount in coins"
-					maxLength={6}
-					value={e.session.data.wager !== undefined ? String(e.session.data.wager) : undefined}
-				/>
-				<checkbox
-					id="lucky"
-					label="Lucky mode"
-					description="Double the payout, double the risk"
-					checked={e.session.data.lucky}
-				/>
-			</modal>,
-		);
-		return;
-	}
-	e.mutate(d => {
-		const amount = Number(e.inputs?.wager);
-		d.wager = Number.isFinite(amount) && amount > 0 ? amount : undefined;
-		d.lucky = e.inputs?.lucky === true;
-	});
+    if (e.kind !== EventKind.ModalSubmit) {
+        void e.ui.showModal(
+            <modal title="Set a wager">
+                <text>Stake some coins on the round. Lucky mode doubles the swing: a win pays double, a loss costs double.</text>
+                <input
+                    id="wager"
+                    label="Wager"
+                    required
+                    placeholder="Amount in coins"
+                    maxLength={6}
+                    value={e.session.data.wager !== undefined ? String(e.session.data.wager) : undefined}
+                />
+                <checkbox
+                    id="lucky"
+                    label="Lucky mode"
+                    description="Double the payout, double the risk"
+                    checked={e.session.data.lucky}
+                />
+            </modal>,
+        );
+        return;
+    }
+    e.mutate(d => {
+        const amount = Number(e.inputs?.wager);
+        d.wager = Number.isFinite(amount) && amount > 0 ? amount : undefined;
+        d.lucky = e.inputs?.lucky === true;
+    });
 });
 ```
 
@@ -48,27 +48,27 @@ Here is the finished roll screen with its launcher in place; the new button slot
 
 ```tsx
 const rollScreen = screen<DiceData>()((data, { Button, Select, Back }) => (
-	<view>
-		<text>{headline(data)}</text>
-		<Select
-			placeholder="Call a number"
-			options={calls}
-			onSelect={call}
-			values={[data.call]}
-			disabled={data.roll !== undefined}
-		/>
-		<row>
-			<Button
-				onClick={roll}
-				label="Roll"
-				disabled={data.call === undefined || data.roll !== undefined}
-				success={data.call !== undefined ? true : undefined}
-			/>
-			<Button onClick={setWager} label="Set a wager" />
-			<Button onClick={reset} label="New round" secondary />
-			<Back />
-		</row>
-	</view>
+    <view>
+        <text>{headline(data)}</text>
+        <Select
+            placeholder="Call a number"
+            options={calls}
+            onSelect={call}
+            values={[data.call]}
+            disabled={data.roll !== undefined}
+        />
+        <row>
+            <Button
+                onClick={roll}
+                label="Roll"
+                disabled={data.call === undefined || data.roll !== undefined}
+                success={data.call !== undefined ? true : undefined}
+            />
+            <Button onClick={setWager} label="Set a wager" />
+            <Button onClick={reset} label="New round" secondary />
+            <Back />
+        </row>
+    </view>
 ));
 ```
 
@@ -91,9 +91,9 @@ Since the wager rides a text field, the submit branch parses it before trusting 
 
 ```tsx
 e.mutate(d => {
-	const amount = Number(e.inputs?.wager);
-	d.wager = Number.isFinite(amount) && amount > 0 ? amount : undefined;
-	d.lucky = e.inputs?.lucky === true;
+    const amount = Number(e.inputs?.wager);
+    d.wager = Number.isFinite(amount) && amount > 0 ? amount : undefined;
+    d.lucky = e.inputs?.lucky === true;
 });
 ```
 

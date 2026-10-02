@@ -50,7 +50,7 @@ With the imports in place, everything else collapses into a single call. This is
 
 ```ts
 const bot = createBot({
-	modules: [{ name: 'about', commands: [aboutCommand] }],
+    modules: [{ name: 'about', commands: [aboutCommand] }],
 });
 ```
 

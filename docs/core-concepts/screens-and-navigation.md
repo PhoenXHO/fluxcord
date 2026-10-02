@@ -10,16 +10,16 @@ Open up `src/modules/dice.tsx` and define the landing screen:
 
 ```tsx
 const menuScreen = screen()((_data, { Button, Back }) => (
-	<view>
-		<text>Dice: one die, one roll, no house edge. Where to?</text>
-		<row>
-			<Button onClick={e => e.ui.go('rules')} label="Rules" />
-			<Button onClick={e => e.ui.go('about')} label="About" />
-		</row>
-		<row>
-			<Back />
-		</row>
-	</view>
+    <view>
+        <text>Dice: one die, one roll, no house edge. Where to?</text>
+        <row>
+            <Button onClick={e => e.ui.go('rules')} label="Rules" />
+            <Button onClick={e => e.ui.go('about')} label="About" />
+        </row>
+        <row>
+            <Back />
+        </row>
+    </view>
 ));
 ```
 
@@ -35,12 +35,12 @@ Destinations need a way back, so the rules screen gets a `Back` button. Here is 
 
 ```tsx
 const rulesScreen = screen()((_data, { Back }) => (
-	<view>
-		<text>Call a number from one to six, then roll. Guess right and you win the round; guess wrong and the die wins.</text>
-		<row>
-			<Back />
-		</row>
-	</view>
+    <view>
+        <text>Call a number from one to six, then roll. Guess right and you win the round; guess wrong and the die wins.</text>
+        <row>
+            <Back />
+        </row>
+    </view>
 ));
 ```
 
@@ -63,8 +63,8 @@ Now we bundle all three screens together into a single flow:
 
 ```ts
 export const diceFlow = flow('dice', {
-	screens: { menu: menuScreen, rules: rulesScreen, about: aboutScreen },
-	first: 'menu',
+    screens: { menu: menuScreen, rules: rulesScreen, about: aboutScreen },
+    first: 'menu',
 });
 ```
 
@@ -76,7 +76,7 @@ Finally, we export a slash command that mounts our dice flow:
 
 ```ts
 export const diceCommand = command('dice', 'Open the dice panel', {
-	mount: mounts(diceFlow),
+    mount: mounts(diceFlow),
 });
 ```
 
@@ -84,10 +84,10 @@ To make this command available in Discord, add the module to your bot's list in 
 
 ```ts
 const bot = createBot({
-	modules: [
-		{ name: 'about', commands: [aboutCommand] },
-		{ name: 'dice', commands: [diceCommand] },
-	],
+    modules: [
+        { name: 'about', commands: [aboutCommand] },
+        { name: 'dice', commands: [diceCommand] },
+    ],
 });
 ```
 

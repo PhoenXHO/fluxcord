@@ -17,13 +17,13 @@ Because `<view>` represents the whole message, it's the natural place for a page
 
 ```tsx
 <view title="Dice">
-	<text>One die, one roll, no house edge. Where to?</text>
-	<row>
-		<Button onClick={e => e.ui.go('roll')} label="Roll" />
-		<Button onClick={e => e.ui.go('rules')} label="Rules" />
-		<Button onClick={e => e.ui.go('about')} label="About" />
-	</row>
-	<Back />
+    <text>One die, one roll, no house edge. Where to?</text>
+    <row>
+        <Button onClick={e => e.ui.go('roll')} label="Roll" />
+        <Button onClick={e => e.ui.go('rules')} label="Rules" />
+        <Button onClick={e => e.ui.go('about')} label="About" />
+    </row>
+    <Back />
 </view>
 ```
 
@@ -35,11 +35,11 @@ To signal that adjacent sections play different roles, you can separate them wit
 
 ```tsx
 <view title="Dice">
-	<text>One die, one roll, no house edge. Where to?</text>
-	<hr />
-	<row>
-		...
-	</row>
+    <text>One die, one roll, no house edge. Where to?</text>
+    <hr />
+    <row>
+        ...
+    </row>
 </view>
 ```
 
@@ -54,12 +54,12 @@ Whenever you need a distinct card, wrapping your content in a `<container>` lets
 
 ```tsx
 const rulesScreen = screen<DiceData>()((_data, { Back }) => (
-	<container color={0xf1c40f}>
-		<text title="House rules">Call a number from one to six, then roll. Guess right and you win the round; guess wrong and the die wins.</text>
-		<hr />
-		<codeblock lang="js">roll === call // the only winning line</codeblock>
-		<Back />
-	</container>
+    <container color={0xf1c40f}>
+        <text title="House rules">Call a number from one to six, then roll. Guess right and you win the round; guess wrong and the die wins.</text>
+        <hr />
+        <codeblock lang="js">roll === call // the only winning line</codeblock>
+        <Back />
+    </container>
 ));
 ```
 
@@ -83,11 +83,11 @@ You can also call out notices with dedicated alert blocks. The `<error>`, `<warn
 
 ```tsx
 const aboutScreen = screen<DiceData>()((_data, { Back }) => (
-	<view>
-		<info>Dice is the guide's example panel.</info>
-		<text>It grows chapter by chapter; the chrome you see here comes from the layout chapter.</text>
-		<Back />
-	</view>
+    <view>
+        <info>Dice is the guide's example panel.</info>
+        <text>It grows chapter by chapter; the chrome you see here comes from the layout chapter.</text>
+        <Back />
+    </view>
 ));
 ```
 
@@ -99,14 +99,14 @@ This grouping behavior makes fragments especially handy for conditional blocks, 
 
 ```tsx
 <view title="Dice">
-	<text>One die, one roll, no house edge. Where to?</text>
-	{hintNeeded && (
-		<>
-			<hr />
-			<text>Pick a number first and the Roll button unlocks.</text>
-		</>
-	)}
-	...
+    <text>One die, one roll, no house edge. Where to?</text>
+    {hintNeeded && (
+        <>
+            <hr />
+            <text>Pick a number first and the Roll button unlocks.</text>
+        </>
+    )}
+    ...
 </view>
 ```
 
@@ -124,7 +124,7 @@ This grouping behavior makes fragments especially handy for conditional blocks, 
 > ```tsx
 > // throws: showModal needs a <modal> root; a fragment or a dropped root is not a modal
 > <>
-> 	<input label="Name" />
+>     <input label="Name" />
 > </>
 > ```
 

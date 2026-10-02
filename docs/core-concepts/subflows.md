@@ -17,51 +17,51 @@ Here is the complete delivery flow definition from `examples/src/modules/order/d
 import { action, EventKind, flow, screen } from 'fluxcord';
 
 export interface DeliveryData {
-	when?: string;
-	address?: string;
+    when?: string;
+    address?: string;
 }
 
 const WHEN = [
-	{ label: 'As soon as possible', value: 'asap' },
-	{ label: 'In about half an hour', value: 'later' },
+    { label: 'As soon as possible', value: 'asap' },
+    { label: 'In about half an hour', value: 'later' },
 ];
 
 const pickWhen = action<DeliveryData>()(e => {
-	e.mutate(d => {
-		d.when = e.values?.[0];
-	});
+    e.mutate(d => {
+        d.when = e.values?.[0];
+    });
 });
 
 // Two lives again: the click opens the dialog, the submit lands back here.
 const setAddress = action<DeliveryData>()(e => {
-	if (e.kind !== EventKind.ModalSubmit) {
-		void e.ui.showModal(
-			<modal title="Delivery address">
-				<input id="address" label="Where to?" required maxLength={100} placeholder="Street and number" />
-			</modal>,
-		);
-		return;
-	}
-	e.mutate(d => {
-		const address = e.inputs?.address;
-		d.address = typeof address === 'string' && address.length > 0 ? address : undefined;
-	});
+    if (e.kind !== EventKind.ModalSubmit) {
+        void e.ui.showModal(
+            <modal title="Delivery address">
+                <input id="address" label="Where to?" required maxLength={100} placeholder="Street and number" />
+            </modal>,
+        );
+        return;
+    }
+    e.mutate(d => {
+        const address = e.inputs?.address;
+        d.address = typeof address === 'string' && address.length > 0 ? address : undefined;
+    });
 });
 
 export const deliveryFlow = flow<DeliveryData>('delivery', {
-	screens: {
-		details: screen<DeliveryData>()((data, { Button, Select }) => (
-			<view title="Delivery">
-				<text>When should the order arrive, and where should it go?</text>
-				<Select placeholder="Pick a time" options={WHEN} onSelect={pickWhen} values={[data.when]} />
-				<row>
-					<Button onClick={setAddress} label={data.address === undefined ? 'Set an address' : 'Change the address'} secondary />
-				</row>
-			</view>
-		)),
-	},
-	first: 'details',
-	initialData: {},
+    screens: {
+        details: screen<DeliveryData>()((data, { Button, Select }) => (
+            <view title="Delivery">
+                <text>When should the order arrive, and where should it go?</text>
+                <Select placeholder="Pick a time" options={WHEN} onSelect={pickWhen} values={[data.when]} />
+                <row>
+                    <Button onClick={setAddress} label={data.address === undefined ? 'Set an address' : 'Change the address'} secondary />
+                </row>
+            </view>
+        )),
+    },
+    first: 'details',
+    initialData: {},
 });
 ```
 
@@ -84,11 +84,11 @@ To mount the plug, pass the plug into the host's `subflows` array:
 
 ```tsx
 export const orderFlow = flow<OrderData>('order', {
-	screens: { menu: menuScreen, build: buildScreen, receipt: receiptScreen },
-	first: 'menu',
-	initialData: { toppings: [], delivery: {} },
-	components: [deliveryBar(deliveryPlug)],
-	subflows: [deliveryPlug],
+    screens: { menu: menuScreen, build: buildScreen, receipt: receiptScreen },
+    first: 'menu',
+    initialData: { toppings: [], delivery: {} },
+    components: [deliveryBar(deliveryPlug)],
+    subflows: [deliveryPlug],
 });
 ```
 
@@ -102,13 +102,13 @@ Because the subflow writes straight into the field specified by `at`, that slot 
 
 ```tsx
 export interface OrderData {
-	size?: string;
-	toppings: readonly string[];
-	name?: string;
-	napkins?: boolean;
-	// The delivery subflow's slot: seeded empty, filled by the subflow's
-	// own screens through the lens.
-	delivery: DeliveryData;
+    size?: string;
+    toppings: readonly string[];
+    name?: string;
+    napkins?: boolean;
+    // The delivery subflow's slot: seeded empty, filled by the subflow's
+    // own screens through the lens.
+    delivery: DeliveryData;
 }
 ```
 
@@ -123,7 +123,7 @@ You open a subflow just like any other destination by calling `e.ui.go('delivery
 
 ```tsx
 const openDelivery = action<OrderData>()(e => {
-	e.ui.go('delivery');
+    e.ui.go('delivery');
 });
 ```
 
@@ -133,10 +133,10 @@ We place that button directly on the build screen alongside our other navigation
 
 ```tsx
 <row>
-	<Button onClick={customize} label="Customize" secondary />
-	<Button onClick={openDelivery} label="Delivery" />
-	<Button onClick={e => e.ui.go('receipt')} label="Checkout" success disabled={data.size === undefined} />
-	<Back />
+    <Button onClick={customize} label="Customize" secondary />
+    <Button onClick={openDelivery} label="Delivery" />
+    <Button onClick={e => e.ui.go('receipt')} label="Checkout" success disabled={data.size === undefined} />
+    <Back />
 </row>
 ```
 
@@ -152,8 +152,8 @@ Since mutations happen directly on the parent's state, returning from the subflo
 
 ```tsx
 if (delivery.when !== undefined) {
-	const when = delivery.when === 'asap' ? 'ASAP' : 'in about half an hour';
-	lines.push(`Delivery: ${when}${delivery.address !== undefined ? `, to ${delivery.address}` : ''}`);
+    const when = delivery.when === 'asap' ? 'ASAP' : 'in about half an hour';
+    lines.push(`Delivery: ${when}${delivery.address !== undefined ? `, to ${delivery.address}` : ''}`);
 }
 ```
 
@@ -165,18 +165,18 @@ To bridge this gap, fluxcord lets you define wrapper layers via the `components`
 
 ```tsx
 function deliveryBar(plug: SubflowPlug): FlowComponent<OrderData> {
-	return (tree, session, { Button }) => {
-		if (!session.screen.startsWith('delivery.')) return tree;
-		return (
-			<view {...tree}>
-				{tree.children}
-				<hr />
-				<row>
-					<Button onClick={plug.done} label="Done" success />
-				</row>
-			</view>
-		);
-	};
+    return (tree, session, { Button }) => {
+        if (!session.screen.startsWith('delivery.')) return tree;
+        return (
+            <view {...tree}>
+                {tree.children}
+                <hr />
+                <row>
+                    <Button onClick={plug.done} label="Done" success />
+                </row>
+            </view>
+        );
+    };
 }
 ```
 
@@ -190,11 +190,11 @@ Leaving a subflow happens through one of two exits. The kit's `<Back />` button 
 
 ```tsx
 const deliveryPlug = subflow({
-	use: deliveryFlow.definition,
-	at: 'delivery',
-	onDone: (state, ui) => {
-		// state is the guest's final DeliveryData
-	},
+    use: deliveryFlow.definition,
+    at: 'delivery',
+    onDone: (state, ui) => {
+        // state is the guest's final DeliveryData
+    },
 });
 ```
 

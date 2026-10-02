@@ -1,15 +1,15 @@
 <p align="center">
-	<picture>
-		<source
-			media="(prefers-color-scheme: dark)"
-			srcset=".github/assets/horizontal-lockup-dark.png"
-		/>
-		<img
-			src=".github/assets/horizontal-lockup-light.png"
-			alt="fluxcord"
-			width="560"
-		/>
-	</picture>
+    <picture>
+        <source
+            media="(prefers-color-scheme: dark)"
+            srcset=".github/assets/horizontal-lockup-dark.png"
+        />
+        <img
+            src=".github/assets/horizontal-lockup-light.png"
+            alt="fluxcord"
+            width="560"
+        />
+    </picture>
 </p>
 
 <div align="center">
@@ -78,12 +78,12 @@ For TSX authoring, point `jsxImportSource` at the package:
 
 ```jsonc
 {
-	"compilerOptions": {
-		"jsx": "react-jsx",
-		"jsxImportSource": "fluxcord",
-		"module": "Node16",
-		"moduleResolution": "Node16"
-	}
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "jsxImportSource": "fluxcord",
+        "module": "Node16",
+        "moduleResolution": "Node16"
+    }
 }
 ```
 
@@ -95,35 +95,35 @@ A counter written as a flow:
 import { action, screen, flow } from 'fluxcord';
 
 interface CounterData {
-	count: number;
+    count: number;
 }
 
 const plus = action<CounterData>()((event) => {
-	event.mutate((data) => {
-		data.count += 1;
-	});
+    event.mutate((data) => {
+        data.count += 1;
+    });
 });
 
 const minus = action<CounterData>()((event) => {
-	event.mutate((data) => {
-		data.count -= 1;
-	});
+    event.mutate((data) => {
+        data.count -= 1;
+    });
 });
 
 const counterScreen = screen<CounterData>()((data, { Button }) => (
-	<view>
-		<text>Count: {data.count}</text>
-		<row>
-			<Button onClick={minus} label="-1" secondary />
-			<Button onClick={plus} label="+1" />
-		</row>
-	</view>
+    <view>
+        <text>Count: {data.count}</text>
+        <row>
+            <Button onClick={minus} label="-1" secondary />
+            <Button onClick={plus} label="+1" />
+        </row>
+    </view>
 ));
 
 export const counterFlow = flow<CounterData>('counter', {
-	screens: { main: counterScreen },
-	first: 'main',
-	initialData: { count: 0 },
+    screens: { main: counterScreen },
+    first: 'main',
+    initialData: { count: 0 },
 });
 ```
 
@@ -135,7 +135,7 @@ that can drift out of sync, and the state lives in a session the framework
 tracks rather than in a `Map` you manage yourself.
 
 <p align="center">
-	<img src=".github/assets/fluxcord-example-counter.gif" alt="The counter panel from the example, with the count climbing as +1 is clicked" width="480" />
+    <img src=".github/assets/fluxcord-example-counter.gif" alt="The counter panel from the example, with the count climbing as +1 is clicked" width="480" />
 </p>
 
 ## Documentation

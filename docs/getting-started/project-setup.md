@@ -56,8 +56,8 @@ Next, create `src/index.ts`. This is where your bot will eventually boot up and 
 `/src/index.ts`
 ```ts
 console.log(
-	'DISCORD_TOKEN is',
-	process.env.DISCORD_TOKEN === undefined ? 'missing' : 'set',
+    'DISCORD_TOKEN is',
+    process.env.DISCORD_TOKEN === undefined ? 'missing' : 'set',
 );
 ```
 
@@ -70,14 +70,14 @@ TypeScript needs to be compiled before Node can run it, so add three scripts to 
 `/package.json`
 ```json
 {
-	"name": "my-bot",
-	"version": "1.0.0",
-	"type": "module",
-	"scripts": {
-		"build": "tsc -p tsconfig.json",
-		"start": "node --env-file=.env dist/index.js",
-		"dev": "node --watch --env-file=.env dist/index.js"
-	}
+    "name": "my-bot",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "start": "node --env-file=.env dist/index.js",
+        "dev": "node --watch --env-file=.env dist/index.js"
+    }
 }
 ```
 

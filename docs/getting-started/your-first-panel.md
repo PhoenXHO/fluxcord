@@ -10,12 +10,12 @@ A panel's layout is defined inside a screen, which is a function that returns TS
 
 ```tsx
 const aboutScreen = screen()(() => (
-	<view>
-		<text>A tiny panel built with fluxcord.</text>
-		<row>
-			<link label="Source" url="https://github.com/PhoenXHO/fluxcord" />
-		</row>
-	</view>
+    <view>
+        <text>A tiny panel built with fluxcord.</text>
+        <row>
+            <link label="Source" url="https://github.com/PhoenXHO/fluxcord" />
+        </row>
+    </view>
 ));
 ```
 
@@ -25,9 +25,9 @@ There are two calls fused into that one line, which is easier to see split apart
 const makeScreen = screen(); // the factory hands back a function...
 
 const aboutScreen = makeScreen(() => (
-	<view>
-		{/* the same layout as before */}
-	</view>
+    <view>
+        {/* the same layout as before */}
+    </view>
 )); // ...and that function receives the view
 ```
 
@@ -52,8 +52,8 @@ While a screen handles presentation, it needs a controller to manage navigation 
 
 ```ts
 export const aboutFlow = flow('about', {
-	screens: { main: aboutScreen },
-	first: 'main',
+    screens: { main: aboutScreen },
+    first: 'main',
 });
 ```
 
@@ -69,7 +69,7 @@ import { command, flow, mounts, screen } from 'fluxcord';
 
 ```ts
 export const aboutCommand = command('about', 'Open the about panel', {
-	mount: mounts(aboutFlow),
+    mount: mounts(aboutFlow),
 });
 ```
 

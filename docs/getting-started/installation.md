@@ -26,9 +26,9 @@ This generates a `package.json` with sensible defaults. Open it and add `"type":
 
 ```json
 {
-	"name": "my-bot",
-	"version": "1.0.0",
-	"type": "module"
+    "name": "my-bot",
+    "version": "1.0.0",
+    "type": "module"
 }
 ```
 
@@ -63,18 +63,18 @@ Create a `tsconfig.json` file in your project's root folder:
 `/tsconfig.json`
 ```json
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "Node16",
-		"moduleResolution": "Node16",
-		"jsx": "react-jsx",
-		"jsxImportSource": "fluxcord",
-		"outDir": "dist",
-		"rootDir": "src",
-		"strict": true,
-		"skipLibCheck": true
-	},
-	"include": ["src"]
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "Node16",
+        "moduleResolution": "Node16",
+        "jsx": "react-jsx",
+        "jsxImportSource": "fluxcord",
+        "outDir": "dist",
+        "rootDir": "src",
+        "strict": true,
+        "skipLibCheck": true
+    },
+    "include": ["src"]
 }
 ```
 

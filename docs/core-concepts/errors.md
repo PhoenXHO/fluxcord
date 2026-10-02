@@ -21,8 +21,8 @@ So far the ticket desk's resolve button can't fail: it just decrements a number.
 
 ```tsx
 interface TicketData {
-	open: number;
-	pinged: boolean;
+    open: number;
+    pinged: boolean;
 }
 
 // Resolving is the gated control: the admin gate rides the button (the
@@ -30,36 +30,36 @@ interface TicketData {
 // checked at dispatch. Even the session owner needs an admin badge for
 // this one.
 const resolveNext = action<TicketData>()(e => {
-	e.mutate(d => {
-		d.open = Math.max(0, d.open - 1);
-	});
+    e.mutate(d => {
+        d.open = Math.max(0, d.open - 1);
+    });
 });
 
 // A real bot would call the assignee through Discord here; the stub flips
 // a coin so the failure path actually fires during a demo.
 const pingAssignee = action<TicketData>()(async e => {
-	if (Math.random() < 0.5) throw new Error('the notification stack refused the ping');
-	e.mutate(d => {
-		d.pinged = true;
-	});
+    if (Math.random() < 0.5) throw new Error('the notification stack refused the ping');
+    e.mutate(d => {
+        d.pinged = true;
+    });
 });
 
 const deskScreen = screen<TicketData>()((data, { Button }) => (
-	<view>
-		<text>The ticket desk: resolve what is handled, ping the assignee when a ticket sits. Wire the real queue to your own tracker.</text>
-		<text>{data.open === 0 ? 'The queue is clear.' : `${data.open} ticket${data.open === 1 ? '' : 's'} in the queue.`}</text>
-		<row>
-			<Button
-				onClick={resolveNext}
-				label="Resolve the next"
-				success
-				disabled={data.open === 0}
-				policy={{ roles: { mode: 'allow', roleIds: [...roleConfig.admin] } }}
-			/>
-			<Button onClick={pingAssignee} label="Ping the assignee" secondary disabled={data.open === 0 || data.pinged} />
-		</row>
-		{data.pinged && <text>The assignee was pinged.</text>}
-	</view>
+    <view>
+        <text>The ticket desk: resolve what is handled, ping the assignee when a ticket sits. Wire the real queue to your own tracker.</text>
+        <text>{data.open === 0 ? 'The queue is clear.' : `${data.open} ticket${data.open === 1 ? '' : 's'} in the queue.`}</text>
+        <row>
+            <Button
+                onClick={resolveNext}
+                label="Resolve the next"
+                success
+                disabled={data.open === 0}
+                policy={{ roles: { mode: 'allow', roleIds: [...roleConfig.admin] } }}
+            />
+            <Button onClick={pingAssignee} label="Ping the assignee" secondary disabled={data.open === 0 || data.pinged} />
+        </row>
+        {data.pinged && <text>The assignee was pinged.</text>}
+    </view>
 ));
 ```
 
@@ -74,15 +74,15 @@ Although generic copy works fine as a fallback, providing specific feedback is m
 
 ```tsx
 const ticketsFlow = flow<TicketData>('tickets', {
-	screens: { desk: deskScreen },
-	first: 'desk',
-	initialData: { open: 3, pinged: false },
-	onError: report => {
-		if (report.source === ErrorSource.Handler) {
-			return 'The notification stack refused the ping. Give it a moment, then try again.';
-		}
-		return undefined;
-	},
+    screens: { desk: deskScreen },
+    first: 'desk',
+    initialData: { open: 3, pinged: false },
+    onError: report => {
+        if (report.source === ErrorSource.Handler) {
+            return 'The notification stack refused the ping. Give it a moment, then try again.';
+        }
+        return undefined;
+    },
 });
 ```
 
@@ -109,13 +109,13 @@ For global error handling or custom logging setups, you can supply a top-level `
 
 ```tsx
 const bot = createBot({
-	onError: report => {
-		logger.error(report.error, { source: report.source, dirtyKeys: report.dirtyKeys });
-		if (report.source === ErrorSource.Handler) {
-			report.reply('Something broke on our side. It has been logged.').catch(() => undefined);
-		}
-	},
-	modules: [/* ... */],
+    onError: report => {
+        logger.error(report.error, { source: report.source, dirtyKeys: report.dirtyKeys });
+        if (report.source === ErrorSource.Handler) {
+            report.reply('Something broke on our side. It has been logged.').catch(() => undefined);
+        }
+    },
+    modules: [/* ... */],
 });
 ```
 

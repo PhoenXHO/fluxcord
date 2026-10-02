@@ -26,7 +26,7 @@ You've written this shape in every module so far:
 
 ```tsx
 export const aboutCommand = command('about', 'Open the about panel', {
-	mount: mounts(aboutFlow),
+    mount: mounts(aboutFlow),
 });
 ```
 
@@ -45,33 +45,33 @@ import { PermissionFlagsBits } from 'discord.js';
 import { command, flow, mounts, screen } from 'fluxcord';
 
 const rolesScreen = screen()(() => (
-	<view>
-		<text>Pick the staff and admin roles this server trusts.</text>
-	</view>
+    <view>
+        <text>Pick the staff and admin roles this server trusts.</text>
+    </view>
 ));
 
 const rolesFlow = flow('roles', {
-	screens: { picker: rolesScreen },
-	first: 'picker',
+    screens: { picker: rolesScreen },
+    first: 'picker',
 });
 
 const deskScreen = screen()(() => (
-	<view>
-		<text>The ticket desk: view the queue and resolve tickets from one panel.</text>
-	</view>
+    <view>
+        <text>The ticket desk: view the queue and resolve tickets from one panel.</text>
+    </view>
 ));
 
 const ticketsFlow = flow('tickets', {
-	screens: { desk: deskScreen },
-	first: 'desk',
+    screens: { desk: deskScreen },
+    first: 'desk',
 });
 
 export const staffCommand = command('staff', 'Moderation panels for server staff', {
-	memberPermissions: PermissionFlagsBits.ManageMessages,
-	subcommands: {
-		roles: mounts(rolesFlow, { description: 'Pick the staff and admin roles' }),
-		tickets: mounts(ticketsFlow, { description: 'Open the ticket desk', ephemeral: true }),
-	},
+    memberPermissions: PermissionFlagsBits.ManageMessages,
+    subcommands: {
+        roles: mounts(rolesFlow, { description: 'Pick the staff and admin roles' }),
+        tickets: mounts(ticketsFlow, { description: 'Open the ticket desk', ephemeral: true }),
+    },
 });
 ```
 
@@ -102,26 +102,26 @@ When you have flows that aren't mounted by any command, your module can register
 ```tsx
 // examples/src/index.ts
 const bot = createBot({
-	modules: [
-		// ...the command-driven modules...
-		{ name: 'campfire', flows: [campfireFlow] },
-	],
+    modules: [
+        // ...the command-driven modules...
+        { name: 'campfire', flows: [campfireFlow] },
+    ],
 });
 
 async function main(): Promise<void> {
-	await bot.start();
-	// The campfire panel mounts once and outlives restarts: the rehydrate
-	// row lets any later click on the message rebuild the session. Set
-	// CAMPFIRE_CHANNEL_ID and CAMPFIRE_OWNER_ID in .env to get the panel
-	const channel = process.env.CAMPFIRE_CHANNEL_ID;
-	const owner = process.env.CAMPFIRE_OWNER_ID;
-	if (channel !== undefined && owner !== undefined) {
-		await bot.mount(campfireFlow, {
-			to: { channel },
-			ownerId: owner,
-			rehydrateRef: 'campfire:main',
-		});
-	}
+    await bot.start();
+    // The campfire panel mounts once and outlives restarts: the rehydrate
+    // row lets any later click on the message rebuild the session. Set
+    // CAMPFIRE_CHANNEL_ID and CAMPFIRE_OWNER_ID in .env to get the panel
+    const channel = process.env.CAMPFIRE_CHANNEL_ID;
+    const owner = process.env.CAMPFIRE_OWNER_ID;
+    if (channel !== undefined && owner !== undefined) {
+        await bot.mount(campfireFlow, {
+            to: { channel },
+            ownerId: owner,
+            rehydrateRef: 'campfire:main',
+        });
+    }
 }
 ```
 

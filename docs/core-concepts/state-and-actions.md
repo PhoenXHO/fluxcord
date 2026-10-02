@@ -15,7 +15,7 @@ The panel lives in `src/modules/counter.tsx`, which mirrors [`examples/src/modul
 import { action, command, flow, mounts, screen } from 'fluxcord';
 
 interface CounterData {
-	count: number;
+    count: number;
 }
 ```
 
@@ -25,15 +25,15 @@ Next, we'll write the two handlers, which are worth reading closely since the pa
 
 ```tsx
 const plus = action<CounterData>()((event) => {
-	event.mutate((data) => {
-		data.count += 1;
-	});
+    event.mutate((data) => {
+        data.count += 1;
+    });
 });
 
 const minus = action<CounterData>()((event) => {
-	event.mutate((data) => {
-		data.count -= 1;
-	});
+    event.mutate((data) => {
+        data.count -= 1;
+    });
 });
 ```
 
@@ -47,19 +47,19 @@ Both phases in one handler:
 
 ```tsx
 const save = action<SettingsData>()(async e => {
-	// fallible work first: the write can fail
-	await e.task(() => db.saveSettings(e.session.data));
-	// mutate last: only reached when the save succeeded
-	e.mutate(d => {
-		d.saved = true;
-	});
+    // fallible work first: the write can fail
+    await e.task(() => db.saveSettings(e.session.data));
+    // mutate last: only reached when the save succeeded
+    e.mutate(d => {
+        d.saved = true;
+    });
 });
 ```
 
 > [!CAUTION]
 > ```tsx
 > e.mutate(d => {
-> 	d.saved = true;
+>     d.saved = true;
 > });
 > await e.task(() => db.saveSettings(e.session.data)); // throws, the save never runs
 > ```
@@ -71,13 +71,13 @@ Now, with our handlers defined, the screen can read from `data` and bind those h
 
 ```tsx
 const counterScreen = screen<CounterData>()((data, { Button }) => (
-	<view>
-		<text>Count: {data.count}</text>
-		<row>
-			<Button onClick={minus} label="-1" secondary />
-			<Button onClick={plus} label="+1" />
-		</row>
-	</view>
+    <view>
+        <text>Count: {data.count}</text>
+        <row>
+            <Button onClick={minus} label="-1" secondary />
+            <Button onClick={plus} label="+1" />
+        </row>
+    </view>
 ));
 ```
 
@@ -91,13 +91,13 @@ Next, we define the flow and command, which follow the familiar pattern we used 
 
 ```tsx
 export const counterFlow = flow<CounterData>('counter', {
-	screens: { main: counterScreen },
-	first: 'main',
-	initialData: { count: 0 },
+    screens: { main: counterScreen },
+    first: 'main',
+    initialData: { count: 0 },
 });
 
 export const counterCommand = command('counter', 'Open the counter panel', {
-	mount: mounts(counterFlow),
+    mount: mounts(counterFlow),
 });
 ```
 
@@ -110,11 +110,11 @@ To hook this up, wire the command into your module list in `src/index.ts` (make 
 
 ```ts
 const bot = createBot({
-	modules: [
-		{ name: 'about', commands: [aboutCommand] },
-		{ name: 'dice', commands: [diceCommand] },
-		{ name: 'counter', commands: [counterCommand] },
-	],
+    modules: [
+        { name: 'about', commands: [aboutCommand] },
+        { name: 'dice', commands: [diceCommand] },
+        { name: 'counter', commands: [counterCommand] },
+    ],
 });
 ```
 
@@ -128,7 +128,7 @@ After opening `src/modules/dice.tsx` (finished version lives at [`examples/src/m
 
 ```tsx
 interface DiceData {
-	roll?: number;
+    roll?: number;
 }
 ```
 
@@ -138,9 +138,9 @@ Next, we'll place the action above the screens that bind it so that it's availab
 
 ```tsx
 const roll = action<DiceData>()(e => {
-	e.mutate(d => {
-		d.roll = 1 + Math.floor(Math.random() * 6);
-	});
+    e.mutate(d => {
+        d.roll = 1 + Math.floor(Math.random() * 6);
+    });
 });
 ```
 
@@ -150,15 +150,15 @@ The new screen then reads that value to show either the invitation or the result
 
 ```tsx
 const rollScreen = screen<DiceData>()((data, { Button, Back }) => (
-	<view>
-		<text>{data.roll === undefined
-			? 'Feeling lucky? Roll.'
-			: `You rolled a ${data.roll}.`}</text>
-		<row>
-			<Button onClick={roll} label="Roll" />
-			<Back />
-		</row>
-	</view>
+    <view>
+        <text>{data.roll === undefined
+            ? 'Feeling lucky? Roll.'
+            : `You rolled a ${data.roll}.`}</text>
+        <row>
+            <Button onClick={roll} label="Roll" />
+            <Back />
+        </row>
+    </view>
 ));
 ```
 
@@ -174,22 +174,22 @@ And finally, register `rollScreen` in the flow. Since the flow now states its ba
 
 ```tsx
 const menuScreen = screen<DiceData>()((_data, { Button, Back }) => (
-	// ...unchanged from the previous chapter
+    // ...unchanged from the previous chapter
 ));
 
 const rulesScreen = screen<DiceData>()((_data, { Back }) => (
-	// ...unchanged from the previous chapter
+    // ...unchanged from the previous chapter
 ));
 
 const aboutScreen = screen<DiceData>()((_data, { Back }) => (
-	// ...unchanged from the previous chapter
+    // ...unchanged from the previous chapter
 ));
 ```
 
 ```tsx
 export const diceFlow = flow<DiceData>('dice', {
-	screens: { menu: menuScreen, roll: rollScreen, rules: rulesScreen, about: aboutScreen },
-	first: 'menu',
+    screens: { menu: menuScreen, roll: rollScreen, rules: rulesScreen, about: aboutScreen },
+    first: 'menu',
 });
 ```
 

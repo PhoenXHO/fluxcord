@@ -10,8 +10,8 @@ By default, fluxcord evaluates permissions using an ownership check: it compares
 
 ```ts
 const bot = createBot({
-	policy: staffPolicy,
-	modules: [/* ... */],
+    policy: staffPolicy,
+    modules: [/* ... */],
 });
 ```
 
@@ -46,8 +46,8 @@ That absence raises an obvious question for our staff example: if the engine can
 
 ```tsx
 const roleConfig = {
-	staff: [] as readonly string[],
-	admin: [] as readonly string[],
+    staff: [] as readonly string[],
+    admin: [] as readonly string[],
 };
 ```
 
@@ -61,18 +61,18 @@ Both checks ship with fluxcord as request helpers (`isOwner`, `hasAnyRole`), so 
 
 ```tsx
 const staffPolicy: PolicyPort = {
-	authorize(request) {
-		const gate = request.actionPolicy;
-		if (gate?.roles?.roleIds !== undefined) {
-			return hasAnyRole(request, gate.roles.roleIds)
-				? Promise.resolve({ allowed: true })
-				: Promise.resolve({ allowed: false, denyMessage: 'Admins only.' });
-		}
-		if (isOwner(request) || hasAnyRole(request, roleConfig.staff)) {
-			return Promise.resolve({ allowed: true });
-		}
-		return Promise.resolve({ allowed: false, denyMessage: 'Staff only.' });
-	},
+    authorize(request) {
+        const gate = request.actionPolicy;
+        if (gate?.roles?.roleIds !== undefined) {
+            return hasAnyRole(request, gate.roles.roleIds)
+                ? Promise.resolve({ allowed: true })
+                : Promise.resolve({ allowed: false, denyMessage: 'Admins only.' });
+        }
+        if (isOwner(request) || hasAnyRole(request, roleConfig.staff)) {
+            return Promise.resolve({ allowed: true });
+        }
+        return Promise.resolve({ allowed: false, denyMessage: 'Staff only.' });
+    },
 };
 ```
 
@@ -84,14 +84,14 @@ Since our store needs a way to update, we can add a `/staff roles` subcommand th
 
 ```tsx
 const rolesScreen = screen()((_data, { Select }) => (
-	<view>
-		<text>
-			Who counts as staff, and who can resolve tickets? New picks apply to fresh panels right away; a
-			panel that is already open adopts them on its next draw.
-		</text>
-		<Select roles placeholder="Staff roles" onSelect={pickStaff} defaultIds={[...roleConfig.staff]} />
-		<Select roles placeholder="Admin roles (may resolve tickets)" onSelect={pickAdmin} defaultIds={[...roleConfig.admin]} />
-	</view>
+    <view>
+        <text>
+            Who counts as staff, and who can resolve tickets? New picks apply to fresh panels right away; a
+            panel that is already open adopts them on its next draw.
+        </text>
+        <Select roles placeholder="Staff roles" onSelect={pickStaff} defaultIds={[...roleConfig.staff]} />
+        <Select roles placeholder="Admin roles (may resolve tickets)" onSelect={pickAdmin} defaultIds={[...roleConfig.admin]} />
+    </view>
 ));
 ```
 
@@ -103,9 +103,9 @@ UI elements can enforce granular access controls by declaring a `policy` prop. F
 
 ```tsx
 <Button
-	onClick={resolveNext}
-	label="Resolve the next"
-	policy={{ roles: { mode: 'allow', roleIds: [...roleConfig.admin] } }}
+    onClick={resolveNext}
+    label="Resolve the next"
+    policy={{ roles: { mode: 'allow', roleIds: [...roleConfig.admin] } }}
 />
 ```
 
