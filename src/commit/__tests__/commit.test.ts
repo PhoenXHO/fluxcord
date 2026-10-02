@@ -31,6 +31,7 @@ import type {
 	ScreenRegistry,
 } from '../../pipeline/types.js';
 import { createCommit } from '../commit.js';
+import { viewOf } from '../commit.js';
 import { freezeTree } from '../freeze.js';
 import { createOnEnd } from '../onEnd.js';
 import { partingView } from '../parting.js';
@@ -457,5 +458,28 @@ describe('partingView', () => {
 	it('a command hint appends the restart line', () => {
 		const tree = partingView('lotto');
 		expect((tree.children[0] as TextNode).body).toContain('Run `/lotto` to start a new one.');
+	});
+});
+
+describe('viewOf (unseeded slot)', () => {
+	it('a plugged screen whose slot the parent never seeded fails loudly, naming screen and slot', () => {
+		const store = createSessionStore();
+		const session = store.create({
+			flowId: 'lotto',
+			moduleId: 'lotto',
+			ownerId: OWNER_ID,
+			messageRef: { channelId: CHANNEL_ID, messageId: MESSAGE_ID },
+			data: {},
+			screen: 'guest',
+			ttlMs: 30 * 60 * 1000,
+			remount: 'coexist',
+		});
+		const screens: ScreenRegistry = {
+			resolve: (viewKey) => viewKey === 'lotto/guest'
+				? { view: (data) => view({}, text(`guest: ${JSON.stringify(data)}`)), slot: ['delivery'] }
+				: undefined,
+		};
+
+		expect(() => viewOf(session, screens)).toThrow(/'lotto\/guest'.*slot 'delivery'/);
 	});
 });

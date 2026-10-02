@@ -101,6 +101,14 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 		throw new Error(`no screen registered for '${key}'`);
 	}
 	const data = screen.slot === undefined ? session.data : getPath(session.data, screen.slot);
+	// An unseeded slot: the lens reads undefined and the guest view would
+	// die on its own TypeError far from the cause. Fail here instead,
+	// naming the screen and the slot path.
+	if (screen.slot !== undefined && data === undefined) {
+		throw new Error(
+			`screen '${key}' views slot '${screen.slot.join('.')}' but the bag has nothing at that path: the parent flow never seeded the slot in its initialData`,
+		);
+	}
 	// Views return the element union (TSX roots type flat), folded to a
 	// view node here, one place; validateTree polices the result below.
 	// Same for the composed wrap's result.
