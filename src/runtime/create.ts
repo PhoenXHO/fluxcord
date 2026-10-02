@@ -197,8 +197,11 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		// author's initialData was checked against TData at defineFlow time.)
 		// A stateless flow (initialData omitted) starts from an empty bag.
 		const seeded = (): TData => structuredClone(def.initialData ?? {}) as TData;
+		// The restore callback rides the definition-boundary erase too: the
+		// author's rehydrate was checked against TData at defineFlow time,
+		// so the read casts back from the erased unknown.
 		const data = def.rehydrate !== undefined && mountOptions.rehydrateRef !== undefined
-			? (await def.rehydrate(mountOptions.rehydrateRef)) ?? seeded()
+			? ((await def.rehydrate(mountOptions.rehydrateRef)) as TData | undefined) ?? seeded()
 			: seeded();
 
 		// Draft session: same shape the store will create, messageRef pending.

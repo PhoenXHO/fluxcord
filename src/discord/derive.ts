@@ -92,10 +92,11 @@ export function deriveCommand(command: Command): DerivedCommand {
 	const leaves = spec.subcommands ?? {};
 	for (const [key, leaf] of Object.entries(leaves)) {
 		builder.addSubcommand((sub) => sub
-			// Subcommand descriptions are required at declare time; there is
-			// no fallback to fall back to.
+			// Subcommand descriptions are required at declare time (declare
+			// rejects a missing one), so the optional type is the leaf's
+			// shape, not a real gap.
 			.setName(key)
-			.setDescription(leaf.description));
+			.setDescription(leaf.description as string));
 	}
 	return {
 		data: builder,
