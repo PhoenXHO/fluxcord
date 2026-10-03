@@ -15,8 +15,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
       - run: npm ci
       - name: Verify tag matches package version
         run: |
@@ -26,6 +26,4 @@ jobs:
             echo "tag $GITHUB_REF_NAME (= $TAG) does not match package.json version $PKG" >&2
             exit 1
           fi
-      - run: npm publish --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm stage publish
