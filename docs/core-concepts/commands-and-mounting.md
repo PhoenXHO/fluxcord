@@ -93,7 +93,7 @@ Visibility settings are defined at the mount leaf rather than inside the flow de
 
 ## Dev-only tools
 
-Command specifications also support a `devOnly` flag to designate development utilities. While the default host registers all commands unconditionally, `devOnly` is exposed through derived registration facts. A custom host can read this flag inside its `registerCommands` callback (see [Hosting and commands](../getting-started/hosting-and-commands.md) for details).
+Command specifications also support a `devOnly` flag to designate development utilities. The default host keeps these commands out of the public registration. When `createBot` is given a `devGuildId` (or the `DISCORD_DEV_GUILD_ID` environment variable is set), dev-only commands register only in that guild. Without a dev guild, they are dropped. A custom host reads the `devOnly` fact inside its `registerCommands` callback (see [Hosting and commands](../getting-started/hosting-and-commands.md) for details).
 
 ## Flow catalog registration
 
