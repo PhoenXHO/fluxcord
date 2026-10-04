@@ -7,7 +7,7 @@
  * the framework does on its own funnels through here: redraws, the
  * close-freeze, and the parting screen.
  *
- * Every draw records the session's frame: the map of every handler the
+ * Every draw records the session's action map: the map of every handler the
  * rendered tree placed on the message. Dispatch resolves clicks against
  * that map, so what was last drawn is exactly what can run.
  *
@@ -133,12 +133,12 @@ export function createCommit(options: CommitOptions): CommitPhase {
 
 	/**
 	 * One draw: materialize the tree (stamping controls, building the
-	 * frame), then render the payload from the same stamps. The frame and
-	 * the pixels can never disagree: they come from the same walk.
+	 * action map), then render the payload from the same stamps. The map
+	 * and the pixels can never disagree: they come from the same walk.
 	 */
 	function draw(session: Session<unknown>, tree: ViewNode): V2MessagePayload {
 		const materialized = materializeTree(tree);
-		session.frame = materialized.frame;
+		session.actions = materialized.actions;
 		return renderV2Message(tree, session.id, `${session.moduleId}/${session.screen}`, materialized.stampOf);
 	}
 
@@ -150,7 +150,7 @@ export function createCommit(options: CommitOptions): CommitPhase {
 		async commitFreeze(session: Session<unknown>): Promise<void> {
 			if (done.has(session.messageRef.messageId)) return;
 			// The frozen tree carries no controls: harvesting it empties the
-			// frame, closing the message for clicks.
+			// action map, closing the message for clicks.
 			await options.platform.editMessage(session.messageRef, draw(session, freezeTree(viewOf(session, options.screens))));
 			done.add(session.messageRef.messageId);
 		},

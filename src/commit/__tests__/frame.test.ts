@@ -26,12 +26,12 @@ describe('materializeTree - stamps', () => {
 		const tree = view({}, row({}, one, two, three));
 		const base = actionHash(one.onClick);
 
-		const { stampOf, frame } = materializeTree(tree);
+		const { stampOf, actions } = materializeTree(tree);
 
 		expect(stampOf(one)).toBe(base);
 		expect(stampOf(two)).toBe(`${base}-1`);
 		expect(stampOf(three)).toBe(`${base}-2`);
-		expect(Object.keys(frame)).toEqual([base, `${base}-1`, `${base}-2`]);
+		expect(Object.keys(actions)).toEqual([base, `${base}-1`, `${base}-2`]);
 	});
 
 	it('counts across top-level rows and container rows in document order', () => {
@@ -50,17 +50,17 @@ describe('materializeTree - stamps', () => {
 		expect(stampOf(three)).toBe(`${stampOf(one)}-2`);
 	});
 
-	it('one handler object bound twice gets two stamps - both frame entries carry it', () => {
+	it('one handler object bound twice gets two stamps - both action-map entries carry it', () => {
 		const shared = (): void => {};
 		const one = button({ onClick: shared, label: 'one' });
 		const two = button({ onClick: shared, label: 'two' });
 		const tree = view({}, row({}, one, two));
 
-		const { stampOf, frame } = materializeTree(tree);
+		const { stampOf, actions } = materializeTree(tree);
 
 		expect(stampOf(two)).toBe(`${stampOf(one)}-1`);
-		expect(frame[stampOf(one)].handler).toBe(shared);
-		expect(frame[stampOf(two)].handler).toBe(shared);
+		expect(actions[stampOf(one)].handler).toBe(shared);
+		expect(actions[stampOf(two)].handler).toBe(shared);
 	});
 
 	it('the counter resets every draw - a fresh tree of the same shape starts bare', () => {
@@ -69,7 +69,7 @@ describe('materializeTree - stamps', () => {
 		const first = materializeTree(build());
 		const second = materializeTree(build());
 
-		expect(Object.keys(second.frame)).toEqual([Object.keys(first.frame)[0]]);
+		expect(Object.keys(second.actions)).toEqual([Object.keys(first.actions)[0]]);
 	});
 
 	it('stampOf throws for a control the walk never saw', () => {
@@ -79,24 +79,24 @@ describe('materializeTree - stamps', () => {
 	});
 });
 
-describe('materializeTree - the frame', () => {
+describe('materializeTree - the action map', () => {
 	it('records a button by its label, a select by placeholder or the plain word', () => {
 		const click = button({ onClick: (): void => {}, label: 'Go' });
 		const withHint = optionSelect({ onSelect: (): void => {}, options: [{ label: 'A', value: 'a' }], placeholder: 'pick one' });
 		const bare = optionSelect({ onSelect: (): void => {}, options: [{ label: 'A', value: 'a' }] });
-		const { frame, stampOf } = materializeTree(view({}, row({}, click, withHint, bare)));
+		const { actions, stampOf } = materializeTree(view({}, row({}, click, withHint, bare)));
 
-		expect(frame[stampOf(click)].label).toBe('Go');
-		expect(frame[stampOf(withHint)].label).toBe('pick one');
-		expect(frame[stampOf(bare)].label).toBe('select');
+		expect(actions[stampOf(click)].label).toBe('Go');
+		expect(actions[stampOf(withHint)].label).toBe('pick one');
+		expect(actions[stampOf(bare)].label).toBe('select');
 	});
 
-	it('returns a frozen frame; a stripped tree materializes empty', () => {
+	it('returns a frozen action map; a stripped tree materializes empty', () => {
 		const stamped = materializeTree(view({}, row({}, button({ onClick: (): void => {}, label: 'Go' }))));
-		expect(Object.isFrozen(stamped.frame)).toBe(true);
+		expect(Object.isFrozen(stamped.actions)).toBe(true);
 
 		const stripped = materializeTree(view({}, text('frozen screen')));
-		expect(stripped.frame).toEqual({});
+		expect(stripped.actions).toEqual({});
 	});
 
 	it('a control-declared policy rides its record; undeclared stays absent', () => {
@@ -108,18 +108,18 @@ describe('materializeTree - the frame', () => {
 			options: [{ label: 'A', value: 'a' }],
 			policy: { owner: { ownerOnly: true, allowAdminOverride: true } },
 		});
-		const { frame, stampOf } = materializeTree(view({}, row({}, open, plain, picked)));
+		const { actions, stampOf } = materializeTree(view({}, row({}, open, plain, picked)));
 
-		expect(frame[stampOf(open)].policy).toBe(gate);
-		expect('policy' in frame[stampOf(plain)]).toBe(false);
-		expect(frame[stampOf(picked)].policy).toEqual({ owner: { ownerOnly: true, allowAdminOverride: true } });
+		expect(actions[stampOf(open)].policy).toBe(gate);
+		expect('policy' in actions[stampOf(plain)]).toBe(false);
+		expect(actions[stampOf(picked)].policy).toEqual({ owner: { ownerOnly: true, allowAdminOverride: true } });
 	});
 
 	it('an untagged control carries no slot: dispatch falls back to the screen lens', () => {
 		const node = kitFor({ history: [] }).Button({ onClick: (): void => {}, label: 'Go' });
-		const { frame, stampOf } = materializeTree(view({}, row({}, node)));
+		const { actions, stampOf } = materializeTree(view({}, row({}, node)));
 
-		expect('slot' in frame[stampOf(node)]).toBe(false);
+		expect('slot' in actions[stampOf(node)]).toBe(false);
 	});
 });
 
@@ -128,20 +128,20 @@ describe('screenKitAt - draw-phase ownership tags', () => {
 		const kit = screenKitAt({ history: [] }, ['picker']);
 		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
 		const picked = kit.Select({ options: [{ label: 'A', value: 'a' }], onSelect: (): void => {} });
-		const { frame, stampOf } = materializeTree(view({}, row({}, node, picked)));
+		const { actions, stampOf } = materializeTree(view({}, row({}, node, picked)));
 
 		expect(node.slot).toEqual(['picker']);
 		expect(picked.slot).toEqual(['picker']);
-		expect(frame[stampOf(node)].slot).toEqual(['picker']);
-		expect(frame[stampOf(picked)].slot).toEqual(['picker']);
+		expect(actions[stampOf(node)].slot).toEqual(['picker']);
+		expect(actions[stampOf(picked)].slot).toEqual(['picker']);
 	});
 
 	it('an empty tag is the root bag, not the absence of one', () => {
 		const kit = screenKitAt({ history: [] }, []);
 		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
-		const { frame, stampOf } = materializeTree(view({}, row({}, node)));
+		const { actions, stampOf } = materializeTree(view({}, row({}, node)));
 
 		expect(node.slot).toEqual([]);
-		expect(frame[stampOf(node)].slot).toEqual([]);
+		expect(actions[stampOf(node)].slot).toEqual([]);
 	});
 });

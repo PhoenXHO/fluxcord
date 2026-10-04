@@ -1,7 +1,7 @@
 /**
  * Flow layer tests: defineFlow's validations, the subflow namespacing/
  * slot machinery, the lens, the registry erase helper, and the pipeline
- * integration through the frame: resolution after a draw, the rule-9
+ * integration through the action map: resolution after a draw, the rule-9
  * policy ladder, lensed delivery, the done round trip, stale semantics,
  * the error copy hook, and parting bundles on both death paths.
  *
@@ -871,10 +871,10 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 		const w = listWorld(['a', 'b', 'c']);
 		await w.draw();
 
-		const stamps = Object.keys(w.session.frame); // document order
+		const stamps = Object.keys(w.session.actions); // document order
 		expect(stamps).toHaveLength(3);
 		expect(new Set(stamps).size).toBe(3);
-		expect(stamps.map((stamp) => w.session.frame[stamp].label)).toEqual(['a', 'b', 'c']);
+		expect(stamps.map((stamp) => w.session.actions[stamp].label)).toEqual(['a', 'b', 'c']);
 
 		await w.clickStamp(stamps[0]);
 		expect(w.session.data.picked).toEqual(['a']); // its OWN closure, not the last one
@@ -887,10 +887,10 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 	it('a re-draw of the same screen from the same data re-stamps identically: restart continuity', async () => {
 		const w = listWorld(['a', 'b', 'c']);
 		await w.draw();
-		const before = Object.keys(w.session.frame);
+		const before = Object.keys(w.session.actions);
 
 		await w.draw();
 
-		expect(Object.keys(w.session.frame)).toEqual(before);
+		expect(Object.keys(w.session.actions)).toEqual(before);
 	});
 });

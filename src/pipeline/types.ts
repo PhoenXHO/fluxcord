@@ -353,7 +353,7 @@ export interface PlatformPort {
  */
 export type BridgePort = Pick<PlatformPort, 'replyToActor' | 'editMessage' | 'showModal'>;
 
-/** One clickable in a frame: its handler plus the control's label text for diagnostics. */
+/** One clickable in an action map: its handler plus the control's label text for diagnostics. */
 export interface ActionRecord<TData = unknown> {
 	readonly handler: ActionHandler<TData>;
 	/** The control's label (a button's label, a select's placeholder); logs and error reports only, never on the wire. */

@@ -1,7 +1,7 @@
 /**
  * Tree materialization: the wiring lives in the draw.
  *
- * One walk per draw stamps every actionable control and builds the frame.
+ * One walk per draw stamps every actionable control and builds the action map.
  * A control's wire id is a pure function of the tree it was rendered in:
  * the handler's source hash plus its occurrence within the draw.
  * Occurrence 0 emits the bare hash (byte-compatible with every wire id
@@ -10,7 +10,7 @@
  * the same data yields the same ids: inline and generated handlers are
  * fully legal, and revived flows keep their ids by construction.
  *
- * The frame half is the click registry: what the engine last drew is the
+ * The actions half is the click registry: what the engine last drew is the
  * whole truth about what is clickable. The stampOf half is the renderer's
  * window into the same walk: rendering without materializing (and thus
  * emitting colliding bare hashes) is structurally impossible.
@@ -29,20 +29,20 @@ import type { ButtonNode, RowNode, SelectNode, ViewNode } from '../tree/types.js
 
 /** One draw's wiring: the click registry plus the renderer's stamps. */
 export interface MaterializedTree {
-	readonly frame: Readonly<Record<string, ActionRecord>>;
+	readonly actions: Readonly<Record<string, ActionRecord>>;
 	readonly stampOf: StampLookup;
 }
 
 /**
- * Stamps each actionable control and builds the frame in one document-order
+ * Stamps each actionable control and builds the action map in one document-order
  * walk. The walk mirrors the tree's legal shapes: controls live in rows,
  * rows at the top level or inside containers. A frozen (stripped) tree
- * materializes to an empty frame, closing the message for clicks.
+ * materializes to an empty action map, closing the message for clicks.
  */
 export function materializeTree(tree: ViewNode): MaterializedTree {
 	const stamps = new Map<ButtonNode | SelectNode, string>();
 	const occurrences = new Map<string, number>();
-	const frame: Record<string, ActionRecord> = {};
+	const actions: Record<string, ActionRecord> = {};
 
 	/** Base hash + occurrence = stamp. Occurrence 0 is the bare hash. */
 	function stamp(handler: ActionHandler<never>, control: ButtonNode | SelectNode, label: string): void {
@@ -52,12 +52,12 @@ export function materializeTree(tree: ViewNode): MaterializedTree {
 		const id = seen === 0 ? base : `${base}-${seen}`;
 		stamps.set(control, id);
 		// The cast is the one type-erase point: controls carry never-typed
-		// handlers so any flow's typed handler fits, while the frame speaks
+		// handlers so any flow's typed handler fits, while the map speaks
 		// the erased form. A control-declared policy rides its record to the
 		// policy consult; the draw-phase ownership tag rides too (an empty
 		// array is a real tag: the root bag), so dispatch lenses by the
 		// handler's owner rather than the screen drawn on.
-		frame[id] = {
+		actions[id] = {
 			handler: handler as ActionHandler<unknown>,
 			label,
 			...(control.policy !== undefined ? { policy: control.policy } : {}),
@@ -90,7 +90,7 @@ export function materializeTree(tree: ViewNode): MaterializedTree {
 	}
 
 	return {
-		frame: Object.freeze(frame),
+		actions: Object.freeze(actions),
 		stampOf: (control): string => {
 			const id = stamps.get(control);
 			if (id === undefined) {

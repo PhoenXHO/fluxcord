@@ -196,7 +196,7 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 				screen: input.screen,
 				history: [],
 				modalNonce: generateId(),
-				frame: {},
+				actions: {},
 			};
 			sessions.set(id, session);
 			return session;

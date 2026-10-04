@@ -107,10 +107,10 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		resolve: (viewKey: string): RegisteredScreen | undefined =>
 			viewKey === 'lotto/main' ? { view: () => lottoView } : undefined,
 	};
-	// The frame a real commit phase would have written: the drawn message
-	// carried one button, 'join', bound to the spy. Tests that want a stale
-	// frame empty it by hand.
-	session.frame = { [actionHash(handler)]: { handler, label: 'join' } };
+	// The action map a real commit phase would have written: the drawn
+	// message carried one button, 'join', bound to the spy. Tests that
+	// want a stale map empty it by hand.
+	session.actions = { [actionHash(handler)]: { handler, label: 'join' } };
 	const tryRevive = vi.fn(async (): Promise<Session<unknown> | undefined> => undefined);
 	const errors: ErrorReport[] = [];
 
@@ -238,7 +238,7 @@ describe('dispatch - touch only accepted events', () => {
 
 	it('a stale click (frame miss) leaves the TTL window alone', async () => {
 		const w = world();
-		w.session.frame = {};
+		w.session.actions = {};
 		const before = w.session.lastActivityAt;
 		w.clock.advance(10 * 60 * 1000);
 		await w.click();
@@ -312,7 +312,7 @@ describe('dispatch - the permission choke point', () => {
 	it('a control-declared gate rides the one question as actionPolicy', async () => {
 		const w = world();
 		const gate = { owner: { ownerOnly: false } };
-		w.session.frame = { [actionHash(w.handler)]: { handler: w.handler, label: 'join', policy: gate } };
+		w.session.actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join', policy: gate } };
 		await w.click({ guildId: 'guild-1' });
 
 		expect(w.policy.authorize).toHaveBeenCalledWith({
@@ -430,7 +430,7 @@ describe('dispatch - dead paths', () => {
 		w.clock.advance(31 * 60 * 1000);
 		const revived: Session<unknown> = {
 			...w.session,
-			frame: {}, // fresh record: nothing is clickable until drawn
+			actions: {}, // fresh record: nothing is clickable until drawn
 		};
 		w.tryRevive.mockResolvedValue(revived);
 
@@ -470,7 +470,7 @@ describe('dispatch - dead paths', () => {
 describe('dispatch - staleness (the frame wins)', () => {
 	it('stale click (hash not in the frame): redraw the current screen, run nothing, ask nothing', async () => {
 		const w = world();
-		w.session.frame = {}; // the last draw carried no such control
+		w.session.actions = {}; // the last draw carried no such control
 		await w.click();
 
 		expect(w.calls).toEqual(['redraw:main']);
@@ -610,7 +610,7 @@ describe('dispatch - the per-session line', () => {
 			ttlMs: 30 * 60 * 1000,
 			remount: 'coexist',
 		});
-		other.frame = { [actionHash(w.handler)]: { handler: w.handler, label: 'join' } };
+		other.actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join' } };
 
 		let release: (() => void) | undefined;
 		w.handler.mockImplementation(async () => {

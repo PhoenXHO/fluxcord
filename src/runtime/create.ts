@@ -224,7 +224,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			screen: def.first,
 			history: [],
 			modalNonce: generateId(),
-			frame: {},
+			actions: {},
 		};
 		const firstTree = viewOf(draft, screens);
 		const materialized = materializeTree(firstTree);
@@ -246,9 +246,9 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrate: { ref: mountOptions.rehydrateRef } } : {}),
 		});
 		// The message went out carrying firstTree's controls; the session's
-		// frame must be that tree's materialization, or its own buttons would
-		// be stale to dispatch. (Same tick as create: no click can land between.)
-		session.frame = materialized.frame;
+		// action map must be that tree's materialization, or its own buttons
+		// would be stale to dispatch. (Same tick as create: no click can land between.)
+		session.actions = materialized.actions;
 
 		if (mountOptions.rehydrateRef !== undefined && options.rehydrate !== undefined) {
 			const row: RehydrateRow = {

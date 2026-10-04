@@ -116,13 +116,13 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				// the opener record below, so a failed open leaves no pending
 				// submit destination behind.
 				const payload = renderV2Modal(normalizeModalRoot(modal), customId);
-				// Record the opener: the running handler, which the frame
-				// resolved (this click came through it). The submit runs this
+				// Record the opener: the running handler, which the action
+				// map resolved (this click came through it). The submit runs this
 				// handler after the nonce check, so a ui.go() before showModal
 				// does not strand the submitted values. The opener's own
 				// policy rides along: the submit re-asks policy and must
 				// answer under the same gate that admitted the opener.
-				const opener = session.frame[address.actionHash];
+				const opener = session.actions[address.actionHash];
 				session.modalHandler = opener?.handler;
 				session.modalPolicy = opener?.policy;
 				return platform.showModal(payload);

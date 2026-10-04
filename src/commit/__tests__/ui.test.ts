@@ -219,7 +219,7 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 		const w = onScreen('menu', [], SHOW);
 		const handler = (): void => { };
 		const gate = { owner: { ownerOnly: false } };
-		w.session.frame = { h0: { handler, label: 'open', policy: gate } };
+		w.session.actions = { h0: { handler, label: 'open', policy: gate } };
 
 		await w.ui.showModal(DIALOG);
 
@@ -230,7 +230,7 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 	it('clears a previous capture when the opener declared no policy', async () => {
 		const w = onScreen('menu', [], SHOW);
 		const handler = (): void => { };
-		w.session.frame = { h0: { handler, label: 'open' } };
+		w.session.actions = { h0: { handler, label: 'open' } };
 		w.session.modalPolicy = { owner: { ownerOnly: true } }; // a previous modal's gate
 
 		await w.ui.showModal(DIALOG);
@@ -257,7 +257,7 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 
 	it('a failed open throws and records no submit destination', () => {
 		const w = onScreen('menu', [], SHOW);
-		w.session.frame = { h0: { handler: (): void => { }, label: 'open' } };
+		w.session.actions = { h0: { handler: (): void => { }, label: 'open' } };
 
 		expect(() => w.ui.showModal(text('not a modal'))).toThrow(/needs a <modal> root/);
 		expect(w.session.modalHandler).toBeUndefined();

@@ -179,9 +179,10 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 	if (overrides.rehydrate !== undefined) {
 		rows.set(MESSAGE_ID, { messageId: MESSAGE_ID, channelId: CHANNEL_ID, ownerId: OWNER_ID, flowId: 'lotto', ref: overrides.rehydrate.ref });
 	}
-	// The frame a real draw of 'main' would have written: two buttons, one
-	// shared handler. Tests that change what the message shows rewrite this.
-	session.frame = { [actionHash(handler)]: { handler, label: 'Join' } };
+	// The action map a real draw of 'main' would have written: two
+	// buttons, one shared handler. Tests that change what the message
+	// shows rewrite this.
+	session.actions = { [actionHash(handler)]: { handler, label: 'Join' } };
 
 	/** The event handed to the current handler invocation; mock args are recorded before the implementation runs. */
 	function currentEvent(): ActionEvent<LottoData> {
@@ -221,7 +222,7 @@ describe('the draw pipeline (redraw)', () => {
 	it('a stale click redraws the current screen through the commit phase, running nothing', async () => {
 		const w = world();
 		w.session.screen = 'confirm';
-		w.session.frame = {}; // confirm's draw carried no controls
+		w.session.actions = {}; // confirm's draw carried no controls
 		await w.click();
 
 		expect(w.handler).not.toHaveBeenCalled();

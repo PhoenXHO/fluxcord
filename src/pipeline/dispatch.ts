@@ -309,11 +309,12 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				throw new Error(`no screen registered for '${screenKey}'`);
 			}
 
-			// Frame resolution: the last draw is the whole truth about what
-			// is clickable. Modal submits run the handler showModal recorded
-			// (nonce proven above; the id's hash segment goes unread, so a
-			// ui.go() before showModal does not strand the values). Any
-			// other click must find its handler in the frame; a miss is a
+			// Action-map resolution: the last draw is the whole truth about
+			// what is clickable. Modal submits run the handler showModal
+			// recorded (nonce proven above; the id's hash segment goes
+			// unread, so a ui.go() before showModal does not strand the
+			// values). Any other click must find its handler in the action
+			// map; a miss is a
 			// stale or forged id and earns stale semantics, never a run.
 			let record: ActionRecord<unknown>;
 			if (incoming.kind === EventKind.ModalSubmit) {
@@ -323,11 +324,11 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				}
 				record = {
 					handler: session.modalHandler,
-					label: session.frame[address.actionHash]?.label ?? 'modal',
+					label: session.actions[address.actionHash]?.label ?? 'modal',
 					...(session.modalPolicy !== undefined ? { policy: session.modalPolicy } : {}),
 				};
 			} else {
-				const found = session.frame[address.actionHash];
+				const found = session.actions[address.actionHash];
 				if (found === undefined) {
 					if (!justRevived) await options.platform.redraw(session);
 					return;

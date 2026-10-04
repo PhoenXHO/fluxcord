@@ -27,11 +27,11 @@ import type { ActionHandler, ActionRecord, PermissionPolicy } from '../pipeline/
  * The click registry of one drawn message, keyed by handler source hash.
  * One entry per interactive control on screen.
  *
- * Rebuilt on every draw (first frame, redraw, freeze), so it always
+ * Rebuilt on every draw (first draw, redraw, freeze), so it always
  * matches what the message actually shows. A click whose hash is missing
  * here is stale and bounces.
  */
-export type Frame = Readonly<Record<string, ActionRecord>>;
+export type ActionMap = Readonly<Record<string, ActionRecord>>;
 
 /** Where a session's message lives. */
 export interface MessageRef {
@@ -112,8 +112,8 @@ export interface Session<TData> {
 	 * would bleed an old draft into the new modal's prefill.
 	 */
 	modalNonce: string;
-	/** The last draw's click registry ({@link Frame}): the whole truth about what is clickable on the message right now. */
-	frame: Frame;
+	/** The last draw's click registry ({@link ActionMap}): the whole truth about what is clickable on the message right now. */
+	actions: ActionMap;
 	/**
 	 * The handler awaiting this screen instance's modal submit. `showModal`
 	 * records it when the modal opens; when the user submits, dispatch
