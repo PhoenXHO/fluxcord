@@ -348,7 +348,9 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				ownerId: session.ownerId,
 				guildId: incoming.guildId,
 				channelId: incoming.channelId,
-				flowId: session.flowId,
+				// Policy hears the flow that owns the visible surface, the
+				// top frame's, not the session's root identity.
+				flowId: frame.flowId,
 				view: screenKey,
 				...(record.policy !== undefined ? { actionPolicy: record.policy } : {}),
 			});

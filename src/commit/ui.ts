@@ -31,7 +31,7 @@ import { renderV2Modal } from '../render/v2.js';
 import { generateId } from '../state/store.js';
 import type { SessionStore } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
-import type { Session } from '../state/types.js';
+import type { FlowFrame, Session } from '../state/types.js';
 import type { ComponentResult } from '../tree/types.js';
 import { normalizeModalRoot, normalizeViewRoot } from '../tree/normalize.js';
 import type { EventTools, PlatformPort, ScreenRegistry, UiToolkit } from '../pipeline/types.js';
@@ -48,31 +48,33 @@ export type MakeUi = (session: Session<unknown>, address: ActionAddress, platfor
 
 export function createMakeUi(options: MakeUiOptions): MakeUi {
 	return (session, address, platform) => {
-		// One frame per session in the current single-flow world; every
-		// verb below acts on it. The call model (0.2.0) replaces this
-		// capture with the top-of-stack lookup per verb.
-		const frame = activeFrame(session);
+		// Sealing. Every verb looks the top frame up when it runs and
+		// touches nothing else on the stack, so a parent's pages stay out
+		// of reach for a child handler and the other way around. The
+		// stack can grow without a verb ever crossing a flow boundary.
+		const top = (): FlowFrame => activeFrame(session);
 		// A subflow root name (ui.go('pick')) resolves to the plugged
 		// subflow's first screen; anything else is a screen id as-is.
 		// Resolution runs BEFORE any dedup lookup, so go('<root>') dedups
 		// against the root's entry screen. Backstop: typed screens cannot
 		// reach the throw, but stringly handlers (factories, subflow
 		// roots) can: fail loud rather than navigate to nothing.
-		const resolve = (verb: 'go' | 'push', view: string): string => {
+		const resolve = (verb: 'go' | 'push', frame: FlowFrame, view: string): string => {
 			const key = `${frame.moduleId}/${frame.screen}`;
 			const current = options.screens?.resolve(key);
 			const target = current?.flow?.roots?.[view] ?? view;
 			if (options.screens !== undefined && current !== undefined) {
 				const root = current.flow?.roots?.[view];
-				if (root === undefined && options.screens.resolve(`${session.moduleId}/${target}`) === undefined) {
-					throw new Error(`ui.${verb}('${view}') targets no screen or subflow root in module '${session.moduleId}' (a renamed screen key?)`);
+				if (root === undefined && options.screens.resolve(`${frame.moduleId}/${target}`) === undefined) {
+					throw new Error(`ui.${verb}('${view}') targets no screen or subflow root in module '${frame.moduleId}' (a renamed screen key?)`);
 				}
 			}
 			return target;
 		};
 		const ui: UiToolkit = {
 			go(view: string): void {
-				const target = resolve('go', view);
+				const frame = top();
+				const target = resolve('go', frame, view);
 				// Navigating to the current screen is a no-op.
 				if (target === frame.screen) return;
 				// Already in history: pop to its topmost occurrence (the
@@ -88,7 +90,8 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				frame.modalNonce = generateId();
 			},
 			push(view: string): void {
-				const target = resolve('push', view);
+				const frame = top();
+				const target = resolve('push', frame, view);
 				if (target === frame.screen) return;
 				frame.history = [...frame.history, frame.screen];
 				frame.screen = target;
@@ -107,6 +110,7 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				options.store.close(session.id);
 			},
 			showModal(modal: ComponentResult): Promise<void> {
+				const frame = top();
 				// A fresh nonce per open: the client keeps drafts per custom_id,
 				// so a reused id would serve an older unsubmitted draft back as
 				// prefill (renderV2Modal's contract says the same).
