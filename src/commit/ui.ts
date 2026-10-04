@@ -30,6 +30,7 @@ import type { ActionAddress } from '../render/id-codec.js';
 import { renderV2Modal } from '../render/v2.js';
 import { generateId } from '../state/store.js';
 import type { SessionStore } from '../state/store.js';
+import { activeFrame } from '../state/types.js';
 import type { Session } from '../state/types.js';
 import type { ComponentResult } from '../tree/types.js';
 import { normalizeModalRoot, normalizeViewRoot } from '../tree/normalize.js';
@@ -47,6 +48,10 @@ export type MakeUi = (session: Session<unknown>, address: ActionAddress, platfor
 
 export function createMakeUi(options: MakeUiOptions): MakeUi {
 	return (session, address, platform) => {
+		// One frame per session in the current single-flow world; every
+		// verb below acts on it. The call model (0.2.0) replaces this
+		// capture with the top-of-stack lookup per verb.
+		const frame = activeFrame(session);
 		// A subflow root name (ui.go('pick')) resolves to the plugged
 		// subflow's first screen; anything else is a screen id as-is.
 		// Resolution runs BEFORE any dedup lookup, so go('<root>') dedups
@@ -54,7 +59,7 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 		// reach the throw, but stringly handlers (factories, subflow
 		// roots) can: fail loud rather than navigate to nothing.
 		const resolve = (verb: 'go' | 'push', view: string): string => {
-			const key = `${session.moduleId}/${session.screen}`;
+			const key = `${frame.moduleId}/${frame.screen}`;
 			const current = options.screens?.resolve(key);
 			const target = current?.flow?.roots?.[view] ?? view;
 			if (options.screens !== undefined && current !== undefined) {
@@ -69,25 +74,25 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 			go(view: string): void {
 				const target = resolve('go', view);
 				// Navigating to the current screen is a no-op.
-				if (target === session.screen) return;
+				if (target === frame.screen) return;
 				// Already in history: pop to its topmost occurrence (the
 				// branch above is pruned). Otherwise push.
-				const at = session.history.lastIndexOf(target);
+				const at = frame.history.lastIndexOf(target);
 				if (at === -1) {
-					session.history = [...session.history, session.screen];
-					session.screen = target;
+					frame.history = [...frame.history, frame.screen];
+					frame.screen = target;
 				} else {
-					session.screen = session.history[at];
-					session.history = session.history.slice(0, at);
+					frame.screen = frame.history[at];
+					frame.history = frame.history.slice(0, at);
 				}
-				session.modalNonce = generateId();
+				frame.modalNonce = generateId();
 			},
 			push(view: string): void {
 				const target = resolve('push', view);
-				if (target === session.screen) return;
-				session.history = [...session.history, session.screen];
-				session.screen = target;
-				session.modalNonce = generateId();
+				if (target === frame.screen) return;
+				frame.history = [...frame.history, frame.screen];
+				frame.screen = target;
+				frame.modalNonce = generateId();
 			},
 			back(): void {
 				navigateBack(session);
@@ -105,12 +110,12 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				// A fresh nonce per open: the client keeps drafts per custom_id,
 				// so a reused id would serve an older unsubmitted draft back as
 				// prefill (renderV2Modal's contract says the same).
-				session.modalNonce = generateId();
+				frame.modalNonce = generateId();
 				const customId = `${encodeActionId({
 					sessionId: session.id,
 					screenKey: address.screenKey,
 					actionHash: address.actionHash,
-				})}~${session.modalNonce}`;
+				})}~${frame.modalNonce}`;
 				// Element roots fold to a modal node at this seam: anything
 				// else (fragment, dropped) throws loudly. Rendering runs before
 				// the opener record below, so a failed open leaves no pending
@@ -122,9 +127,9 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				// does not strand the submitted values. The opener's own
 				// policy rides along: the submit re-asks policy and must
 				// answer under the same gate that admitted the opener.
-				const opener = session.actions[address.actionHash];
-				session.modalHandler = opener?.handler;
-				session.modalPolicy = opener?.policy;
+				const opener = frame.actions[address.actionHash];
+				frame.modalHandler = opener?.handler;
+				frame.modalPolicy = opener?.policy;
 				return platform.showModal(payload);
 			},
 		};
@@ -153,8 +158,9 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
  * No-op when history is empty (the entry screen has nothing under it).
  */
 export function navigateBack(session: Session<unknown>): void {
-	if (session.history.length === 0) return;
-	session.screen = session.history[session.history.length - 1];
-	session.history = session.history.slice(0, -1);
-	session.modalNonce = generateId();
+	const frame = activeFrame(session);
+	if (frame.history.length === 0) return;
+	frame.screen = frame.history[frame.history.length - 1];
+	frame.history = frame.history.slice(0, -1);
+	frame.modalNonce = generateId();
 }

@@ -30,12 +30,13 @@ const ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw
 const ID_LENGTH = 8;
 
 /**
- * Generates a short opaque id from the 62-char alphabet; session ids and
- * modal nonces both. Seeded by node:crypto, so ids are not guessable
- * from earlier ones. Uniqueness among live sessions is guarded by the
- * collision loop in `create`; reuse after death is guarded by id space
- * (62^8) plus frame resolution: a wrong-session click misses that
- * session's frame and bounces as stale, so it can never misdeliver.
+ * Generates a short opaque id from the 62-char alphabet; session ids,
+ * frame ids and modal nonces all. Seeded by `node:crypto`, so ids are not
+ * guessable from earlier ones. Uniqueness among live sessions is guarded
+ * by the collision loop in `create`; reuse after death is guarded by id
+ * space (`62^8`) plus action-map resolution (a wrong-session click misses
+ * that session's action map and bounces as stale, so it can never
+ * misdeliver).
  */
 export function generateId(): string {
 	let id = '';
@@ -193,10 +194,23 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 				rehydrate: input.rehydrate,
 				lastActivityAt: at,
 				data: input.data,
-				screen: input.screen,
-				history: [],
-				modalNonce: generateId(),
-				actions: {},
+				frames: [
+					{
+						id: generateId(),
+						flowId: input.flowId,
+						moduleId: input.moduleId,
+						screen: input.screen,
+						history: [],
+						modalNonce: generateId(),
+						actions: {},
+					},
+				],
+				get screen() {
+					return this.frames[this.frames.length - 1].screen;
+				},
+				get history() {
+					return this.frames[this.frames.length - 1].history;
+				},
 			};
 			sessions.set(id, session);
 			return session;

@@ -15,7 +15,7 @@ import { encodeActionId } from '../../render/id-codec.js';
 import { createSessionStore } from '../../state/store.js';
 import type { SessionStore } from '../../state/store.js';
 import type { Session } from '../../state/types.js';
-import { DEFAULT_TTL_MS } from '../../state/types.js';
+import { activeFrame, DEFAULT_TTL_MS } from '../../state/types.js';
 import { button, optionSelect, row, text, view } from '../../tree/builders.js';
 import type { ViewNode } from '../../tree/types.js';
 import { createCommit } from '../../commit/commit.js';
@@ -287,8 +287,8 @@ describe('the subflow done handler', () => {
 			ttlMs: DEFAULT_TTL_MS,
 			remount: 'coexist',
 		});
-		session.history = ['main'];
-		session.modalNonce = 'old-nonce';
+		activeFrame(session).history = ['main'];
+		activeFrame(session).modalNonce = 'old-nonce';
 
 		const onDone = vi.fn();
 		const plug = subflow({ use: defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } }), at: 'picker', onDone });
@@ -308,7 +308,7 @@ describe('the subflow done handler', () => {
 		expect(onDone).toHaveBeenCalledWith({ chosen: 'seed' }, ui);
 		expect(session.screen).toBe('main');
 		expect(session.history).toEqual([]);
-		expect(session.modalNonce).not.toBe('old-nonce');
+		expect(activeFrame(session).modalNonce).not.toBe('old-nonce');
 	});
 });
 
@@ -352,8 +352,8 @@ describe('the lens', () => {
 		lens.data = { chosen: 'replaced' }; // setter replaces the slot value
 		expect(session.data.picker).toEqual({ chosen: 'replaced' });
 
-		lens.screen = 'picker.pick'; // navigation writes forward to the record
-		expect(session.screen).toBe('picker.pick');
+		activeFrame(session).screen = 'picker.pick'; // navigation writes the frame
+		expect(lens.screen).toBe('picker.pick'); // and the lens forwards the read
 	});
 });
 
@@ -621,7 +621,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 	it('a laggy click on a handler the frame still carries RUNS: the address screen is decorative', async () => {
 		const w = world();
-		w.session.screen = 'picker.pick';
+		activeFrame(w.session).screen = 'picker.pick';
 		await w.draw(); // the frame is picker.pick's: choose, refresh, Done
 		const fromMain = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: w.hashOf('choose') });
 
@@ -647,7 +647,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 	it('delivers subflow screens against the lensed slot', async () => {
 		const w = world();
-		w.session.screen = 'picker.pick';
+		activeFrame(w.session).screen = 'picker.pick';
 		await w.draw();
 
 		await w.click('choose');
@@ -658,7 +658,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 	it('a flow wrap control clicked on a subflow screen lenses to the root bag', async () => {
 		const w = world();
-		w.session.screen = 'picker.pick';
+		activeFrame(w.session).screen = 'picker.pick';
 		await w.draw();
 
 		await w.click('refresh');
@@ -696,7 +696,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 	it('redraw renders a slotted screen through the flow wrap', async () => {
 		const w = world();
-		w.session.screen = 'picker.pick';
+		activeFrame(w.session).screen = 'picker.pick';
 
 		await w.draw();
 
@@ -871,10 +871,10 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 		const w = listWorld(['a', 'b', 'c']);
 		await w.draw();
 
-		const stamps = Object.keys(w.session.actions); // document order
+		const stamps = Object.keys(activeFrame(w.session).actions); // document order
 		expect(stamps).toHaveLength(3);
 		expect(new Set(stamps).size).toBe(3);
-		expect(stamps.map((stamp) => w.session.actions[stamp].label)).toEqual(['a', 'b', 'c']);
+		expect(stamps.map((stamp) => activeFrame(w.session).actions[stamp].label)).toEqual(['a', 'b', 'c']);
 
 		await w.clickStamp(stamps[0]);
 		expect(w.session.data.picked).toEqual(['a']); // its OWN closure, not the last one
@@ -887,10 +887,10 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 	it('a re-draw of the same screen from the same data re-stamps identically: restart continuity', async () => {
 		const w = listWorld(['a', 'b', 'c']);
 		await w.draw();
-		const before = Object.keys(w.session.actions);
+		const before = Object.keys(activeFrame(w.session).actions);
 
 		await w.draw();
 
-		expect(Object.keys(w.session.actions)).toEqual(before);
+		expect(Object.keys(activeFrame(w.session).actions)).toEqual(before);
 	});
 });

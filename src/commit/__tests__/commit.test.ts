@@ -15,6 +15,7 @@ import { encodeActionId } from '../../render/id-codec.js';
 import type { V2MessagePayload, V2ModalPayload } from '../../render/v2.js';
 import { createSessionStore } from '../../state/store.js';
 import type { SessionStore } from '../../state/store.js';
+import { activeFrame } from '../../state/types.js';
 import type { MessageRef, RehydrateRow, RehydrateStore, Session } from '../../state/types.js';
 import { button, container, input, link, modal, optionSelect, row, text, view } from '../../tree/builders.js';
 import type { ContainerNode, RowNode, TextNode, ViewNode } from '../../tree/types.js';
@@ -182,7 +183,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 	// The action map a real draw of 'main' would have written: two
 	// buttons, one shared handler. Tests that change what the message
 	// shows rewrite this.
-	session.actions = { [actionHash(handler)]: { handler, label: 'Join' } };
+	activeFrame(session).actions = { [actionHash(handler)]: { handler, label: 'Join' } };
 
 	/** The event handed to the current handler invocation; mock args are recorded before the implementation runs. */
 	function currentEvent(): ActionEvent<LottoData> {
@@ -221,8 +222,8 @@ describe('the draw pipeline (redraw)', () => {
 
 	it('a stale click redraws the current screen through the commit phase, running nothing', async () => {
 		const w = world();
-		w.session.screen = 'confirm';
-		w.session.actions = {}; // confirm's draw carried no controls
+		activeFrame(w.session).screen = 'confirm';
+		activeFrame(w.session).actions = {}; // confirm's draw carried no controls
 		await w.click();
 
 		expect(w.handler).not.toHaveBeenCalled();
@@ -232,7 +233,7 @@ describe('the draw pipeline (redraw)', () => {
 
 	it('multiple go calls in one handler produce ONE edit - the final screen wins, no flash', async () => {
 		const w = world();
-		const nonceBefore = w.session.modalNonce;
+		const nonceBefore = activeFrame(w.session).modalNonce;
 		w.handler.mockImplementationOnce(async (): Promise<void> => {
 			const event = w.currentEvent();
 			event.ui.go('confirm');
@@ -246,7 +247,7 @@ describe('the draw pipeline (redraw)', () => {
 		// nonce regenerated per screen change.
 		expect(w.session.screen).toBe('main');
 		expect(w.session.history).toEqual([]);
-		expect(w.session.modalNonce).not.toBe(nonceBefore);
+		expect(activeFrame(w.session).modalNonce).not.toBe(nonceBefore);
 	});
 });
 
@@ -413,7 +414,7 @@ describe('modals (event-based, E1)', () => {
 
 		expect(w.modals).toHaveLength(1);
 		const clickId = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
-		expect(w.modals[0].custom_id).toBe(`${clickId}~${w.session.modalNonce}`);
+		expect(w.modals[0].custom_id).toBe(`${clickId}~${activeFrame(w.session).modalNonce}`);
 		// A modal-open still counts as an event: exactly one redraw.
 		expect(w.edits).toHaveLength(1);
 	});

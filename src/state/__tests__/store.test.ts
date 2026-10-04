@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSessionStore, isExpired } from '../store.js';
-import { DEFAULT_TTL_MS, EndReason, RemountPolicy } from '../types.js';
+import { activeFrame, DEFAULT_TTL_MS, EndReason, RemountPolicy } from '../types.js';
 import type { CreateSessionInput, RehydrateRow, RehydrateStore } from '../types.js';
 
 const MINUTE = 60_000;
@@ -54,9 +54,10 @@ describe('create', () => {
 		expect(session.ttlMs).toBe(30 * MINUTE);
 		expect(session.history).toEqual([]);
 		expect(session.screen).toBe('main');
+		expect(session.frames).toHaveLength(1);
 		expect(session.data).toEqual({ tickets: 3, names: ['ada', 'bob'] });
 		expect(session.rehydrate).toBeUndefined();
-		expect(session.modalNonce).toMatch(/^[0-9A-Za-z]{8}$/);
+		expect(activeFrame(session).modalNonce).toMatch(/^[0-9A-Za-z]{8}$/);
 	});
 
 	it('regenerates the id on collision, keeping live ids unique', () => {

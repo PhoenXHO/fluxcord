@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { createMakeUi } from '../ui.js';
 import { createSessionStore } from '../../state/store.js';
-import { DEFAULT_TTL_MS } from '../../state/types.js';
+import { activeFrame, DEFAULT_TTL_MS } from '../../state/types.js';
 import { input, modal, text, view } from '../../tree/builders.js';
 import type { RegisteredScreen, ScreenRegistry, PlatformPort, UiToolkit } from '../../pipeline/types.js';
 import type { Session } from '../../state/types.js';
@@ -36,7 +36,7 @@ function onScreen(
 		ttlMs: DEFAULT_TTL_MS,
 		remount: 'replace',
 	});
-	session.history = [...history];
+	activeFrame(session).history = [...history];
 	const { ui } = createMakeUi({ store })(session, ADDRESS, platform);
 	return { session, ui };
 }
@@ -79,18 +79,18 @@ describe('ui.go (smart)', () => {
 
 	it('navigating to the current screen is a no-op - no push, no nonce regen', () => {
 		const w = onScreen('counter', ['menu']);
-		const nonce = w.session.modalNonce;
+		const nonce = activeFrame(w.session).modalNonce;
 		w.ui.go('counter');
 		expect(w.session.screen).toBe('counter');
 		expect(w.session.history).toEqual(['menu']);
-		expect(w.session.modalNonce).toBe(nonce);
+		expect(activeFrame(w.session).modalNonce).toBe(nonce);
 	});
 
 	it('regenerates the modal nonce on a real screen change', () => {
 		const w = onScreen('menu', []);
-		const nonce = w.session.modalNonce;
+		const nonce = activeFrame(w.session).modalNonce;
 		w.ui.go('counter');
-		expect(w.session.modalNonce).not.toBe(nonce);
+		expect(activeFrame(w.session).modalNonce).not.toBe(nonce);
 	});
 });
 
@@ -104,30 +104,30 @@ describe('ui.push (plain)', () => {
 
 	it('navigating to the current screen is a no-op', () => {
 		const w = onScreen('counter', ['menu']);
-		const nonce = w.session.modalNonce;
+		const nonce = activeFrame(w.session).modalNonce;
 		w.ui.push('counter');
 		expect(w.session.history).toEqual(['menu']);
-		expect(w.session.modalNonce).toBe(nonce);
+		expect(activeFrame(w.session).modalNonce).toBe(nonce);
 	});
 });
 
 describe('ui.back', () => {
 	it('pops one entry without naming a target', () => {
 		const w = onScreen('counter', ['menu']);
-		const nonce = w.session.modalNonce;
+		const nonce = activeFrame(w.session).modalNonce;
 		w.ui.back();
 		expect(w.session.screen).toBe('menu');
 		expect(w.session.history).toEqual([]);
-		expect(w.session.modalNonce).not.toBe(nonce);
+		expect(activeFrame(w.session).modalNonce).not.toBe(nonce);
 	});
 
 	it('is a no-op on empty history (the entry screen)', () => {
 		const w = onScreen('menu', []);
-		const nonce = w.session.modalNonce;
+		const nonce = activeFrame(w.session).modalNonce;
 		w.ui.back();
 		expect(w.session.screen).toBe('menu');
 		expect(w.session.history).toEqual([]);
-		expect(w.session.modalNonce).toBe(nonce);
+		expect(activeFrame(w.session).modalNonce).toBe(nonce);
 	});
 });
 
@@ -163,7 +163,7 @@ describe('subflow roots', () => {
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
 		});
-		session.history = ['pick.first'];
+		activeFrame(session).history = ['pick.first'];
 		const { ui } = createMakeUi({
 			store,
 			screens: registry(['m/menu', 'm/pick.first'], { pick: 'pick.first' }),
@@ -219,23 +219,23 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 		const w = onScreen('menu', [], SHOW);
 		const handler = (): void => { };
 		const gate = { owner: { ownerOnly: false } };
-		w.session.actions = { h0: { handler, label: 'open', policy: gate } };
+		activeFrame(w.session).actions = { h0: { handler, label: 'open', policy: gate } };
 
 		await w.ui.showModal(DIALOG);
 
-		expect(w.session.modalHandler).toBe(handler);
-		expect(w.session.modalPolicy).toBe(gate);
+		expect(activeFrame(w.session).modalHandler).toBe(handler);
+		expect(activeFrame(w.session).modalPolicy).toBe(gate);
 	});
 
 	it('clears a previous capture when the opener declared no policy', async () => {
 		const w = onScreen('menu', [], SHOW);
 		const handler = (): void => { };
-		w.session.actions = { h0: { handler, label: 'open' } };
-		w.session.modalPolicy = { owner: { ownerOnly: true } }; // a previous modal's gate
+		activeFrame(w.session).actions = { h0: { handler, label: 'open' } };
+		activeFrame(w.session).modalPolicy = { owner: { ownerOnly: true } }; // a previous modal's gate
 
 		await w.ui.showModal(DIALOG);
 
-		expect(w.session.modalPolicy).toBeUndefined();
+		expect(activeFrame(w.session).modalPolicy).toBeUndefined();
 	});
 
 	it('stamps a fresh nonce per open, so a reopened modal gets a new custom_id', async () => {
@@ -252,15 +252,15 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 		expect(seen[0]).not.toBe(seen[1]);
 		// The session's nonce matches the id just shown, so a submit from this
 		// modal passes the check.
-		expect(w.session.modalNonce).toBe(seen[1]!.split('~')[1]);
+		expect(activeFrame(w.session).modalNonce).toBe(seen[1]!.split('~')[1]);
 	});
 
 	it('a failed open throws and records no submit destination', () => {
 		const w = onScreen('menu', [], SHOW);
-		w.session.actions = { h0: { handler: (): void => { }, label: 'open' } };
+		activeFrame(w.session).actions = { h0: { handler: (): void => { }, label: 'open' } };
 
 		expect(() => w.ui.showModal(text('not a modal'))).toThrow(/needs a <modal> root/);
-		expect(w.session.modalHandler).toBeUndefined();
-		expect(w.session.modalPolicy).toBeUndefined();
+		expect(activeFrame(w.session).modalHandler).toBeUndefined();
+		expect(activeFrame(w.session).modalPolicy).toBeUndefined();
 	});
 });

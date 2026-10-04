@@ -21,6 +21,7 @@
 
 import { renderV2Message } from '../render/v2.js';
 import type { V2MessagePayload } from '../render/v2.js';
+import { activeFrame } from '../state/types.js';
 import type { MessageRef, Session } from '../state/types.js';
 import type { PartingOptions, PlatformPort, ScreenRegistry } from '../pipeline/types.js';
 import type { ButtonNode, SelectNode, ViewNode } from '../tree/types.js';
@@ -95,7 +96,8 @@ export function screenKitAt(session: Pick<ViewSession, 'history'>, slot: readonl
  * tag, and dispatch keeps its direct session.
  */
 export function viewOf(session: Session<unknown>, screens: ScreenRegistry): ViewNode {
-	const key = `${session.moduleId}/${session.screen}`;
+	const frame = activeFrame(session);
+	const key = `${frame.moduleId}/${frame.screen}`;
 	const screen = screens.resolve(key);
 	if (screen === undefined) {
 		throw new Error(`no screen registered for '${key}'`);
@@ -138,8 +140,9 @@ export function createCommit(options: CommitOptions): CommitPhase {
 	 */
 	function draw(session: Session<unknown>, tree: ViewNode): V2MessagePayload {
 		const materialized = materializeTree(tree);
-		session.actions = materialized.actions;
-		return renderV2Message(tree, session.id, `${session.moduleId}/${session.screen}`, materialized.stampOf);
+		const frame = activeFrame(session);
+		frame.actions = materialized.actions;
+		return renderV2Message(tree, session.id, `${frame.moduleId}/${frame.screen}`, materialized.stampOf);
 	}
 
 	return {

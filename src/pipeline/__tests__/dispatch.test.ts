@@ -12,6 +12,7 @@ import { actionHash } from '../../render/action-hash.js';
 import { encodeActionId } from '../../render/id-codec.js';
 import { createSessionStore } from '../../state/store.js';
 import type { SessionStore } from '../../state/store.js';
+import { activeFrame } from '../../state/types.js';
 import type { Session } from '../../state/types.js';
 import { text, view } from '../../tree/builders.js';
 import type { ViewNode } from '../../tree/types.js';
@@ -110,7 +111,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 	// The action map a real commit phase would have written: the drawn
 	// message carried one button, 'join', bound to the spy. Tests that
 	// want a stale map empty it by hand.
-	session.actions = { [actionHash(handler)]: { handler, label: 'join' } };
+	activeFrame(session).actions = { [actionHash(handler)]: { handler, label: 'join' } };
 	const tryRevive = vi.fn(async (): Promise<Session<unknown> | undefined> => undefined);
 	const errors: ErrorReport[] = [];
 
@@ -197,20 +198,20 @@ describe('dispatch - allow path', () => {
 
 	it('passes modal inputs through, keyed by authored input id', async () => {
 		const w = world();
-		w.session.modalHandler = w.handler; // what showModal records when the modal opens
+		activeFrame(w.session).modalHandler = w.handler; // what showModal records when the modal opens
 		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
-		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${w.session.modalNonce}`, inputs: { amount: '10' } });
+		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${activeFrame(w.session).modalNonce}`, inputs: { amount: '10' } });
 
 		expect(w.handler.mock.calls[0][0].inputs).toEqual({ amount: '10' });
 	});
 
 	it('modal submits route by nonce + the recorded opener - the id\'s hash segment goes unread', async () => {
 		const w = world();
-		w.session.modalHandler = w.handler;
+		activeFrame(w.session).modalHandler = w.handler;
 		// A ui.go() before showModal strands the old address; the submit
 		// still finds its handler because routing never read the hash.
 		const elsewhere = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/confirm', actionHash: actionHash(() => { }) });
-		await w.click({ kind: EventKind.ModalSubmit, customId: `${elsewhere}~${w.session.modalNonce}`, inputs: { amount: '10' } });
+		await w.click({ kind: EventKind.ModalSubmit, customId: `${elsewhere}~${activeFrame(w.session).modalNonce}`, inputs: { amount: '10' } });
 
 		expect(w.handler).toHaveBeenCalledTimes(1);
 		expect(w.handler.mock.calls[0][0].inputs).toEqual({ amount: '10' });
@@ -238,7 +239,7 @@ describe('dispatch - touch only accepted events', () => {
 
 	it('a stale click (frame miss) leaves the TTL window alone', async () => {
 		const w = world();
-		w.session.actions = {};
+		activeFrame(w.session).actions = {};
 		const before = w.session.lastActivityAt;
 		w.clock.advance(10 * 60 * 1000);
 		await w.click();
@@ -312,7 +313,7 @@ describe('dispatch - the permission choke point', () => {
 	it('a control-declared gate rides the one question as actionPolicy', async () => {
 		const w = world();
 		const gate = { owner: { ownerOnly: false } };
-		w.session.actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join', policy: gate } };
+		activeFrame(w.session).actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join', policy: gate } };
 		await w.click({ guildId: 'guild-1' });
 
 		expect(w.policy.authorize).toHaveBeenCalledWith({
@@ -329,10 +330,10 @@ describe('dispatch - the permission choke point', () => {
 	it('a modal submit consults under the gate the opening button carried', async () => {
 		const w = world();
 		const gate = { owner: { ownerOnly: false } };
-		w.session.modalHandler = w.handler; // what showModal records when the modal opens
-		w.session.modalPolicy = gate; // and the opener's policy alongside it
+		activeFrame(w.session).modalHandler = w.handler; // what showModal records when the modal opens
+		activeFrame(w.session).modalPolicy = gate; // and the opener's policy alongside it
 		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
-		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${w.session.modalNonce}`, inputs: {} });
+		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${activeFrame(w.session).modalNonce}`, inputs: {} });
 
 		expect(w.policy.authorize).toHaveBeenCalledTimes(1);
 		expect(vi.mocked(w.policy.authorize).mock.calls[0][0].actionPolicy).toBe(gate);
@@ -430,8 +431,8 @@ describe('dispatch - dead paths', () => {
 		w.clock.advance(31 * 60 * 1000);
 		const revived: Session<unknown> = {
 			...w.session,
-			actions: {}, // fresh record: nothing is clickable until drawn
 		};
+		activeFrame(revived).actions = {}; // fresh record: nothing is clickable until drawn
 		w.tryRevive.mockResolvedValue(revived);
 
 		await w.click();
@@ -470,7 +471,7 @@ describe('dispatch - dead paths', () => {
 describe('dispatch - staleness (the frame wins)', () => {
 	it('stale click (hash not in the frame): redraw the current screen, run nothing, ask nothing', async () => {
 		const w = world();
-		w.session.actions = {}; // the last draw carried no such control
+		activeFrame(w.session).actions = {}; // the last draw carried no such control
 		await w.click();
 
 		expect(w.calls).toEqual(['redraw:main']);
@@ -480,7 +481,7 @@ describe('dispatch - staleness (the frame wins)', () => {
 
 	it('stale modal submit (nonce mismatch): redraw, run nothing', async () => {
 		const w = world();
-		w.session.modalHandler = w.handler;
+		activeFrame(w.session).modalHandler = w.handler;
 		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~stale1234`, inputs: { amount: '10' } });
 
@@ -491,7 +492,7 @@ describe('dispatch - staleness (the frame wins)', () => {
 	it('modal submit with no recorded opener: stale semantics - redraw, run nothing', async () => {
 		const w = world();
 		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
-		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${w.session.modalNonce}`, inputs: { amount: '10' } });
+		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${activeFrame(w.session).modalNonce}`, inputs: { amount: '10' } });
 
 		expect(w.calls).toEqual(['redraw:main']);
 		expect(w.handler).not.toHaveBeenCalled();
@@ -528,7 +529,7 @@ describe('dispatch - the error socket', () => {
 
 	it('routes pipeline failures as source framework, no session attached', async () => {
 		const w = world();
-		w.session.screen = 'ghost';
+		activeFrame(w.session).screen = 'ghost';
 		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/ghost', actionHash: actionHash(w.handler) });
 		await w.click({ customId: id });
 
@@ -548,7 +549,7 @@ describe('dispatch - the error socket', () => {
 
 		// Framework failures log but never reply: "try again" advice would be useless.
 		w.calls.length = 0;
-		w.session.screen = 'ghost';
+		activeFrame(w.session).screen = 'ghost';
 		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/ghost', actionHash: actionHash(w.handler) });
 		await w.click({ customId: id });
 		expect(w.calls).toEqual([]);
@@ -610,7 +611,7 @@ describe('dispatch - the per-session line', () => {
 			ttlMs: 30 * 60 * 1000,
 			remount: 'coexist',
 		});
-		other.actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join' } };
+		activeFrame(other).actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join' } };
 
 		let release: (() => void) | undefined;
 		w.handler.mockImplementation(async () => {

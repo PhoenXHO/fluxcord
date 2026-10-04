@@ -63,9 +63,68 @@ export type EndReason = (typeof EndReason)[keyof typeof EndReason];
 // --- The session -----------------------------------------------------------------
 
 /**
+ * One running flow instance. A session's panel is a stack of these, the
+ * mounted flow's frame at the bottom and one frame per called flow on
+ * top. Each frame owns its current screen, back trail, click registry
+ * and modal state, so navigation never crosses a flow boundary; only the
+ * top frame renders, and only its records are clickable. The event
+ * pipeline and the `ui` toolkit write everything here, and the identity
+ * fields are fixed at frame creation.
+ */
+export interface FlowFrame {
+	readonly id: string;
+	readonly flowId: string;
+	readonly moduleId: string;
+	/** The current screen (a view id). */
+	screen: string;
+	/** The back trail: screens stacked by `push`, oldest first. The current screen is not in it (it lives in `screen`), and `back` pops the newest entry. */
+	history: readonly string[];
+	/**
+	 * Fresh identity for this screen instance's modal, drawn from
+	 * `generateId`. Flips on every screen change and again on every modal
+	 * open, but survives redraws: a redraw must not orphan a modal the
+	 * user still has open. It rides the modal's custom id as a `~nonce`
+	 * suffix, and a submit whose nonce no longer matches bounces as stale.
+	 * The flip on open keeps every modal's custom id fresh, which matters
+	 * because Discord keeps unsent draft text per custom id: a reused id
+	 * would bleed an old draft into the new modal's prefill.
+	 */
+	modalNonce: string;
+	/** The last draw's click registry ({@link ActionMap}): the whole truth about what is clickable on the message right now. */
+	actions: ActionMap;
+	/**
+	 * The handler awaiting this screen instance's modal submit. `showModal`
+	 * records it when the modal opens; when the user submits, dispatch
+	 * matches the submit's `~nonce` suffix to the frame and calls this
+	 * handler with the input values. One modal can be open per frame at a
+	 * time.
+	 */
+	modalHandler?: ActionHandler;
+	/**
+	 * A copy of the opener control's policy gate, taken when `showModal`
+	 * opens the modal. A submit is a new interaction with no control
+	 * behind it, and the screen may have been redrawn since the modal
+	 * opened, so the gate cannot be looked up again at submit time; it is
+	 * snapshotted next to `modalHandler` and the submit answers under it.
+	 */
+	modalPolicy?: PermissionPolicy;
+}
+
+/**
+ * The running flow on top of the session's stack. Its screen is what
+ * renders, and its click records are what accept clicks. Navigation,
+ * drawing and dispatch all act on this frame.
+ */
+export function activeFrame(session: Session<unknown>): FlowFrame {
+	return session.frames[session.frames.length - 1];
+}
+
+/**
  * One live session. The identity fields above the blank line are fixed at
  * creation; the live state below it is written by the event pipeline and
- * the `ui` toolkit as the user navigates.
+ * the `ui` toolkit as the user navigates. Screen and history live on the
+ * frames (one per running flow instance); the session exposes the top
+ * frame's as read-only views, and writes go through `frames`.
  */
 export interface Session<TData> {
 	readonly id: string;
@@ -97,39 +156,12 @@ export interface Session<TData> {
 	lastActivityAt: number;
 	/** The flow's one shared data object; handlers mutate it directly. */
 	data: TData;
-	/** The current screen (a view id). */
-	screen: string;
-	/** The back trail: screens stacked by `push`, oldest first. The current screen is not in it (it lives in `screen`), and `back` pops the newest entry. */
-	history: readonly string[];
-	/**
-	 * Fresh identity for this screen instance's modal, drawn from
-	 * `generateId`. Flips on every screen change and again on every modal
-	 * open, but survives redraws: a redraw must not orphan a modal the
-	 * user still has open. It rides the modal's custom id as a `~nonce`
-	 * suffix, and a submit whose nonce no longer matches bounces as stale.
-	 * The flip on open keeps every modal's custom id fresh, which matters
-	 * because Discord keeps unsent draft text per custom id: a reused id
-	 * would bleed an old draft into the new modal's prefill.
-	 */
-	modalNonce: string;
-	/** The last draw's click registry ({@link ActionMap}): the whole truth about what is clickable on the message right now. */
-	actions: ActionMap;
-	/**
-	 * The handler awaiting this screen instance's modal submit. `showModal`
-	 * records it when the modal opens; when the user submits, dispatch
-	 * matches the submit's `~nonce` suffix to the session and calls this
-	 * handler with the input values. One modal can be open per session at
-	 * a time.
-	 */
-	modalHandler?: ActionHandler;
-	/**
-	 * A copy of the opener control's policy gate, taken when `showModal`
-	 * opens the modal. A submit is a new interaction with no control
-	 * behind it, and the frame may have been redrawn since the modal
-	 * opened, so the gate cannot be looked up again at submit time; it is
-	 * snapshotted next to `modalHandler` and the submit answers under it.
-	 */
-	modalPolicy?: PermissionPolicy;
+	/** The frame stack, the root flow's frame first and the running one last. */
+	readonly frames: FlowFrame[];
+	/** The top frame's current screen. A read-only view over the stack; navigation writes the frame. */
+	readonly screen: string;
+	/** The top frame's back trail. A read-only view over the stack. */
+	readonly history: readonly string[];
 	/**
 	 * The goodbye a closing handler authored: `ui.close(view)` records it
 	 * here, and the close death path renders it through the parting seam

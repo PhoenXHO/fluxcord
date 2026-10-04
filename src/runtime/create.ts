@@ -29,6 +29,7 @@ import { createDispatch } from '../pipeline/dispatch.js';
 import { createSessionQueue } from '../pipeline/queue.js';
 import { renderV2Message } from '../render/v2.js';
 import { createSessionStore, generateId, isExpired } from '../state/store.js';
+import { activeFrame } from '../state/types.js';
 import type { MessageRef, RehydrateRow, Session } from '../state/types.js';
 import type { IncomingEvent, PlatformPort } from '../pipeline/types.js';
 import type { V2MessagePayload } from '../render/v2.js';
@@ -221,10 +222,23 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrate: { ref: mountOptions.rehydrateRef } } : {}),
 			lastActivityAt: at,
 			data,
-			screen: def.first,
-			history: [],
-			modalNonce: generateId(),
-			actions: {},
+			frames: [
+				{
+					id: generateId(),
+					flowId,
+					moduleId,
+					screen: def.first,
+					history: [],
+					modalNonce: generateId(),
+					actions: {},
+				},
+			],
+			get screen() {
+				return this.frames[this.frames.length - 1].screen;
+			},
+			get history() {
+				return this.frames[this.frames.length - 1].history;
+			},
 		};
 		const firstTree = viewOf(draft, screens);
 		const materialized = materializeTree(firstTree);
@@ -245,10 +259,11 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			remount: def.remount,
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrate: { ref: mountOptions.rehydrateRef } } : {}),
 		});
-		// The message went out carrying firstTree's controls; the session's
-		// action map must be that tree's materialization, or its own buttons
-		// would be stale to dispatch. (Same tick as create: no click can land between.)
-		session.actions = materialized.actions;
+		// The message went out carrying firstTree's controls; the root
+		// frame's action map must be that tree's materialization, or its own
+		// buttons would be stale to dispatch. (Same tick as create: no click
+		// can land between.)
+		activeFrame(session).actions = materialized.actions;
 
 		if (mountOptions.rehydrateRef !== undefined && options.rehydrate !== undefined) {
 			const row: RehydrateRow = {

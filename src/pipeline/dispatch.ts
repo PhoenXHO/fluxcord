@@ -10,17 +10,17 @@
  * ```
  *
  * Standing rules:
- * - The session is the truth; the customId is just an address. The frame
- *   (the handler map of the last draw) decides what runs: a stamp the frame
- *   does not carry is stale (or forged) and runs nothing; the current
- *   screen is redrawn so the client snaps to reality.
+ * - The session is the truth; the customId is just an address. The action
+ *   map of the last draw decides what runs: a stamp the map does not
+ *   carry is stale (or forged) and runs nothing; the current screen is
+ *   redrawn so the client snaps to reality.
  * - Every delivered event asks the policy seam exactly one question, even
  *   when no policy ref exists anywhere. Deny is the only framework-initiated
  *   actor reply besides the error socket's.
  * - A dead click edits its message into the parting screen (the click
  *   buries its own corpse); revive is consulted first, and a revived
- *   session is drawn once before its click resolves (a revived session has
- *   no frame until drawn).
+ *   session is drawn once before its click resolves (a revived session
+ *   has no action map until drawn).
  * - Events on one session id line up FIFO: handlers never interleave over
  *   the session's single data object.
  * - After a successful handler, exactly one redraw: the current screen,
@@ -42,6 +42,7 @@ import type { ActionAddress } from '../render/id-codec.js';
 import { decodeActionId } from '../render/id-codec.js';
 import { isExpired } from '../state/store.js';
 import type { SessionStore } from '../state/store.js';
+import { activeFrame } from '../state/types.js';
 import type { Session } from '../state/types.js';
 import { getPath, lensSession } from '../flow/lens.js';
 import { EventKind, ErrorSource } from './types.js';
@@ -288,22 +289,26 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				}
 				session = revived;
 				justRevived = true;
-				// A revived session has no frame until drawn. Draw the current
-				// screen once (building the frame and snapping the client to
-				// reality), then resolve the click against that frame. The
-				// stale paths below skip their own redraw: it would edit the
-				// same pixels twice.
+				// A revived session has no action map until drawn. Draw the
+				// current screen once (building the map and snapping the
+				// client to reality), then resolve the click against that
+				// map. The stale paths below skip their own redraw: it would
+				// edit the same pixels twice.
 				await options.platform.redraw(session);
 			}
+			// Everything the guards below resolve against lives on the top
+			// frame: its screen renders, its map says what is clickable, its
+			// nonce admits the modal submit.
+			const frame = activeFrame(session);
 			// Stale modal draft: the nonce identifies the view instance the
 			// modal was opened for. A mismatch means the draft is stale:
 			// run nothing.
-			if (incoming.kind === EventKind.ModalSubmit && nonce !== session.modalNonce) {
+			if (incoming.kind === EventKind.ModalSubmit && nonce !== frame.modalNonce) {
 				if (!justRevived) await options.platform.redraw(session);
 				return;
 			}
 
-			const screenKey = `${session.moduleId}/${session.screen}`;
+			const screenKey = `${frame.moduleId}/${frame.screen}`;
 			const screen = options.screens.resolve(screenKey);
 			if (screen === undefined) {
 				throw new Error(`no screen registered for '${screenKey}'`);
@@ -318,17 +323,17 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 			// stale or forged id and earns stale semantics, never a run.
 			let record: ActionRecord<unknown>;
 			if (incoming.kind === EventKind.ModalSubmit) {
-				if (session.modalHandler === undefined) {
+				if (frame.modalHandler === undefined) {
 					if (!justRevived) await options.platform.redraw(session);
 					return;
 				}
 				record = {
-					handler: session.modalHandler,
-					label: session.actions[address.actionHash]?.label ?? 'modal',
-					...(session.modalPolicy !== undefined ? { policy: session.modalPolicy } : {}),
+					handler: frame.modalHandler,
+					label: frame.actions[address.actionHash]?.label ?? 'modal',
+					...(frame.modalPolicy !== undefined ? { policy: frame.modalPolicy } : {}),
 				};
 			} else {
-				const found = session.actions[address.actionHash];
+				const found = frame.actions[address.actionHash];
 				if (found === undefined) {
 					if (!justRevived) await options.platform.redraw(session);
 					return;
