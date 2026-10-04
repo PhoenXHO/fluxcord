@@ -9,8 +9,7 @@
  * appends, for journeys where revisiting is meaningful. back pops one
  * entry without naming a target. All three are pure state changes
  * (screen, history, nonce: no draw; the auto-redraw after the handler
- * commits the final screen). Subflow roots resolve through the screen
- * registry: ui.go('pick') opens the plugged subflow at its first screen.
+ * commits the final screen).
  * close routes through the store, whose onEnd wiring freezes the message.
  * showModal records the running handler as the submit's destination and
  * renders the modal with a fresh nonce-stamped customId per open, so a
@@ -39,7 +38,7 @@ import type { EventTools, PlatformPort, ScreenRegistry, UiToolkit } from '../pip
 export interface MakeUiOptions {
 	/** The live session store. */
 	readonly store: SessionStore;
-	/** Resolves ui.go('<root>') to a plugged subflow's entry screen. Needed only when flows use subflows. */
+	/** Resolves screen keys for the ui.go/push target validation. Omit for no validation. */
 	readonly screens?: ScreenRegistry;
 }
 
@@ -53,23 +52,14 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 		// of reach for a child handler and the other way around. The
 		// stack can grow without a verb ever crossing a flow boundary.
 		const top = (): FlowFrame => activeFrame(session);
-		// A subflow root name (ui.go('pick')) resolves to the plugged
-		// subflow's first screen; anything else is a screen id as-is.
-		// Resolution runs BEFORE any dedup lookup, so go('<root>') dedups
-		// against the root's entry screen. Backstop: typed screens cannot
-		// reach the throw, but stringly handlers (factories, subflow
-		// roots) can: fail loud rather than navigate to nothing.
+		// Backstop: typed screens cannot reach the throw, but stringly
+		// handlers (factories) can. Fail loud rather than navigate to
+		// nothing.
 		const resolve = (verb: 'go' | 'push', frame: FlowFrame, view: string): string => {
-			const key = `${frame.moduleId}/${frame.screen}`;
-			const current = options.screens?.resolve(key);
-			const target = current?.flow?.roots?.[view] ?? view;
-			if (options.screens !== undefined && current !== undefined) {
-				const root = current.flow?.roots?.[view];
-				if (root === undefined && options.screens.resolve(`${frame.moduleId}/${target}`) === undefined) {
-					throw new Error(`ui.${verb}('${view}') targets no screen or subflow root in module '${frame.moduleId}' (a renamed screen key?)`);
-				}
+			if (options.screens !== undefined && options.screens.resolve(`${frame.moduleId}/${view}`) === undefined) {
+				throw new Error(`ui.${verb}('${view}') targets no screen in module '${frame.moduleId}' (a renamed screen key?)`);
 			}
-			return target;
+			return view;
 		};
 		const ui: UiToolkit = {
 			go(view: string): void {
@@ -158,7 +148,7 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 
 /**
  * Pops one history entry back onto the screen and regenerates the modal
- * nonce: the machinery behind ui.back() and the subflow done action.
+ * nonce: the machinery behind ui.back().
  * No-op when history is empty (the entry screen has nothing under it).
  */
 export function navigateBack(session: Session<unknown>): void {

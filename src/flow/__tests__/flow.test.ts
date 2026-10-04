@@ -1,9 +1,8 @@
 /**
- * Flow layer tests: defineFlow's validations, the subflow namespacing/
- * slot machinery, the lens, the registry erase helper, and the pipeline
- * integration through the action map: resolution after a draw, the rule-9
- * policy ladder, lensed delivery, the done round trip, stale semantics,
- * the error copy hook, and parting bundles on both death paths.
+ * Flow layer tests: defineFlow's validations, the lens, the registry
+ * erase helper, and the pipeline integration through the action map:
+ * resolution after a draw, stale semantics, the error copy hook, and
+ * parting bundles on both death paths.
  *
  * @module flow/__tests__/flow
  */
@@ -26,7 +25,6 @@ import { action } from '../../pipeline/action.js';
 import { DEFAULT_ERROR_MESSAGE, createDispatch } from '../../pipeline/dispatch.js';
 import { EventKind } from '../../pipeline/types.js';
 import type {
-	ActionEvent,
 	ActionHandler,
 	ErrorReport,
 	IncomingEvent,
@@ -35,40 +33,19 @@ import type {
 	PolicyPort,
 	PolicyRequest,
 	RegisteredScreen,
-	UiToolkit,
 } from '../../pipeline/types.js';
-import { defineFlow, subflow } from '../define.js';
+import { defineFlow } from '../define.js';
 import { viewOf } from '../../commit/commit.js';
 import { screen, subview } from '../screen.js';
 import { kitFor } from '../../tree/kit.js';
 import { getPath, lensSession, setPath } from '../lens.js';
 import { asScreenRegistry, screenEntries } from '../registry.js';
 import { validateFlows } from '../validate.js';
-import type { Screen, ViewSession } from '../types.js';
+import type { ViewSession } from '../types.js';
 
 interface LottoData {
 	count: number;
 	picker: { chosen: string };
-}
-
-interface PickData {
-	chosen: string;
-}
-
-/** The picker subflow's one handler: bound in its view, hashed by identity. */
-const choose: ActionHandler<PickData> = (event) => {
-	event.mutate((data) => {
-		data.chosen = 'winner';
-	});
-};
-
-/** Shared fixture: the one-screen picker subflow's screen. */
-function pickerScreen(): Screen<PickData> {
-	return screen<PickData>()((data) => view(
-		{},
-		text(`picked: ${data.chosen}`),
-		row({}, button({ onClick: choose, label: 'choose' })),
-	));
 }
 
 describe('defineFlow - validations', () => {
@@ -83,8 +60,6 @@ describe('defineFlow - validations', () => {
 		expect(def.first).toBe('main');
 		expect(def.ttlMs).toBe(DEFAULT_TTL_MS);
 		expect(def.remount).toBe('replace');
-		expect(def.slots).toEqual({ main: [] });
-		expect(def.roots).toEqual({});
 		// Carried as-is: the definition freezes itself, never the bag.
 		expect(def.initialData).toEqual({ count: 0, picker: { chosen: 'none' } });
 		expect(Object.isFrozen(def)).toBe(true);
@@ -108,12 +83,7 @@ describe('defineFlow - validations', () => {
 		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: -1000 })).toThrow(/ttlMs/);
 	});
 
-	it('rejects screen ids and subflow keys the customId codec cannot carry', () => {
-		expect(() => defineFlow({
-			screens: { 'a.b': { view: () => view({}, text('m')) } },
-			first: 'a.b',
-			initialData: {},
-		})).toThrow(/namespace separator/);
+	it('rejects screen ids the customId codec cannot carry', () => {
 		expect(() => defineFlow({
 			screens: { 'a:b': { view: () => view({}, text('m')) } },
 			first: 'a:b',
@@ -150,67 +120,6 @@ describe('defineFlow - validations', () => {
 			initialData: { count: 0, picker: { chosen: 'none' } },
 		});
 		expect(def.wrap).toBeUndefined();
-	});
-});
-
-describe('defineFlow - subflow plugs', () => {
-	it('namespaces screens, rebases slot paths, and maps the root', () => {
-		const plug = subflow({ use: defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } }), at: 'picker' });
-		const def = defineFlow<LottoData>({
-			screens: { main: { view: () => view({}, text('m')) } },
-			first: 'main',
-			initialData: { count: 0, picker: { chosen: 'none' } },
-			subflows: [plug],
-		});
-
-		expect(def.screenIds).toEqual(['main', 'picker.pick']);
-		expect(def.slots['picker.pick']).toEqual(['picker']);
-		expect(def.slots.main).toEqual([]);
-		expect(def.roots).toEqual({ picker: 'picker.pick' });
-		// The namespaced screen is the source screen, unmolested: the done
-		// handler is the parent's to bind in a view, not defineFlow's to install.
-		expect(def.screens['picker.pick'].view).toBe(plug.use.screens.pick.view);
-	});
-
-	it('composes namespaces and slot paths through nested plugs', () => {
-		const leaf = defineFlow<{ n: number }>({
-			screens: { leaf: { view: (data) => view({}, text(`n ${data.n}`)) } },
-			first: 'leaf',
-			initialData: { n: 0 },
-		});
-		const middle = defineFlow<{ m: string }>({
-			screens: { mid: { view: (data) => view({}, text(data.m)) } },
-			first: 'mid',
-			initialData: { m: 'm' },
-			subflows: [subflow({ use: leaf, at: 'inner' })],
-		});
-		const outer = defineFlow<{ top: boolean }>({
-			screens: { top: { view: () => view({}, text('top')) } },
-			first: 'top',
-			initialData: { top: false },
-			subflows: [subflow({ use: middle, at: 'mid' })],
-		});
-
-		expect(outer.screenIds).toEqual(['top', 'mid.mid', 'mid.inner.leaf']);
-		expect(outer.slots['mid.mid']).toEqual(['mid']);
-		expect(outer.slots['mid.inner.leaf']).toEqual(['mid', 'inner']);
-		expect(outer.roots).toEqual({ mid: 'mid.mid', inner: 'mid.inner.leaf' });
-	});
-
-	it('throws on duplicate plug keys and keys colliding with own screens', () => {
-		const picker = defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } });
-		expect(() => defineFlow({
-			screens: { main: { view: () => view({}, text('m')) } },
-			first: 'main',
-			initialData: {},
-			subflows: [subflow({ use: picker, at: 'x' }), subflow({ use: picker, at: 'x' })],
-		})).toThrow(/one plug per key/);
-		expect(() => defineFlow({
-			screens: { main: { view: () => view({}, text('m')) } },
-			first: 'main',
-			initialData: {},
-			subflows: [subflow({ use: picker, at: 'main' })],
-		})).toThrow(/collides with own screen/);
 	});
 });
 
@@ -274,44 +183,6 @@ describe('the drawn session', () => {
 	});
 });
 
-describe('the subflow done handler', () => {
-	it('pops history through the lens and hands onDone the slot state', async () => {
-		const store = createSessionStore();
-		const session = store.create<LottoData>({
-			flowId: 'lotto',
-			moduleId: 'lotto',
-			ownerId: 'u1',
-			messageRef: { channelId: 'c1', messageId: 'm1' },
-			data: { count: 0, picker: { chosen: 'seed' } },
-			screen: 'picker.pick',
-			ttlMs: DEFAULT_TTL_MS,
-			remount: 'coexist',
-		});
-		activeFrame(session).history = ['main'];
-		activeFrame(session).modalNonce = 'old-nonce';
-
-		const onDone = vi.fn();
-		const plug = subflow({ use: defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } }), at: 'picker', onDone });
-
-		const ui: UiToolkit = { go: vi.fn(), push: vi.fn(), back: vi.fn(), close: vi.fn(), showModal: vi.fn(async () => undefined) };
-		const event = {
-			kind: EventKind.Button,
-			name: 'Done',
-			actorId: 'u1',
-			session: lensSession<PickData>(session, ['picker']),
-			ui,
-			task: <T>(fn: () => Promise<T>): Promise<T> => fn(),
-			mutate: vi.fn(),
-		};
-		await plug.done(event as unknown as ActionEvent<never>);
-
-		expect(onDone).toHaveBeenCalledWith({ chosen: 'seed' }, ui);
-		expect(session.screen).toBe('main');
-		expect(session.history).toEqual([]);
-		expect(activeFrame(session).modalNonce).not.toBe('old-nonce');
-	});
-});
-
 describe('the lens', () => {
 	it('getPath reads nested slots and returns undefined past missing or non-object hops', () => {
 		const bag = { a: { b: { c: 7 } }, n: 5 };
@@ -341,7 +212,7 @@ describe('the lens', () => {
 			ttlMs: DEFAULT_TTL_MS,
 			remount: 'coexist',
 		});
-		const lens = lensSession<PickData>(session, ['picker']);
+		const lens = lensSession<{ chosen: string }>(session, ['picker']);
 
 		expect(lens.data).toEqual({ chosen: 'none' });
 		expect(lens.id).toBe(session.id);
@@ -363,16 +234,12 @@ describe('registry population and cross-flow validation', () => {
 		first: 'main',
 		initialData: { count: 0, picker: { chosen: 'none' } },
 		parting: { command: 'lotto' },
-		subflows: [subflow({ use: defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } }), at: 'picker' })],
 	});
 
-	it('screenEntries keys entries and carries slot plus the flow slice', () => {
+	it('screenEntries keys entries and carries the flow slice', () => {
 		const entries = screenEntries('lotto', flow);
 
-		expect(Object.keys(entries)).toEqual(['lotto/main', 'lotto/picker.pick']);
-		expect(entries['lotto/picker.pick']?.slot).toEqual(['picker']);
-		expect(entries['lotto/main']?.slot).toBeUndefined();
-		expect(entries['lotto/main']?.flow?.roots).toEqual({ picker: 'picker.pick' });
+		expect(Object.keys(entries)).toEqual(['lotto/main']);
 		expect(entries['lotto/main']?.flow?.parting).toEqual({ command: 'lotto' });
 		expect(asScreenRegistry(entries).resolve('lotto/main')).toBe(entries['lotto/main']);
 	});
@@ -452,7 +319,6 @@ interface World {
 
 interface WorldOptions {
 	onError?: (report: ErrorReport) => string | undefined;
-	onDone?: (state: unknown, ui: UiToolkit) => void;
 	omitErrorHandler?: boolean;
 }
 
@@ -476,22 +342,16 @@ function world(options: WorldOptions = {}): World {
 		event.mutate((data) => {
 			// A different expression from bump on purpose: source-identical
 			// handlers share one action hash, and the stale-frame test below
-			// needs 'bump' truly absent from picker.pick's frame.
+			// needs 'bump' truly absent from counter's frame.
 			data.count = data.count + 1;
 		});
 	};
 	const open: ActionHandler<LottoData> = (event) => {
-		event.ui.go('picker');
+		event.ui.go('counter');
 	};
 	const boom: ActionHandler<LottoData> = () => {
 		throw new Error('boom');
 	};
-
-	const plug = subflow({
-		use: defineFlow<PickData>({ screens: { pick: pickerScreen() }, first: 'pick', initialData: { chosen: 'none' } }),
-		at: 'picker',
-		onDone: options.onDone,
-	});
 
 	const flow = defineFlow<LottoData>({
 		screens: {
@@ -504,20 +364,19 @@ function world(options: WorldOptions = {}): World {
 					button({ onClick: boom, label: 'boom' }),
 				),
 			)),
+			counter: { view: (data) => view({}, text(`count: ${data.count}`)) },
 		},
 		first: 'main',
 		initialData: { count: 0, picker: { chosen: 'none' } },
 		components: [
-			(tree, session, kit): ViewNode => view({},
+			(tree, _session, kit): ViewNode => view({},
 				...tree.children,
 				text('flow chrome'),
 				row({},
 					kit.Button({ onClick: refresh, label: 'refresh' }),
-					...(session.screen.startsWith('picker.') ? [kit.Button({ onClick: plug.done, label: 'Done' })] : []),
 				),
 			),
 		],
-		subflows: [plug],
 		parting: { command: 'lotto', note: 'The lotto ended.' },
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 	});
@@ -570,7 +429,7 @@ function world(options: WorldOptions = {}): World {
 	});
 
 	/** Label = wire hash: tests address handlers by the label they authored on the control. */
-	const handlers: Record<string, ActionHandler<never>> = { bump, refresh, open, boom, choose, done: plug.done };
+	const handlers: Record<string, ActionHandler<never>> = { bump, refresh, open, boom };
 	function hashOf(label: string): string {
 		return actionHash(handlers[label]);
 	}
@@ -619,91 +478,27 @@ describe('dispatch - flow integration through the frame', () => {
 		expect(w.errors).toHaveLength(0);
 	});
 
-	it('a laggy click on a handler the frame still carries RUNS: the address screen is decorative', async () => {
-		const w = world();
-		activeFrame(w.session).screen = 'picker.pick';
-		await w.draw(); // the frame is picker.pick's: choose, refresh, Done
-		const fromMain = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: w.hashOf('choose') });
-
-		await w.click('choose', { customId: fromMain });
-
-		// Ran, through the slot lens the current screen owns: the old
-		// screen-key guard would have called this click stale.
-		expect(w.session.data.picker.chosen).toBe('winner');
-		expect(w.calls).toEqual(['redraw:picker.pick']);
-	});
-
 	it('a click on a handler absent from the current frame is stale: no run', async () => {
 		const w = world();
 		await w.draw();
-		await w.click('open'); // session -> picker.pick
+		await w.click('open'); // session -> counter
 
-		await w.draw(); // the frame is picker.pick's; bump is not on it
+		await w.draw(); // the frame is counter's; bump is not on it
 		await w.click('bump');
 
 		expect(w.session.data.count).toBe(0);
-		expect(w.calls).toEqual(['redraw:picker.pick', 'redraw:picker.pick']);
+		expect(w.calls).toEqual(['redraw:counter', 'redraw:counter']);
 	});
 
-	it('delivers subflow screens against the lensed slot', async () => {
+	it('redraw renders a second screen through the flow wrap', async () => {
 		const w = world();
-		activeFrame(w.session).screen = 'picker.pick';
-		await w.draw();
-
-		await w.click('choose');
-
-		expect(w.session.data.picker).toEqual({ chosen: 'winner' }); // the mutate hook wrote through the slot
-		expect(w.calls).toEqual(['redraw:picker.pick']);
-	});
-
-	it('a flow wrap control clicked on a subflow screen lenses to the root bag', async () => {
-		const w = world();
-		activeFrame(w.session).screen = 'picker.pick';
-		await w.draw();
-
-		await w.click('refresh');
-
-		// The wrap's refresh owns the root bag even though the click landed
-		// on a slotted screen: count increments on the bag, the slot untouched.
-		expect(w.session.data.count).toBe(1);
-		expect(w.session.data.picker).toEqual({ chosen: 'none' });
-	});
-
-	it('ui.go resolves a subflow root to its entry screen', async () => {
-		const w = world();
-		await w.draw();
-
-		await w.click('open');
-
-		expect(w.session.screen).toBe('picker.pick');
-		expect(w.session.history).toEqual(['main']);
-	});
-
-	it('done pops back, fires onDone with the slot state, and redraws the parent', async () => {
-		const onDone = vi.fn();
-		const w = world({ onDone });
-
-		await w.draw();
-		await w.click('open');
-		await w.draw(); // picker.pick's frame carries the wrap's Done button
-		await w.click('done');
-
-		expect(onDone).toHaveBeenCalledWith({ chosen: 'none' }, expect.anything());
-		expect(w.session.screen).toBe('main');
-		expect(w.session.history).toEqual([]);
-		expect(w.calls).toEqual(['redraw:picker.pick', 'redraw:main']);
-	});
-
-	it('redraw renders a slotted screen through the flow wrap', async () => {
-		const w = world();
-		activeFrame(w.session).screen = 'picker.pick';
+		activeFrame(w.session).screen = 'counter';
 
 		await w.draw();
 
 		expect(w.edits).toHaveLength(1);
-		expect(w.edits[0]).toContain('picked: none'); // the slot's data, not the bag
+		expect(w.edits[0]).toContain('count: 0');
 		expect(w.edits[0]).toContain('flow chrome'); // the component drew around it
-		expect(w.edits[0]).toContain('Done'); // the wrap's subflow chrome
 	});
 
 	it('the flow onError hook decides the reply copy over the default', async () => {

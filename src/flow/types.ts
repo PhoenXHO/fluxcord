@@ -9,7 +9,7 @@
  * @module flow/types
  */
 
-import type { ActionHandler, ErrorReport, PartingOptions } from '../pipeline/types.js';
+import type { ErrorReport, PartingOptions } from '../pipeline/types.js';
 import type { Session } from '../state/types.js';
 import type { RemountPolicy } from '../state/types.js';
 import type { ScreenKit } from '../tree/kit.js';
@@ -18,7 +18,7 @@ import type { ComponentResult, ViewNode } from '../tree/types.js';
 // used in docs
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { screen } from './screen.js';
-import { defineFlow, subflow } from './define.js';
+import { defineFlow } from './define.js';
 import { expiryEpoch } from './expiry.js';
 /* eslint-enable */
 
@@ -127,8 +127,6 @@ export interface FlowOptions<TData, TScreens extends string = string> {
 	 * with no chrome.
 	 */
 	readonly components?: readonly FlowComponent<TData>[];
-	/** Subflows plugged into this flow; build each with {@link subflow}. Omit for none. */
-	readonly subflows?: readonly SubflowPlug[];
 	/** The session's sliding TTL in milliseconds. Default: 30 minutes. Must be finite and positive; `Infinity` throws. */
 	readonly ttlMs?: number;
 	/** What a mount does when the owner already holds a live panel of this flow. Default: `'replace'` closes the old panel. */
@@ -154,40 +152,20 @@ export interface FlowOptions<TData, TScreens extends string = string> {
 	readonly rehydrate?: (ref: string) => TData | undefined | Promise<TData | undefined>;
 }
 
-/** A plugged subflow (built via the {@link subflow} helper, which infers types). */
-export interface SubflowPlug {
-	/** Internal erased form; use {@link subflow} to build one. */
-	readonly use: FlowDefinition;
-	/**
-	 * The parent-bag key this subflow works in (its data slot) and its
-	 * namespace: subflow screens register as `'<at>.<screen>'` and
-	 * `ui.go('<at>')` opens the subflow at its first screen. One plug
-	 * per key.
-	 */
-	readonly at: string;
-	/**
-	 * The subflow finisher. ONE function object: the parent's views bind it
-	 * `(button({ onClick: plug.done }))` and the frame harvest at draw time
-	 * registers it. It pops history, then hands the slot state to the
-	 * `onDone` callback given to {@link subflow}.
-	 */
-	readonly done: ActionHandler;
-}
-
 /**
- * The runtime flow definition: built by {@link defineFlow}, then either
- * mounted by the boot layer or plugged as a subflow. `TData` survives only
- * as the type-level channel for {@link subflow} inference (see {@link __data});
- * every other field is erased so downstream machinery never fights type
- * variance. `FlowDefinition` with no type argument is the fully erased
- * form.
+ * The runtime flow definition: built by {@link defineFlow}, then mounted
+ * by the boot layer. `TData` survives only as the type-level channel
+ * carried by {@link __data}, which keeps two flows with different bags
+ * distinct as types; every other field is erased so downstream machinery
+ * never fights type variance. `FlowDefinition` with no type argument is
+ * the fully erased form.
  */
 export interface FlowDefinition<TData = never> {
-	/** Type-only; never present at runtime. Carries `TData` from `defineFlow` to `subflow()`'s inference. */
+	/** Type-only; never present at runtime. The phantom channel for `TData`. */
 	readonly __data?: (data: TData) => void;
-	/** Merged screen map: own screens plus namespaced subflow screens (`<at>.<screen>`). */
+	/** The flow's own screens, keyed by screen id. */
 	readonly screens: Readonly<Record<string, Screen<TData>>>;
-	/** All screen keys, namespaced where a subflow supplied them. */
+	/** All screen ids. */
 	readonly screenIds: readonly string[];
 	/** The screen the flow opens at. */
 	readonly first: string;
@@ -199,10 +177,6 @@ export interface FlowDefinition<TData = never> {
 	readonly initialData: unknown;
 	/** The composed component chain; absent when the flow declares no components. */
 	readonly wrap?: (tree: ViewNode, session: Session<TData>, kit: ScreenKit<TData, string>) => ComponentResult;
-	/** Full screen key to bag path: the slice of the bag each screen works in. Own screens map to `[]`. */
-	readonly slots: Readonly<Record<string, readonly string[]>>;
-	/** Namespace root to the screen id `ui.go(root)` opens. */
-	readonly roots: Readonly<Record<string, string>>;
 	/** The flow's sliding TTL in milliseconds. */
 	readonly ttlMs: number;
 	/** The resolved remount policy (`'replace'` when undeclared). */

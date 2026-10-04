@@ -12,7 +12,6 @@ import { describe, expect, it } from 'vitest';
 import { actionHash } from '../../render/action-hash.js';
 import { button, container, optionSelect, row, text, view } from '../../tree/builders.js';
 import { kitFor } from '../../tree/kit.js';
-import { screenKitAt } from '../commit.js';
 import { materializeTree } from '../frame.js';
 
 /** Two products of one factory share byte-identical source: the collision shape. */
@@ -120,28 +119,5 @@ describe('materializeTree - the action map', () => {
 		const { actions, stampOf } = materializeTree(view({}, row({}, node)));
 
 		expect('slot' in actions[stampOf(node)]).toBe(false);
-	});
-});
-
-describe('screenKitAt - draw-phase ownership tags', () => {
-	it('tags buttons and selects with the slot, and the record carries it', () => {
-		const kit = screenKitAt({ history: [] }, ['picker']);
-		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
-		const picked = kit.Select({ options: [{ label: 'A', value: 'a' }], onSelect: (): void => {} });
-		const { actions, stampOf } = materializeTree(view({}, row({}, node, picked)));
-
-		expect(node.slot).toEqual(['picker']);
-		expect(picked.slot).toEqual(['picker']);
-		expect(actions[stampOf(node)].slot).toEqual(['picker']);
-		expect(actions[stampOf(picked)].slot).toEqual(['picker']);
-	});
-
-	it('an empty tag is the root bag, not the absence of one', () => {
-		const kit = screenKitAt({ history: [] }, []);
-		const node = kit.Button({ onClick: (): void => {}, label: 'Go' });
-		const { actions, stampOf } = materializeTree(view({}, row({}, node)));
-
-		expect(node.slot).toEqual([]);
-		expect(actions[stampOf(node)].slot).toEqual([]);
 	});
 });

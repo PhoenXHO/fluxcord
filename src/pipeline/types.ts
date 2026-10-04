@@ -361,10 +361,9 @@ export interface ActionRecord<TData = unknown> {
 	/** The control's own gate, when it declared one, rides the record to the policy consult. */
 	readonly policy?: PermissionPolicy;
 	/**
-	 * Draw-phase ownership tag copied from the control: the bag path the
+	 * Draw-phase ownership tag copied from the frame: the bag path the
 	 * handler lenses to at click time. `[]` is a real tag meaning the root
-	 * bag (flow-wrap controls); absent means the screen's own slot — the
-	 * historical lens a subflow screen's controls keep.
+	 * bag; absent means no lens and the handler reads the whole session.
 	 */
 	readonly slot?: readonly string[];
 }
@@ -388,8 +387,6 @@ export interface PartingOptions {
 export interface FlowContext {
 	/** Draws around every screen's content (components compose into this). */
 	readonly wrap?: (tree: ViewNode, session: Session<unknown>, kit: ScreenKit<unknown, string>) => ComponentResult;
-	/** Subflow namespace roots: root name to the screen id `ui.go(root)` opens. */
-	readonly roots?: Readonly<Record<string, string>>;
 	/** The flow's parting copy, consulted before the framework defaults. */
 	readonly parting?: PartingOptions;
 	/**
@@ -413,8 +410,6 @@ export interface RegisteredScreen<TData = unknown> {
 	 * to a view node at the one draw seam.
 	 */
 	readonly view: (data: TData, controls: ScreenKit<unknown, string>, session: ViewSession) => ComponentResult;
-	/** Subflow screens only: the bag path this screen's view is lensed to. Absent = parent bag. */
-	readonly slot?: readonly string[];
 	/** The owning flow's consultation slice. Absent on hand-built test screens; real registration always sets it. */
 	readonly flow?: FlowContext;
 }

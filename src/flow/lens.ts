@@ -1,13 +1,13 @@
 /**
- * The subflow lens: a live facade over one slot of the parent bag.
+ * The bag lens: a live facade over one slot of a session's data.
  *
- * Subflow screens and actions are authored on the subflow's own data
- * type; at runtime they receive the parent session with `data`
- * redirected to the bag path their screen owns (the registry slot).
- * Every other property (screen, history, nonce, identity) forwards to
- * the real session record, so navigation and diagnostics keep working
- * through the lens. This is what makes a subflow reusable across
- * different parent bags: it never sees the bag, only its room.
+ * A flow's handlers are authored on that flow's own data type; at
+ * runtime they receive the session with `data` redirected to the bag
+ * path their frame owns. Every other property (screen, history, nonce,
+ * identity) forwards to the real session record, so navigation and
+ * diagnostics keep working through the lens. This is what makes a flow
+ * reusable across different parent bags: it never sees the parent's
+ * bag, only its room.
  *
  * @module flow/lens
  */

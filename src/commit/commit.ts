@@ -24,14 +24,10 @@ import type { V2MessagePayload } from '../render/v2.js';
 import { activeFrame } from '../state/types.js';
 import type { MessageRef, Session } from '../state/types.js';
 import type { PartingOptions, PlatformPort, ScreenRegistry } from '../pipeline/types.js';
-import type { ButtonNode, SelectNode, ViewNode } from '../tree/types.js';
+import type { ViewNode } from '../tree/types.js';
 import { kitFor } from '../tree/kit.js';
-import type { ScreenKit } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
 import { validateTree } from '../tree/validate.js';
-import type { ViewSession } from '../flow/types.js';
-import { getPath } from '../flow/lens.js';
-import { isSubflowDone } from '../flow/define.js';
 import { materializeTree } from './frame.js';
 import { freezeTree } from './freeze.js';
 import { partingView } from './parting.js';
@@ -59,41 +55,11 @@ export interface CommitOptions {
 }
 
 /**
- * The draw kit for a plugged screen: the session-bound kit, every control
- * tagged with the bag path the handler lenses to at click time. Tagged
- * controls ride their tag on the frame record, so dispatch lenses by the
- * HANDLER's owner instead of the screen it was drawn on. Nodes are
- * frozen, so the tag lands on a fresh frozen copy; the originals never
- * enter the tree. A subflow plug's done handler is left untagged (it
- * must keep the screen's lens to read the subflow state), as are
- * handlers the kit builds for a screen with no slot at all. Back is
- * tagged like any control (its onLeave sees the slot's lens); the pop
- * itself rides the ui toolkit, which always acts on the real session.
- */
-export function screenKitAt(session: Pick<ViewSession, 'history'>, slot: readonly string[]): ScreenKit {
-	const base = kitFor(session);
-	function withSlot<N extends ButtonNode | SelectNode>(node: N): N {
-		return Object.freeze({ ...node, slot }) as unknown as N;
-	}
-	return {
-		Button: (props) => isSubflowDone(props.onClick) ? base.Button(props) : withSlot(base.Button(props)),
-		Select: (props) => withSlot(base.Select(props)),
-		Back: (props) => withSlot(base.Back(props)),
-		handler: base.handler,
-	};
-}
-
-/**
- * Resolves the session's current screen and runs its view template:
- * subflow screens view their slot (lensed read), then the flow's wrap
- * draws around the result. Shared by the commit phase (redraw/freeze)
- * and mount's first render (which passes a draft session, same shape,
- * messageRef still pending until the send returns).
- *
- * Ownership is tagged at draw: a plugged screen's view is tagged with
- * the screen's slot, and the wrap (the parent flow's surface) with the
- * root bag. Own screens draw with the session-bound kit — no slot, no
- * tag, and dispatch keeps its direct session.
+ * Resolves the session's current screen and runs its view template on
+ * the bag, then the flow's wrap draws around the result. Shared by the
+ * commit phase (redraw/freeze) and mount's first render (which passes a
+ * draft session, same shape, messageRef still pending until the send
+ * returns).
  */
 export function viewOf(session: Session<unknown>, screens: ScreenRegistry): ViewNode {
 	const frame = activeFrame(session);
@@ -102,21 +68,12 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 	if (screen === undefined) {
 		throw new Error(`no screen registered for '${key}'`);
 	}
-	const data = screen.slot === undefined ? session.data : getPath(session.data, screen.slot);
-	// An unseeded slot: the lens reads undefined and the guest view would
-	// die on its own TypeError far from the cause. Fail here instead,
-	// naming the screen and the slot path.
-	if (screen.slot !== undefined && data === undefined) {
-		throw new Error(
-			`screen '${key}' views slot '${screen.slot.join('.')}' but the bag has nothing at that path: the parent flow never seeded the slot in its initialData`,
-		);
-	}
 	// Views return the element union (TSX roots type flat), folded to a
 	// view node here, one place; validateTree polices the result below.
 	// Same for the composed wrap's result.
-	let tree = normalizeViewRoot(screen.view(data, screen.slot === undefined ? kitFor(session) : screenKitAt(session, screen.slot), session));
+	let tree = normalizeViewRoot(screen.view(session.data, kitFor(session), session));
 	if (screen.flow?.wrap !== undefined) {
-		tree = normalizeViewRoot(screen.flow.wrap(tree, session, screen.slot === undefined ? kitFor(session) : screenKitAt(session, [])));
+		tree = normalizeViewRoot(screen.flow.wrap(tree, session, kitFor(session)));
 	}
 	// The pipeline's one validation point: redraws, the freeze, and mount's
 	// first frame all funnel through here, so an illegal tree fails loudly

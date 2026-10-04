@@ -366,14 +366,11 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 
 			const tools = options.makeUi(session, address, options.platform);
 			// Lensing follows ownership, not the screen: the draw phase tags
-			// every control with the bag path its handler lenses to (the
-			// screen's slot for the screen's own controls, the root bag for
-			// the flow wrap's). The tag rides the record; a record without one
-			// (older frames, modal handlers) falls back to the screen's slot,
-			// the historical lens. Empty paths are the root bag: the session
-			// itself, no lens.
-			const slot = record.slot ?? screen.slot;
-			const lensPath = slot !== undefined && slot.length > 0 ? slot : undefined;
+			// every control with the bag path its handler lenses to. The tag
+			// rides the record; a record without one (modal handlers, and
+			// every control until frames carry slots) means no lens, and the
+			// handler reads the whole session.
+			const lensPath = record.slot !== undefined && record.slot.length > 0 ? record.slot : undefined;
 			const handlerSession: Session<unknown> = lensPath === undefined ? session : lensSession(session, lensPath);
 			const mutate = lensPath === undefined
 				? tools.mutate

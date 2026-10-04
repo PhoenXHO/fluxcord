@@ -12,7 +12,7 @@
  */
 
 // Authoring: what flow and command authors write.
-export * from './flow/define.js'; // defineFlow, subflow
+export * from './flow/define.js'; // defineFlow
 export * from './flow/token.js'; // flow, Flow, FlowMeta
 export * from './flow/screen.js'; // screen, subview
 export * from './flow/types.js'; // Screen, FlowOptions, FlowDefinition

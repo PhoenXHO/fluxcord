@@ -42,9 +42,9 @@ function onScreen(
 }
 
 /** A registry that resolves exactly the given '<module>/<screen>' keys. */
-function registry(keys: readonly string[], roots: Record<string, string> = {}): ScreenRegistry {
+function registry(keys: readonly string[]): ScreenRegistry {
 	return {
-		resolve: (key) => (keys.includes(key) ? { flow: { roots } } as unknown as RegisteredScreen : undefined),
+		resolve: (key) => (keys.includes(key) ? {} as unknown as RegisteredScreen : undefined),
 	};
 }
 
@@ -132,7 +132,7 @@ describe('ui.back', () => {
 });
 
 describe('the backstop (stringly targets)', () => {
-	it('go throws on a target that resolves to no screen or root', () => {
+	it('go throws on a target that resolves to no screen', () => {
 		const store = createSessionStore();
 		const session = store.create<Record<string, never>>({
 			flowId: 'f', moduleId: 'm', ownerId: 'u1',
@@ -140,7 +140,7 @@ describe('the backstop (stringly targets)', () => {
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
 		});
 		const { ui } = createMakeUi({ store, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
-		expect(() => ui.go('nope')).toThrow(/targets no screen or subflow root/);
+		expect(() => ui.go('nope')).toThrow(/targets no screen in module/);
 	});
 
 	it('push throws the same way', () => {
@@ -151,29 +151,7 @@ describe('the backstop (stringly targets)', () => {
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
 		});
 		const { ui } = createMakeUi({ store, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
-		expect(() => ui.push('nope')).toThrow(/targets no screen or subflow root/);
-	});
-});
-
-describe('subflow roots', () => {
-	it('resolve BEFORE the dedup lookup - go(root) pops to the root\'s entry screen', () => {
-		const store = createSessionStore();
-		const session = store.create<Record<string, never>>({
-			flowId: 'f', moduleId: 'm', ownerId: 'u1',
-			messageRef: { channelId: 'c1', messageId: 'm1' },
-			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
-		});
-		activeFrame(session).history = ['pick.first'];
-		const { ui } = createMakeUi({
-			store,
-			screens: registry(['m/menu', 'm/pick.first'], { pick: 'pick.first' }),
-		})(session, ADDRESS, PLATFORM);
-
-		ui.go('pick');
-
-		// Had the root NAME fed the lookup instead, this would have pushed.
-		expect(session.screen).toBe('pick.first');
-		expect(session.history).toEqual([]);
+		expect(() => ui.push('nope')).toThrow(/targets no screen in module/);
 	});
 });
 
