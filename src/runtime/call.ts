@@ -7,7 +7,7 @@
  * exit, so later clicks must not line up behind it. The child's clicks
  * chain among themselves on the fresh line that forms.
  *
- * `ui.exit(value, final)` is the other half. Below the root it pops the
+ * `ui.exit({ value, final })` is the other half. Below the root it pops the
  * frame and queues a resume job that presses the parked call's resolve
  * (after resetting the caller's task/mutate phase machine); at the root
  * it ends the session through the store's close path, `final` riding as

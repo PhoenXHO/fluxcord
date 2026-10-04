@@ -312,7 +312,7 @@ describe('close freezes the message', () => {
 	it('close with a view leaves the authored goodbye instead of the frozen screen', async () => {
 		const w = world();
 		w.handler.mockImplementationOnce(async (): Promise<void> => {
-			w.currentEvent().ui.exit(undefined, view({ title: 'All set' }, text('Your faction is connected.')));
+			w.currentEvent().ui.exit({ final: view({ title: 'All set' }, text('Your faction is connected.')) });
 		});
 		await w.click();
 		await vi.waitFor(() => expect(w.edits).toHaveLength(1));

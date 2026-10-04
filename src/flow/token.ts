@@ -9,16 +9,18 @@
  * so the prefix is derived, never hand-typed.
  *
  * The second argument is the plain `FlowOptions` shape (screens, first,
- * components, subflows). `flow` runs it through {@link defineFlow} and
- * keeps the definition. `defineFlow` stays the subflow/library tool: a
- * flow reused as a subflow plugs in via `subflow({ use: flow.definition })`.
+ * components). `flow` runs it through {@link defineFlow} and keeps the
+ * definition. That definition is also what another flow's handler hands
+ * `event.call`: one flow kind, opened like a function, returning through
+ * `ui.exit`.
  *
  * The third argument carries registration facts that belong to the flow
- * itself: its default policy gate and its session lifecycle hooks
- * (`onSessionStart` / `onSessionEnd`). These are facts about being an
- * independent panel. A flow reused as a subflow keeps none of them (its
- * clicks answer to the parent's gate), which is why they live here on the
- * registration wrapper and not on the reusable definition.
+ * as an independently mounted panel: its default policy gate and its
+ * session lifecycle hooks (`onSessionStart` / `onSessionEnd`). A flow
+ * opened by `event.call` runs inside the caller's session: its hooks
+ * stay dormant (birth and death belong to the root flow), while policy
+ * still hears its flowId for as long as one of its screens is the
+ * visible surface.
  *
  * @module flow/token
  */
@@ -38,8 +40,10 @@ export interface SessionEnd {
 }
 
 /**
- * Registration facts a flow declares about itself. Everything here attaches
- * to the mounted panel, never to subflow reuse.
+ * Registration facts a flow declares about itself. They attach to the
+ * flow as an independently mounted panel: the session hooks fire for the
+ * flow that owns the session, so a flow opened by `event.call` keeps its
+ * hooks dormant.
  */
 export interface FlowMeta<TData = unknown> {
 	/**

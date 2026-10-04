@@ -134,8 +134,13 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 	const now = options.now ?? Date.now;
 	const sessions = new Map<string, Session<unknown>>();
 
-	/** The exit path for real deaths: delete first, then report. The silent revive-replace in `create` is the one deliberate bypass. */
+	/** The exit path for real deaths: drop parked calls, delete, then report. The silent revive-replace in `create` is the other death path. */
 	function end(session: Session<unknown>, reason: EndReason): void {
+		// Parked calls settle nowhere: no resolve, no reject. The parent
+		// continuations waiting on them never resume (in-flight calls die
+		// with the session), and clearing the map keeps any button from
+		// being pressed after death.
+		session.pending.clear();
 		sessions.delete(session.id);
 		options.onEnd?.(session, reason);
 	}
@@ -158,6 +163,9 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 				const existing = sessions.get(input.id);
 				if (existing !== undefined) {
 					if (isExpired(existing, now())) {
+						// The revive-replace death: quiet (no onEnd), but the
+						// dying record's parked calls still settle nowhere.
+						existing.pending.clear();
 						sessions.delete(input.id);
 					} else {
 						throw new Error(`session id '${input.id}' is already live`);

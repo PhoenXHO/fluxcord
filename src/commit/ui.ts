@@ -96,8 +96,8 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 			back(): void {
 				navigateBack(session);
 			},
-			exit(value?: unknown, final?: ComponentResult): void {
-				options.exit(session, value, final);
+			exit(exitOptions?: { readonly value?: unknown; readonly final?: ComponentResult }): void {
+				options.exit(session, exitOptions?.value, exitOptions?.final);
 			},
 			showModal(modal: ComponentResult): Promise<void> {
 				const frame = top();

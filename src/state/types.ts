@@ -191,7 +191,7 @@ export interface Session<TData> {
 	/** The top frame's back trail. A read-only view over the stack. */
 	readonly history: readonly string[];
 	/**
-	 * The goodbye a root-level `ui.exit(undefined, view)` authored: the
+	 * The goodbye a root-level `ui.exit({ final: view })` authored: the
 	 * close death path renders it through the parting seam (final edit,
 	 * done-set dedupe) instead of freezing the current screen. Absent:
 	 * close freezes as usual.

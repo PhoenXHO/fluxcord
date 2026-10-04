@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Flows call flows like functions: `await event.call(childFlow, { as: 'slot', args })` runs the child on its own frame (own screen history, own bag nested under `slot` in the parent's data), parks the caller until the child exits, and resolves with the child's return value. A throw inside a called flow rejects the caller's `await`, so an author's `try`/`catch` owns the crash. A session dying mid-call drops the in-flight call without settling; a revived session restarts at the root's first screen.
+
+### Changed
+
+- Breaking: the subflow system is removed (`subflow()` plugs, the `subflows` option, `<at>.` screen-name namespacing). Open a child with `await event.call(...)` instead; a called flow's screens are addressed through its own frame, and stale parent-screen clicks bounce as before.
+- Breaking: `ui.close` merged into `ui.exit(options?)`: `{ value }` returns to the caller below the root, `{ final }` is the goodbye view at the root (`final` below the root throws), and bare `exit()` just leaves.
+- Breaking: `Flow` gained a second type parameter, the exit value: `Flow<TData, TExit>`, `void` by default. Annotate a flow constant as `Flow<MyData, MyExit>` and the caller's `await event.call(...)` is typed.
+
 ## [0.1.1] - 2026-10-03
 
 ### Added

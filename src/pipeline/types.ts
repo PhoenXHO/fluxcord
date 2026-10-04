@@ -82,18 +82,18 @@ export interface UiToolkit<TKeys extends string = string> {
 	 */
 	back(): void;
 	/**
-	 * Leave this flow and hand the caller the value. In a flow another
-	 * flow called, this pops the frame and wakes the waiting `event.call`
-	 * with the value; the parent's screen redraws through the ordinary
-	 * machinery. At the root the flow ends the session: the message is
-	 * tidied by the commit phase, and without a final argument the last
-	 * screen freezes (controls stripped). With a view, that authored
-	 * goodbye is left on the message instead, rendered as-is with no wrap
-	 * around it: the ending for flows whose last step has its own parting
-	 * words (a wizard's "you're all set"). A final argument below the
-	 * root throws: goodbyes belong to the panel's root.
+	 * Leave this flow. Hand the caller a value with `{ value }`: in a flow
+	 * another flow called, this pops the frame and wakes the waiting
+	 * `event.call` with it; the parent's screen redraws through the
+	 * ordinary machinery. At the root the flow ends the session: the
+	 * message is tidied by the commit phase, and without `{ final }` the
+	 * last screen freezes (controls stripped). With `{ final: view }`,
+	 * that authored goodbye is left on the message instead, rendered
+	 * as-is with no wrap around it: the ending for flows whose last step
+	 * has its own parting words (a wizard's "you're all set"). `final`
+	 * below the root throws: goodbyes belong to the panel's root.
 	 */
-	exit(value?: unknown, final?: ComponentResult): void;
+	exit(options?: { readonly value?: unknown; readonly final?: ComponentResult }): void;
 	/**
 	 * Open a modal; resolves once opened. Submitted values arrive as the
 	 * modal-submit event to the same action; dismissal is Discord silence

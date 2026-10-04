@@ -187,17 +187,17 @@ describe('ui.exit - the injected seam', () => {
 		expect(w.session.finalView).toBeUndefined();
 	});
 
-	it('exit(undefined, view) passes the goodbye through untouched', () => {
+	it('exit({ final }) passes the goodbye through untouched', () => {
 		const w = world();
 		const goodbye = view({ title: 'Done' }, text('All set.'));
-		w.ui.exit(undefined, goodbye);
+		w.ui.exit({ final: goodbye });
 		expect(w.exits).toEqual([{ session: w.session, value: undefined, final: goodbye }]);
 		expect(w.session.finalView).toBeUndefined();
 	});
 
-	it('exit(value) passes the value through', () => {
+	it('exit({ value }) passes the value through', () => {
 		const w = world();
-		w.ui.exit('done');
+		w.ui.exit({ value: 'done' });
 		expect(w.exits).toEqual([{ session: w.session, value: 'done', final: undefined }]);
 	});
 });
