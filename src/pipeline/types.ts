@@ -11,9 +11,10 @@
  * @module pipeline/types
  */
 
+import type { Flow } from '../flow/token.js';
 import type { ViewSession } from '../flow/types.js';
 import type { V2MessagePayload, V2ModalPayload } from '../render/v2.js';
-import type { MessageRef, Session } from '../state/types.js';
+import type { FlowFrame, MessageRef, Session } from '../state/types.js';
 import type { ScreenKit } from '../tree/kit.js';
 import type { ComponentResult, ViewNode } from '../tree/types.js';
 
@@ -81,13 +82,18 @@ export interface UiToolkit<TKeys extends string = string> {
 	 */
 	back(): void;
 	/**
-	 * End the session; the message is tidied by the commit phase. Without
-	 * an argument the final screen is frozen (controls stripped). With a
-	 * view, that authored goodbye is left on the message instead, rendered
-	 * as-is with no wrap around it: the ending for flows whose last step
-	 * has its own parting words (a wizard's "you're all set").
+	 * Leave this flow and hand the caller the value. In a flow another
+	 * flow called, this pops the frame and wakes the waiting `event.call`
+	 * with the value; the parent's screen redraws through the ordinary
+	 * machinery. At the root the flow ends the session: the message is
+	 * tidied by the commit phase, and without a final argument the last
+	 * screen freezes (controls stripped). With a view, that authored
+	 * goodbye is left on the message instead, rendered as-is with no wrap
+	 * around it: the ending for flows whose last step has its own parting
+	 * words (a wizard's "you're all set"). A final argument below the
+	 * root throws: goodbyes belong to the panel's root.
 	 */
-	close(final?: ComponentResult): void;
+	exit(value?: unknown, final?: ComponentResult): void;
 	/**
 	 * Open a modal; resolves once opened. Submitted values arrive as the
 	 * modal-submit event to the same action; dismissal is Discord silence
@@ -114,8 +120,27 @@ export interface ActionEvent<TData = unknown, TKeys extends string = string> {
 	readonly values?: readonly string[];
 	/** Modal field values, keyed by input node id in each field's natural shape (string, boolean, or pick array); set on modal-submit events. */
 	readonly inputs?: Readonly<Record<string, string | boolean | readonly string[]>>;
-	/** The effects toolkit for this event: navigation, `close`, `showModal`. */
+	/** The effects toolkit for this event: navigation, `exit`, `showModal`. */
 	readonly ui: UiToolkit<TKeys>;
+	/**
+	 * Call another flow like a function: the child's first screen draws on
+	 * this panel, this handler freezes at the await, and the value the
+	 * child hands `ui.exit` resolves here. `as` names the child's bag slot
+	 * in this flow's data (the child lives at that key, readable and
+	 * writable from the parent), and `args` seeds the child's bag when
+	 * given (its own initialData seeds otherwise). The child must be
+	 * listed in its module's manifest flows. A second `call` while one is
+	 * still awaited from the same frame throws: one call per frame.
+	 *
+	 * A method on purpose: method parameters check bivariantly, which
+	 * keeps the erased `ActionEvent<never>` of the registration forms
+	 * comparable with a fully typed `ActionEvent<TData>` across the
+	 * framework's type-erase boundary.
+	 */
+	call<K extends string & keyof TData, TExit>(
+		flow: Flow<TData[K], TExit>,
+		options: { readonly as: K; readonly args?: TData[K] },
+	): Promise<TExit>;
 	/**
 	 * The work hook: run fallible calls (services, APIs) here, before any
 	 * mutation. Throws if called after a mutate; the work phase ends when
@@ -138,6 +163,52 @@ export interface EventTools<TData = unknown> {
 	readonly task: <T>(fn: () => Promise<T>) => Promise<T>;
 	/** The commit hook. @see {@link ActionEvent.mutate}. */
 	readonly mutate: (fn: (data: TData) => void) => void;
+	/**
+	 * Engine seam: clears this event's task/mutate phase machine, so a
+	 * handler resumed from an `event.call` may run work and mutations
+	 * again after the child flow returns. The call engine invokes it
+	 * through the parked call; ordinary handlers never need it.
+	 */
+	readonly resetPhase: () => void;
+}
+
+/**
+ * The engine behind `event.call` and `ui.exit`, plus the crash path that
+ * turns a child handler's throw into a rejection of the parent's await.
+ * The runtime builds one (runtime/call); dispatch binds `call` into each
+ * delivered event and consults `crash` before reporting a handler
+ * failure. Flow and bag types are erased here; the author-facing
+ * generics live on {@link ActionEvent.call}.
+ */
+export interface CallEngine {
+	/**
+	 * Opens a child flow on the session: seed the child's bag at the
+	 * parent's slot path, push a frame, draw the child's first screen,
+	 * then cut the session's queue line (the caller's deliver is parked on
+	 * the child's exit, so later clicks must not line up behind it).
+	 * Resolves when the child exits, with its exit value.
+	 */
+	call(
+		session: Session<unknown>,
+		frame: FlowFrame,
+		tools: EventTools,
+		flow: Flow<unknown, unknown>,
+		options: { readonly as: string; readonly args?: unknown },
+	): Promise<unknown>;
+	/**
+	 * Leaves the flow on top. Depth > 0 pops the frame and resolves the
+	 * parked call (queued, so clicks already on the line land first);
+	 * depth 0 ends the session through the store's close path, `final`
+	 * riding as the goodbye view.
+	 */
+	exit(session: Session<unknown>, value: unknown, final?: ComponentResult): void;
+	/**
+	 * Crashes the top frame's call when there is one to crash: pops the
+	 * frame and rejects the parked call with the error. `false` means the
+	 * thrower sat at the root (or on no frame stack yet) and the failure
+	 * is an ordinary handler report.
+	 */
+	crash(session: Session<unknown>, error: unknown): boolean;
 }
 
 /** Whose code failed: the only fork with behavioral consequences for error policy. */

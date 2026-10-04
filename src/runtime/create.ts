@@ -27,6 +27,7 @@ import { materializeTree } from '../commit/frame.js';
 import { createOnEnd } from '../commit/onEnd.js';
 import { createDispatch } from '../pipeline/dispatch.js';
 import { createSessionQueue } from '../pipeline/queue.js';
+import { createCall } from './call.js';
 import { renderV2Message } from '../render/v2.js';
 import { createSessionStore, generateId, isExpired } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
@@ -93,7 +94,10 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			},
 		}),
 	});
-	const makeUi = createMakeUi({ store, screens });
+	// The call engine needs store, queue and commit; the toolkit needs the
+	// engine's exit seam. Order is fixed by those edges.
+	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken });
+	const makeUi = createMakeUi({ screens, exit: callEngine.exit });
 	// The host supplies the bridge (editMessage, replyToActor, showModal);
 	// the commit phase owns redraw and the parting edit. Compose them once;
 	// dispatch, mount and the toolkit all see this one port.
@@ -150,6 +154,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		screens,
 		tryRevive,
 		makeUi,
+		call: callEngine,
 		queue,
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 		...(options.now !== undefined ? { now: options.now } : {}),
@@ -231,8 +236,10 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 					history: [],
 					modalNonce: generateId(),
 					actions: {},
+					slot: [],
 				},
 			],
+			pending: new Map(),
 			get screen() {
 				return this.frames[this.frames.length - 1].screen;
 			},

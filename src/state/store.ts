@@ -203,8 +203,10 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 						history: [],
 						modalNonce: generateId(),
 						actions: {},
+						slot: [],
 					},
 				],
+				pending: new Map(),
 				get screen() {
 					return this.frames[this.frames.length - 1].screen;
 				},

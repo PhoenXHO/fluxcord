@@ -45,9 +45,12 @@ import type { SessionStore } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
 import type { Session } from '../state/types.js';
 import { getPath, lensSession } from '../flow/lens.js';
+import type { Flow } from '../flow/token.js';
 import { EventKind, ErrorSource } from './types.js';
 import type {
+	ActionEvent,
 	ActionRecord,
+	CallEngine,
 	ErrorHandler,
 	ErrorReport,
 	EventTools,
@@ -108,6 +111,8 @@ export interface DispatchOptions {
 	 * tests inject a stand-in.
 	 */
 	readonly makeUi: (session: Session<unknown>, address: ActionAddress, platform: PlatformPort) => EventTools;
+	/** The call engine: `event.call`'s machinery, shared with `ui.exit` and the crash path. */
+	readonly call: CallEngine;
 	/**
 	 * The error socket. Omit it and the shipped default runs (log everything,
 	 * generic actor reply for handler failures); provide it and the default
@@ -387,10 +392,24 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 					values: incoming.values,
 					inputs: incoming.inputs,
 					ui: tools.ui,
+					// The one cast seam: the event's call carries the
+					// author-facing generics (typed bag key, exit value); the
+					// engine runs erased at session level. Same boundary
+					// pattern as the registry's type erase.
+					call: ((flow: Flow<unknown, unknown>, callOptions: { readonly as: string; readonly args?: unknown }) =>
+						options.call.call(session, frame, tools, flow, callOptions)) as ActionEvent['call'],
 					task: tools.task,
 					mutate,
 				});
 			} catch (error) {
+				// A throw from a called flow's handler crashes that call:
+				// pop the frame, reject the parent's await. The rejection
+				// surfaces in the parent handler, whose own try/catch may
+				// own it; uncaught, it cascades frame by frame to the root,
+				// where this same guard lets it through as an ordinary
+				// handler failure. No report here either way: the reporter
+				// sits wherever the cascade stops.
+				if (options.call.crash(session, error)) return;
 				// Handler failure: the clicker's copy goes through the error
 				// socket (the flow's hook may have decided one), the message
 				// keeps its last good render, and the session survives for a

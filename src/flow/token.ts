@@ -80,14 +80,22 @@ export interface FlowMeta<TData = unknown> {
  * A flow as authored: its bare name plus its definition. Modules export
  * these as constants and list them in their manifest's `flows` field, or a
  * `command`'s leaf mounts one.
+ *
+ * The second type parameter is the flow's exit value: what a caller's
+ * `event.call(flow, ...)` resolves with. It defaults to void (a flow that
+ * ends its panel), and it is phantom only: the runtime value is whatever
+ * the flow's screens hand `ui.exit`, so a flow promising a typed exit
+ * annotates its constant with the pair.
  */
-export interface Flow<TData = never> {
+export interface Flow<TData = never, TExit = void> {
 	/** The flow's name within its module: the only id the author writes. */
 	readonly id: string;
 	/** The built definition: `screens`, `initialData`, ttl and the rest. */
 	readonly definition: FlowDefinition<TData>;
 	/** Registration facts declared on the flow; absent when it declares none. */
 	readonly meta?: FlowMeta<TData>;
+	/** Phantom carry for the exit value type; never present at runtime. */
+	readonly exit?: (value: TExit) => void;
 }
 
 /**

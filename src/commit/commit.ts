@@ -21,6 +21,7 @@
 
 import { renderV2Message } from '../render/v2.js';
 import type { V2MessagePayload } from '../render/v2.js';
+import { getPath } from '../flow/lens.js';
 import { activeFrame } from '../state/types.js';
 import type { MessageRef, Session } from '../state/types.js';
 import type { PartingOptions, PlatformPort, ScreenRegistry } from '../pipeline/types.js';
@@ -68,10 +69,13 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 	if (screen === undefined) {
 		throw new Error(`no screen registered for '${key}'`);
 	}
+	// Views see the frame's own room in the bag: a called flow's screen
+	// lenses to its slot path, the root frame reads the whole bag.
+	const bag = frame.slot.length > 0 ? getPath(session.data, frame.slot) : session.data;
 	// Views return the element union (TSX roots type flat), folded to a
 	// view node here, one place; validateTree polices the result below.
 	// Same for the composed wrap's result.
-	let tree = normalizeViewRoot(screen.view(session.data, kitFor(session), session));
+	let tree = normalizeViewRoot(screen.view(bag, kitFor(session), session));
 	if (screen.flow?.wrap !== undefined) {
 		tree = normalizeViewRoot(screen.flow.wrap(tree, session, kitFor(session)));
 	}
@@ -98,7 +102,14 @@ export function createCommit(options: CommitOptions): CommitPhase {
 	function draw(session: Session<unknown>, tree: ViewNode): V2MessagePayload {
 		const materialized = materializeTree(tree);
 		const frame = activeFrame(session);
-		frame.actions = materialized.actions;
+		// Every control this draw placed stamps the frame's bag path, so a
+		// click lenses to the frame's own room. An empty slot (the root
+		// frame) stores the map untouched.
+		frame.actions = frame.slot.length > 0
+			? Object.fromEntries(
+				Object.entries(materialized.actions).map(([hash, record]) => [hash, { ...record, slot: frame.slot }]),
+			)
+			: materialized.actions;
 		return renderV2Message(tree, session.id, `${frame.moduleId}/${frame.screen}`, materialized.stampOf);
 	}
 

@@ -23,6 +23,8 @@ import { createOnEnd } from '../../commit/onEnd.js';
 import { createMakeUi } from '../../commit/ui.js';
 import { action } from '../../pipeline/action.js';
 import { DEFAULT_ERROR_MESSAGE, createDispatch } from '../../pipeline/dispatch.js';
+import { createSessionQueue } from '../../pipeline/queue.js';
+import { createCall } from '../../runtime/call.js';
 import { EventKind } from '../../pipeline/types.js';
 import type {
 	ActionHandler,
@@ -423,7 +425,14 @@ function world(options: WorldOptions = {}): World {
 		platform,
 		screens,
 		tryRevive: vi.fn(async () => undefined),
-		makeUi: createMakeUi({ store, screens }),
+		makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit }),
+		call: {
+			call: async () => {
+				throw new Error('no call engine in test');
+			},
+			exit: () => {},
+			crash: () => false,
+		},
 		...(options.omitErrorHandler !== true ? { onError: (report: ErrorReport): void => { errors.push(report); } } : {}),
 		now: () => clock.now,
 	});
@@ -642,7 +651,14 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			platform,
 			screens,
 			tryRevive: vi.fn(async () => undefined),
-			makeUi: createMakeUi({ store, screens }),
+			makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit }),
+			call: {
+				call: async () => {
+					throw new Error('no call engine in test');
+				},
+				exit: () => {},
+				crash: () => false,
+			},
 		});
 
 		async function draw(): Promise<void> {

@@ -115,13 +115,13 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 	const tryRevive = vi.fn(async (): Promise<Session<unknown> | undefined> => undefined);
 	const errors: ErrorReport[] = [];
 
-	/** A stand-in toolkit: close is wired to the real store so close-path tests are honest. */
+	/** A stand-in toolkit: the root exit is wired to the real store so exit-path tests are honest. */
 	const tools: EventTools = {
 		ui: {
 			go: () => undefined,
 			push: () => undefined,
 			back: () => undefined,
-			close: (): void => {
+			exit: (): void => {
 				store.close(session.id);
 			},
 			showModal: () => Promise.resolve(),
@@ -130,6 +130,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		mutate: (fn: (data: unknown) => void): void => {
 			fn(session.data);
 		},
+		resetPhase: () => undefined,
 	};
 
 	const dispatch = createDispatch({
@@ -139,6 +140,15 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		screens,
 		tryRevive,
 		makeUi: () => tools,
+		// No call engine under test here: handlers that call throw, and the
+		// crash seam answers false so handler throws still report as before.
+		call: {
+			call: async () => {
+				throw new Error('no call engine in test');
+			},
+			exit: () => {},
+			crash: () => false,
+		},
 		...(options.omitErrorHandler !== true
 			? {
 				onError: (report: ErrorReport): void => {
@@ -365,10 +375,10 @@ describe('dispatch - auto-redraw', () => {
 		expect(w.calls).toEqual(['redraw:main']);
 	});
 
-	it('skips the redraw when the handler closed the session - close owns the message', async () => {
+	it('skips the redraw when the handler exited the session - the root exit owns the message', async () => {
 		const w = world();
 		w.handler.mockImplementationOnce(async (): Promise<void> => {
-			w.tools.ui.close();
+			w.tools.ui.exit();
 		});
 		await w.click();
 

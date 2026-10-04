@@ -7,6 +7,12 @@
  * never block each other. A failed entry does not jam the line, and a
  * drained line leaves no entry behind.
  *
+ * `suspend` cuts the line behind the current occupant: a running
+ * `event.call` holds the head while it awaits the child flow, so a child
+ * click chained behind that head would deadlock. The cut strand keeps
+ * running to its own end; the next enqueue starts a fresh line, and the
+ * child's clicks chain up behind each other on it as usual.
+ *
  * @module pipeline/queue
  */
 
@@ -17,6 +23,8 @@ export interface SessionQueue {
 	 * affects the next entry.
 	 */
 	enqueue<T>(key: string, job: () => Promise<T>): Promise<T>;
+	/** Cuts the line behind the current occupant of the key: later enqueues stop waiting for the stranded strand. */
+	suspend(key: string): void;
 }
 
 export function createSessionQueue(): SessionQueue {
@@ -41,6 +49,12 @@ export function createSessionQueue(): SessionQueue {
 				}
 			});
 			return run;
+		},
+		suspend(key: string): void {
+			// Cut the strand. The running call's chain is no longer the line;
+			// it keeps executing on its own, its own cleanup finds a newer
+			// tail and bows out, and the next enqueue starts fresh.
+			tails.delete(key);
 		},
 	};
 }

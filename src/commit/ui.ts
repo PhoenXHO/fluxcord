@@ -10,7 +10,10 @@
  * entry without naming a target. All three are pure state changes
  * (screen, history, nonce: no draw; the auto-redraw after the handler
  * commits the final screen).
- * close routes through the store, whose onEnd wiring freezes the message.
+ * exit routes through the injected call engine: below the root it pops
+ * the frame and wakes the parent's `event.call`; at the root it closes
+ * through the store, whose onEnd wiring freezes the message or renders
+ * the goodbye view.
  * showModal records the running handler as the submit's destination and
  * renders the modal with a fresh nonce-stamped customId per open, so a
  * stale draft from an earlier view instance bounces and the client never
@@ -28,16 +31,19 @@ import { encodeActionId } from '../render/id-codec.js';
 import type { ActionAddress } from '../render/id-codec.js';
 import { renderV2Modal } from '../render/v2.js';
 import { generateId } from '../state/store.js';
-import type { SessionStore } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
 import type { FlowFrame, Session } from '../state/types.js';
 import type { ComponentResult } from '../tree/types.js';
-import { normalizeModalRoot, normalizeViewRoot } from '../tree/normalize.js';
+import { normalizeModalRoot } from '../tree/normalize.js';
 import type { EventTools, PlatformPort, ScreenRegistry, UiToolkit } from '../pipeline/types.js';
 
 export interface MakeUiOptions {
-	/** The live session store. */
-	readonly store: SessionStore;
+	/**
+	 * The call engine's exit seam: what `ui.exit` does. Below the root it
+	 * pops the frame and wakes the parent's `event.call`; at the root it
+	 * closes the session (the store's onEnd wiring does the farewell).
+	 */
+	readonly exit: (session: Session<unknown>, value: unknown, final?: ComponentResult) => void;
 	/** Resolves screen keys for the ui.go/push target validation. Omit for no validation. */
 	readonly screens?: ScreenRegistry;
 }
@@ -90,14 +96,8 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 			back(): void {
 				navigateBack(session);
 			},
-			close(final?: ComponentResult): void {
-				if (final !== undefined) {
-					// The authored goodbye rides the session to the store's onEnd,
-					// which renders it through the parting seam instead of
-					// freezing the screen under the user.
-					session.finalView = normalizeViewRoot(final);
-				}
-				options.store.close(session.id);
+			exit(value?: unknown, final?: ComponentResult): void {
+				options.exit(session, value, final);
 			},
 			showModal(modal: ComponentResult): Promise<void> {
 				const frame = top();
@@ -140,6 +140,9 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 			mutate(fn: (data: unknown) => void): void {
 				mutated = true;
 				fn(session.data);
+			},
+			resetPhase(): void {
+				mutated = false;
 			},
 		};
 		return tools;

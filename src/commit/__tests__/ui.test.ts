@@ -14,6 +14,7 @@ import { activeFrame, DEFAULT_TTL_MS } from '../../state/types.js';
 import { input, modal, text, view } from '../../tree/builders.js';
 import type { RegisteredScreen, ScreenRegistry, PlatformPort, UiToolkit } from '../../pipeline/types.js';
 import type { Session } from '../../state/types.js';
+import type { ComponentResult } from '../../tree/types.js';
 import type { ActionAddress } from '../../render/id-codec.js';
 
 const ADDRESS = { sessionId: 's1', screenKey: 'm/menu', actionHash: 'h0' } as ActionAddress;
@@ -37,7 +38,7 @@ function onScreen(
 		remount: 'replace',
 	});
 	activeFrame(session).history = [...history];
-	const { ui } = createMakeUi({ store })(session, ADDRESS, platform);
+	const { ui } = createMakeUi({ exit: () => {} })(session, ADDRESS, platform);
 	return { session, ui };
 }
 
@@ -139,7 +140,7 @@ describe('the backstop (stringly targets)', () => {
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
 		});
-		const { ui } = createMakeUi({ store, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
+		const { ui } = createMakeUi({ exit: () => {}, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
 		expect(() => ui.go('nope')).toThrow(/targets no screen in module/);
 	});
 
@@ -150,42 +151,54 @@ describe('the backstop (stringly targets)', () => {
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
 		});
-		const { ui } = createMakeUi({ store, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
+		const { ui } = createMakeUi({ exit: () => {}, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
 		expect(() => ui.push('nope')).toThrow(/targets no screen in module/);
 	});
 });
 
-/** The close test's world: session, its toolkit, and the owning store. */
-interface CloseWorld {
+/** The exit test's world: session, its toolkit, and the calls the seam saw. */
+interface ExitWorld {
 	session: Session<Record<string, never>>;
 	ui: UiToolkit;
-	store: ReturnType<typeof createSessionStore>;
+	exits: Array<{ session: Session<unknown>; value: unknown; final?: ComponentResult }>;
 }
 
-describe('ui.close - the authored goodbye', () => {
-	function world(): CloseWorld {
+describe('ui.exit - the injected seam', () => {
+	function world(): ExitWorld {
 		const store = createSessionStore();
 		const session = store.create<Record<string, never>>({
 			flowId: 'f', moduleId: 'm', ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
 		});
-		const { ui } = createMakeUi({ store })(session, ADDRESS, PLATFORM);
-		return { session, ui, store };
+		const exits: ExitWorld['exits'] = [];
+		const { ui } = createMakeUi({
+			exit: (s, value, final) => {
+				exits.push({ session: s, value, final });
+			},
+		})(session, ADDRESS, PLATFORM);
+		return { session, ui, exits };
 	}
 
-	it('plain close records no final view and ends the session', () => {
+	it('plain exit hands the session and no value to the seam', () => {
 		const w = world();
-		w.ui.close();
+		w.ui.exit();
+		expect(w.exits).toEqual([{ session: w.session, value: undefined, final: undefined }]);
 		expect(w.session.finalView).toBeUndefined();
-		expect(w.store.get(w.session.id)).toBeUndefined();
 	});
 
-	it('close(view) records the goodbye and ends the session', () => {
+	it('exit(undefined, view) passes the goodbye through untouched', () => {
 		const w = world();
-		w.ui.close(view({ title: 'Done' }, text('All set.')));
-		expect(w.session.finalView?.kind).toBe('view');
-		expect(w.store.get(w.session.id)).toBeUndefined();
+		const goodbye = view({ title: 'Done' }, text('All set.'));
+		w.ui.exit(undefined, goodbye);
+		expect(w.exits).toEqual([{ session: w.session, value: undefined, final: goodbye }]);
+		expect(w.session.finalView).toBeUndefined();
+	});
+
+	it('exit(value) passes the value through', () => {
+		const w = world();
+		w.ui.exit('done');
+		expect(w.exits).toEqual([{ session: w.session, value: 'done', final: undefined }]);
 	});
 });
 

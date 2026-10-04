@@ -108,6 +108,27 @@ export interface FlowFrame {
 	 * snapshotted next to `modalHandler` and the submit answers under it.
 	 */
 	modalPolicy?: PermissionPolicy;
+	/**
+	 * The bag path this frame's data lives at under the root bag: empty
+	 * for the root frame, one more key per `event.call` that opened this
+	 * flow. Dispatch lenses the frame's handlers and views to this path.
+	 */
+	slot: readonly string[];
+}
+
+/**
+ * One running `event.call`: the parent handler's suspended continuation,
+ * keyed by the child frame's id in `Session.pending`. The child's
+ * `ui.exit` resolves it with the exit value; a crash or session death
+ * rejects it (or, on death, drops it without settling).
+ */
+export interface PendingCall {
+	/** The frame that called, and whose handler awaits the outcome. */
+	readonly parentFrameId: string;
+	resolve(value: unknown): void;
+	reject(error: unknown): void;
+	/** Clears the parent's task/mutate phase machine so work is legal again after the resume. */
+	resetParentPhase(): void;
 }
 
 /**
@@ -158,15 +179,22 @@ export interface Session<TData> {
 	data: TData;
 	/** The frame stack, the root flow's frame first and the running one last. */
 	readonly frames: FlowFrame[];
+	/**
+	 * One entry per running `event.call`, keyed by the child frame id.
+	 * The caller's continuation resolves through it; `ui.exit` settles it,
+	 * a crash rejects it, and the death paths drop entries without
+	 * settling.
+	 */
+	readonly pending: Map<string, PendingCall>;
 	/** The top frame's current screen. A read-only view over the stack; navigation writes the frame. */
 	readonly screen: string;
 	/** The top frame's back trail. A read-only view over the stack. */
 	readonly history: readonly string[];
 	/**
-	 * The goodbye a closing handler authored: `ui.close(view)` records it
-	 * here, and the close death path renders it through the parting seam
-	 * (final edit, done-set dedupe) instead of freezing the current
-	 * screen. Absent: close freezes as usual.
+	 * The goodbye a root-level `ui.exit(undefined, view)` authored: the
+	 * close death path renders it through the parting seam (final edit,
+	 * done-set dedupe) instead of freezing the current screen. Absent:
+	 * close freezes as usual.
 	 */
 	finalView?: ViewNode;
 }

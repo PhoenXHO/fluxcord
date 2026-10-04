@@ -20,7 +20,9 @@ import type { MessageRef, RehydrateRow, RehydrateStore, Session } from '../../st
 import { button, container, input, link, modal, optionSelect, row, text, view } from '../../tree/builders.js';
 import type { ContainerNode, RowNode, TextNode, ViewNode } from '../../tree/types.js';
 import { DEFAULT_ERROR_MESSAGE, createDispatch } from '../../pipeline/dispatch.js';
+import { createSessionQueue } from '../../pipeline/queue.js';
 import { EventKind } from '../../pipeline/types.js';
+import { createCall } from '../../runtime/call.js';
 import type {
 	ActionEvent,
 	ErrorReport,
@@ -154,13 +156,23 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		authorize: async (): Promise<PolicyDecision> => decision,
 	};
 
+	// The real call engine over the real queue: ui.exit at the root closes
+	// through the store exactly as production does.
+	const call = createCall({
+		store,
+		queue: createSessionQueue(),
+		commit: { redraw: commit.redraw },
+		byToken: new Map(),
+	});
+
 	const dispatch = createDispatch({
 		store,
 		policy,
 		platform,
 		screens,
 		tryRevive: async (): Promise<Session<unknown> | undefined> => undefined,
-		makeUi: createMakeUi({ store }),
+		makeUi: createMakeUi({ exit: call.exit }),
+		call,
 		...(overrides.captureErrors === true ? { onError: (report: ErrorReport): void => { errors.push(report); } } : {}),
 		now: () => clock.now,
 	});
@@ -269,7 +281,7 @@ describe('close freezes the message', () => {
 			event.mutate((data) => {
 				data.tickets = 5;
 			});
-			event.ui.close();
+			event.ui.exit();
 		});
 		await w.click();
 		await vi.waitFor(() => expect(w.edits).toHaveLength(1));
@@ -285,7 +297,7 @@ describe('close freezes the message', () => {
 	it('a laggy dead click after close cannot overwrite the frozen screen', async () => {
 		const w = world();
 		w.handler.mockImplementationOnce(async (): Promise<void> => {
-			w.currentEvent().ui.close();
+			w.currentEvent().ui.exit();
 		});
 		await w.click();
 		await vi.waitFor(() => expect(w.edits).toHaveLength(1));
@@ -300,7 +312,7 @@ describe('close freezes the message', () => {
 	it('close with a view leaves the authored goodbye instead of the frozen screen', async () => {
 		const w = world();
 		w.handler.mockImplementationOnce(async (): Promise<void> => {
-			w.currentEvent().ui.close(view({ title: 'All set' }, text('Your faction is connected.')));
+			w.currentEvent().ui.exit(undefined, view({ title: 'All set' }, text('Your faction is connected.')));
 		});
 		await w.click();
 		await vi.waitFor(() => expect(w.edits).toHaveLength(1));
