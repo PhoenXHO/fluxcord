@@ -5,15 +5,17 @@
 // The picks live in the module-level store, which stands in for the
 // database a real bot would query. They die with the process, on
 // purpose: this is a demo of the seam, not of persistence.
-import { PermissionFlagsBits } from 'discord.js';
 import { action, command, ErrorSource, flow, mounts, policy, screen } from 'fluxcord';
 import type { PrivilegeFacts } from 'fluxcord';
 
 // --- The badge store: the engine's own truth --------------------------------------
 
 const roleConfig = {
+	// The bootstrap admin: the picker sits behind the admin door, so the
+	// first admin role comes from .env (STAFF_ADMIN_ROLE_ID). Everything
+	// after that is picked live.
+	admin: process.env.STAFF_ADMIN_ROLE_ID !== undefined ? [process.env.STAFF_ADMIN_ROLE_ID] : ([] as readonly string[]),
 	staff: [] as readonly string[],
-	admin: [] as readonly string[],
 };
 
 // Names only: the gate rides the flows and controls, the facts at the
@@ -117,9 +119,8 @@ export const staffFacts: PrivilegeFacts = {
 };
 
 export const staffCommand = command('staff', 'Moderation panels for server staff', {
-	memberPermissions: PermissionFlagsBits.ManageMessages,
 	subcommands: {
-		roles: mounts(rolesFlow, { description: 'Pick the staff and admin roles' }),
-		tickets: mounts(ticketsFlow, { description: 'Open the ticket desk', ephemeral: true }),
+		roles: mounts(rolesFlow, { description: 'Pick the staff and admin roles', policy: policy.privilege('admin', { deny: 'Admins only.' }) }),
+		tickets: mounts(ticketsFlow, { description: 'Open the ticket desk', ephemeral: true, policy: staffGate }),
 	},
 });

@@ -13,6 +13,7 @@
 
 import type { ChatInputCommandInteraction } from 'discord.js';
 import type { Flow } from '../flow/token.js';
+import type { Policy, PolicyDecision } from '../pipeline/types.js';
 import type { InteractionSender, MountHandle, MountOptions } from '../runtime/types.js';
 
 /** The two runtime abilities a command handler needs to open a flow. */
@@ -21,6 +22,14 @@ export interface UiHost {
 	mount<TData>(flow: Flow<TData>, options: MountOptions): Promise<MountHandle<TData>>;
 	/** Builds the reply target for one live command interaction; `{ ephemeral: true }` rides the interaction line. */
 	replySender(interaction: ChatInputCommandInteraction, as?: { ephemeral?: boolean }): InteractionSender;
+	/**
+	 * The command door: answers whether this interaction may mount this
+	 * flow at all, from the invocation's identity and the leaf's gate.
+	 * Wired by the composition root from the policy port and the boot
+	 * catalog; absent when the host declared no policy option (nothing
+	 * gated, nothing asked).
+	 */
+	checkDoor?(flow: Flow<unknown>, gate: Policy, interaction: ChatInputCommandInteraction): Promise<PolicyDecision>;
 }
 
 let host: UiHost | undefined;

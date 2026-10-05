@@ -16,10 +16,11 @@
  * @module discord/derive
  */
 
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
 import type { Command, MountLeaf } from '../command/declare.js';
 import type { Flow } from '../flow/token.js';
+import { DEFAULT_DENY_MESSAGE } from '../pipeline/dispatch.js';
 import { uiHost } from './ui-host.js';
 
 /**
@@ -41,6 +42,20 @@ export interface DerivedCommand {
 /** Mounts one leaf's flow onto the interaction's reply. */
 async function mountLeaf(leaf: MountLeaf, interaction: ChatInputCommandInteraction): Promise<void> {
 	const host = uiHost();
+	// The door: a leaf gate is evaluated before anything mounts, from the
+	// invocation's identity alone (no session exists yet, so
+	// `policy.owner()` is vacuously false there). Deny = an ephemeral
+	// reply, no panel; the host without a policy option never asks.
+	if (leaf.policy !== undefined && host.checkDoor !== undefined) {
+		const decision = await host.checkDoor(leaf.flow as Flow<unknown>, leaf.policy, interaction);
+		if (!decision.allowed) {
+			await interaction.reply({
+				content: decision.denyMessage ?? DEFAULT_DENY_MESSAGE,
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+	}
 	// The never-to-unknown cast of the leaf's flow: the same object, widened
 	// for mount's generic (the phantom __data channel makes them distinct
 	// to the checker). This file is the one place it happens. The bag comes

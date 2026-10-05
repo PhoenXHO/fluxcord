@@ -272,8 +272,8 @@ export interface PolicyRequest {
 	readonly channelId?: string;
 	/** The owning flow's full id (`'<moduleId>/<name>'`). */
 	readonly flowId: string;
-	/** '<flowId>/<screenId>' of the screen the event is delivered to. */
-	readonly view: string;
+	/** '<flowId>/<screenId>' of the screen the event is delivered to; absent on door requests (a command run before any screen exists). */
+	readonly view?: string;
 	/**
 	 * The flow's own gate (the flow's `meta.policy`), as the frame's token
 	 * carries it. The shipped engine evaluates it whenever the control

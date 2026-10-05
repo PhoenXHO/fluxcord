@@ -17,6 +17,7 @@
  */
 
 import type { Flow } from '../flow/token.js';
+import type { Policy } from '../pipeline/types.js';
 
 /** Command and subcommand names must be Discord-valid bare names. */
 const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -41,6 +42,13 @@ export interface MountSpec {
 	 * mounted both ways.
 	 */
 	readonly ephemeral?: boolean;
+	/**
+	 * The door gate: evaluated before the flow mounts, from the command
+	 * invocation's identity alone (no session exists, so `policy.owner()`
+	 * is vacuously false). Deny = an ephemeral reply, no panel. Same
+	 * vocabulary as the control and flow gates.
+	 */
+	readonly policy?: Policy;
 }
 
 /** The erased leaf mounts() returns; readers treat the leaf generically. */
@@ -48,6 +56,7 @@ export interface MountLeaf {
 	readonly flow: Flow<never>;
 	readonly description?: string;
 	readonly ephemeral?: boolean;
+	readonly policy?: Policy;
 }
 
 /**
@@ -65,6 +74,7 @@ export function mounts<TData>(
 		flow,
 		...(spec.description !== undefined ? { description: spec.description } : {}),
 		...(spec.ephemeral !== undefined ? { ephemeral: spec.ephemeral } : {}),
+		...(spec.policy !== undefined ? { policy: spec.policy } : {}),
 	});
 }
 

@@ -155,17 +155,37 @@ export function createBot(options: CreateBotOptions): Bot {
 		...(options.ephemeralAsPublic !== undefined ? { ephemeralAsPublic: options.ephemeralAsPublic } : {}),
 	});
 	const flows = buildFlowCatalog(options.modules.flatMap(moduleFlowRegistrations));
+	const policyPort = normalizePolicy(options.policy);
 	const runtime = createUiRuntime({
 		platform: bridge.platform,
 		sendToChannel: bridge.sendToChannel,
-		policy: normalizePolicy(options.policy),
+		policy: policyPort,
 		flows,
 		...(options.rehydrate !== undefined ? { rehydrate: options.rehydrate } : {}),
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 		...(options.now !== undefined ? { now: options.now } : {}),
 		...(options.sweeper !== undefined ? { sweeper: options.sweeper } : {}),
 	});
-	setUiHost({ mount: runtime.mount, replySender: bridge.replySender });
+	setUiHost({
+		mount: runtime.mount,
+		replySender: bridge.replySender,
+		// The command door: leaf gates evaluate here, where the policy port
+		// and the boot catalog live. Absent when no policy option exists:
+		// nothing gated, nothing asked.
+		...(options.policy !== undefined ? {
+			// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+			checkDoor: async (flow, gate, interaction) => {
+				const flowId = flows.byToken.get(flow)?.flowId ?? flow.id;
+				return policyPort.authorize({
+					actorId: interaction.user.id,
+					...(interaction.guildId !== null ? { guildId: interaction.guildId } : {}),
+					...(interaction.channelId !== null ? { channelId: interaction.channelId } : {}),
+					flowId,
+					...(gate !== undefined ? { actionPolicy: gate } : {}),
+				});
+			},
+		} : {}),
+	});
 
 	// Module pairing survives derivation: a custom registration may want
 	// to route by source module.
