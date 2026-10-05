@@ -183,7 +183,7 @@ Revival isn't a one-time event either; the newly constructed session carries the
 <!-- -->
 
 > [!NOTE]
-> Expiry behaves differently when a panel can rehydrate: instead of painting an expiry notice over the components, fluxcord leaves the message intact so the next user click can trigger revival. Explicit `ui.close()` calls remove the stored row, preventing closed panels from being restored.
+> Expiry behaves differently when a panel can rehydrate: instead of painting an expiry notice over the components, fluxcord leaves the message intact so the next user click can trigger revival. Explicit `ui.exit()` calls remove the stored row, preventing closed panels from being restored.
 
 ## Rebinding existing messages
 

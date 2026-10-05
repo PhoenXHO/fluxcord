@@ -65,7 +65,7 @@ const save = action<SettingsData>()(async e => {
 > ```
 > Every `task` call after a mutate dies with an error. Always do the fallible work first inside `task`.
 
-In [Subflows](subflows.md), flows nest inside other flows, and the lens slices automatically: on a nested screen, `event.session.data` already is the parent's slot, so even a bare write lands in the right place. A bare write just never sets the mutated mark, and only that mark makes `task` throw.
+In [Calling flows](calling-flows.md), a handler can open a child flow, and the lens slices automatically for it: inside the child, `event.session.data` already is the slot the call named, so even a bare write lands in the right place. A bare write just never sets the mutated mark, and only that mark makes `task` throw.
 
 Now, with our handlers defined, the screen can read from `data` and bind those handlers directly to buttons:
 

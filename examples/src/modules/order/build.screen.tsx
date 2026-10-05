@@ -1,10 +1,11 @@
-// The counter: two selects drive the bag, and the "So far" panel repaints
-// under them on every pick. Checkout walks straight to the receipt; the
-// modal is the side door - Customize opens it, and its submit lands back
-// on this screen, where the redraw does the walking.
+// The counter: a screen that shows the order's size, toppings, delivery
+// address, and a button to customize the order. The button opens a modal
+// containing a form to change the order's name and whether to add napkins.
+
 import { action, EventKind, Expiry, expiryEpoch, screen } from 'fluxcord';
 import { SIZES, TOPPINGS } from './data.js';
 import type { OrderData } from './data.js';
+import { deliveryFlow } from './delivery.flow.js';
 
 const pickSize = action<OrderData>()(e => {
 	e.mutate(d => {
@@ -44,10 +45,12 @@ const customize = action<OrderData>()(e => {
 	});
 });
 
-// A standalone action, so it may name the flow's root key: typed handlers
-// inside screens only know the screen map, and "delivery" lives beside it.
-const openDelivery = action<OrderData>()(e => {
-	e.ui.go('delivery');
+// This handler calls another flow, which becomes the child of the current
+// flow. The parent flow stays parked at the await until the child exits,
+// and the child's bag nests under the slot named by `as`. While the child
+// runs, its screens own the message.
+const openDelivery = action<OrderData>()(async e => {
+	await e.call(deliveryFlow, { as: 'delivery' });
 });
 
 function headline({ size }: OrderData): string {

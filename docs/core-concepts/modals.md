@@ -119,4 +119,4 @@ Submissions also inherit authorization context automatically: fluxcord routes th
 
 ## Next steps
 
-The wager dialog works, but the whole dice game still lives in one flow file. In [Subflows](subflows.md), we'll nest flows inside parent flows, so a complex panel can be assembled from smaller, self-contained pieces.
+The wager dialog works, but the whole dice game still lives in one flow file. In [Calling flows](calling-flows.md), a flow calls another flow like a function, so a complex panel can be assembled from smaller, self-contained pieces.

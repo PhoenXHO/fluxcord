@@ -20,7 +20,7 @@ That leaves the question of who actually holds this handle. Action handlers rece
 
 ## Implementing the kitchen timer
 
-Beyond their name and options, flows accept an optional third argument for registration options (`FlowMeta`). These options configure standalone panel behaviors, such as policy gates and lifecycle hooks. And because a flow reused as a subflow shouldn't inherit standalone behaviors, these hooks sit on the registration wrapper rather than on the options object that a parent borrows:
+Beyond their name and options, flows accept an optional third argument for registration options (`FlowMeta`). These options configure standalone panel behaviors, such as policy gates and lifecycle hooks. They attach to the flow as an independently mounted panel, so a flow opened by `event.call` runs with its hooks dormant; birth and death belong to the flow that owns the session:
 
 ```tsx
 export const timerFlow = flow<TimerData>(
@@ -104,7 +104,7 @@ Before you start pushing updates everywhere, two limits are worth knowing:
 
 That persistence is ideal while a live view remains relevant, but you'll want to halt updates as soon as they stop being useful so the panel can expire naturally. The map pattern shown earlier enforces this discipline: once the timer runs out, pushes cease, allowing the panel to idle out on its own or die from a user's click.
 
-Finally, remember the architectural boundary: while an external service holding a handle can stop watching, it can't shut the panel down directly. When `redraw` resolves to `false`, it's signaling that the session is gone and you should drop your handle. Closing a panel deliberately remains an internal handler action through `ui.close`, ensuring that only the user's direct actions can dismiss what's on screen.
+Finally, remember the architectural boundary: while an external service holding a handle can stop watching, it can't shut the panel down directly. When `redraw` resolves to `false`, it's signaling that the session is gone and you should drop your handle. Closing a panel deliberately remains an internal handler action through `ui.exit`, ensuring that only the user's direct actions can dismiss what's on screen.
 
 ## Next steps
 

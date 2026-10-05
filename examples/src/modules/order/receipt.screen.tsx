@@ -13,14 +13,17 @@ const freshOrder = action<OrderData>()(e => {
 	e.ui.go('menu');
 });
 
-// Closing with a view leaves these parting words on the message instead
-// of the frozen receipt. Without the argument, close() freezes as usual.
+// Exiting with a final view leaves these parting words on the message
+// instead of the frozen receipt. Without `final`, the last screen
+// freezes as usual.
 const done = action<OrderData>()(e => {
-	e.ui.close(
-		<container color={0x2ecc71}>
-			<text title="Enjoy">Tacos inbound. Run /order whenever hunger strikes again.</text>
-		</container>,
-	);
+	e.ui.exit({
+		final: (
+			<container color={0x2ecc71}>
+				<text title="Enjoy">Tacos inbound. Run /order whenever hunger strikes again.</text>
+			</container>
+		),
+	});
 });
 
 function receipt({ size, toppings, name, napkins, delivery }: OrderData): string {

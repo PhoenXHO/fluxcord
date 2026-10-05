@@ -1,6 +1,9 @@
-// The delivery subflow: a small, self-contained flow the taco stand
-// plugs in. Authored against its own data type, it never sees the order
-// bag, only the slot the parent seeds for it.
+// The delivery flow: a small, self-contained flow the taco stand calls.
+// Authored against its own data type, it never sees the order bag, only
+// the slot the parent names for it.
+// The Done button calls ui.exit(), the verb that ends this flow and
+// returns to the parent.
+
 import { action, EventKind, flow, screen } from 'fluxcord';
 
 export interface DeliveryData {
@@ -43,6 +46,7 @@ export const deliveryFlow = flow<DeliveryData>('delivery', {
 				<Select placeholder="Pick a time" options={WHEN} onSelect={pickWhen} values={[data.when]} />
 				<row>
 					<Button onClick={setAddress} label={data.address === undefined ? 'Set an address' : 'Change the address'} secondary />
+					<Button onClick={e => e.ui.exit()} label="Done" success />
 				</row>
 			</view>
 		)),

@@ -17,8 +17,6 @@ export const orderFlow = flow<OrderData>('order', {
     initialData: { toppings: [], delivery: {} },
     // Ten idle minutes, not the default thirty: taco cravings are urgent.
     ttlMs: 10 * 60 * 1000,
-    components: [deliveryBar(deliveryPlug)],
-    subflows: [deliveryPlug],
 });
 ```
 
@@ -66,8 +64,6 @@ export const orderFlow = flow<OrderData>('order', {
     ttlMs: 10 * 60 * 1000,
     // Adds a line under the framework's default expiry copy.
     parting: { note: 'Nothing was saved: the next order starts from scratch.' },
-    components: [deliveryBar(deliveryPlug)],
-    subflows: [deliveryPlug],
 });
 ```
 
@@ -83,19 +79,21 @@ Panels encounter this parting note through one of two paths. Most often, the bac
 
 ## Closing sessions deliberately
 
-Besides expiring abandoned sessions, you can close a panel deliberately by calling `ui.close()` inside your action handlers:
+Besides expiring abandoned sessions, you can close a panel deliberately by calling `ui.exit()` inside your action handlers:
 
 ```tsx
 const done = action<OrderData>()(e => {
-    e.ui.close(
-        <container color={0x2ecc71}>
-            <text title="Enjoy">Tacos inbound. Run /order whenever hunger strikes again.</text>
-        </container>,
-    );
+    e.ui.exit({
+        final: (
+            <container color={0x2ecc71}>
+                <text title="Enjoy">Tacos inbound. Run /order whenever hunger strikes again.</text>
+            </container>
+        ),
+    });
 });
 ```
 
-If you call `close()` without arguments, fluxcord freezes the screen by stripping out the interactive controls, which keeps the final receipt readable while preventing further clicks (a plain URL button would survive the freeze, since it's not an interactive control with a handler of its own). Supplying a custom view argument replaces the panel directly with your chosen markup instead, making it ideal for final confirmations like our taco receipt.
+If you call `exit()` without arguments, fluxcord freezes the screen by stripping out the interactive controls, which keeps the final receipt readable while preventing further clicks (a plain URL button would survive the freeze, since it's not an interactive control with a handler of its own). Supplying `{ final: view }` replaces the panel directly with your chosen markup instead, making it ideal for final confirmations like our taco receipt.
 
 We can hook that action up by adding a Done button right alongside the existing controls:
 

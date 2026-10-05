@@ -1,6 +1,6 @@
 # Commands and mounting
 
-Up to this point, nearly every module so far has followed the same pattern: a `flow` containing UI screens, and a `command` that opens it. While this pairing seems straightforward, commands do more than open a flow: they define who owns the panel and how it opens. A command establishes an ownership tree where a module owns its commands, and a command owns mount leaves that point to the single flow they launch. The flow itself remains completely independent of commands, which is why the delivery subflow from the previous chapter could ignore tacos entirely. Flows manage internal state and UI rendering, whereas commands simply serve as entry doors into those flows.
+Up to this point, nearly every module so far has followed the same pattern: a `flow` containing UI screens, and a `command` that opens it. While this pairing seems straightforward, commands do more than open a flow: they define who owns the panel and how it opens. A command establishes an ownership tree where a module owns its commands, and a command owns mount leaves that point to the single flow they launch. The flow itself remains completely independent of commands, which is why the delivery flow from the previous chapter could ignore tacos entirely. Flows manage internal state and UI rendering, whereas commands simply serve as entry doors into those flows.
 
 In this chapter, we will examine how that hierarchy works by introducing a grouped command with subcommands, gating it behind a Discord native permission, and mounting one of its panels as an ephemeral reply.
 

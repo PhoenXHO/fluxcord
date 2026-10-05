@@ -6,8 +6,8 @@ export interface OrderData {
 	toppings: readonly string[];
 	name?: string;
 	napkins?: boolean;
-	// The delivery subflow's slot: seeded empty, filled by the subflow's
-	// own screens through the lens.
+	// The delivery flow's slot: event.call nests the child's bag here,
+	// and the parent's screens read it like any other field.
 	delivery: DeliveryData;
 }
 

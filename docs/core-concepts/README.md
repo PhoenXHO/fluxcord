@@ -7,7 +7,7 @@ The getting-started chapters left you with a small but complete bot. The core-co
 - [Controls](controls.md) — Buttons, selects, and the values handlers receive.
 - [Layout and content](layout-and-content.md) — Structure your panels with headings, separators, containers, and text dressings.
 - [Modals](modals.md) — Pop up modal dialogs to collect user input.
-- [Subflows](subflows.md) — Nest UI flows inside parent flows for modular layouts.
+- [Calling flows](calling-flows.md) — Call one flow from another like a function.
 - [Commands and mounting](commands-and-mounting.md) — Attach flows to slash commands, including subcommands and permission knobs.
 - [Permission gates](permission-gates.md) — Control who can interact with specific components.
 - [Sessions and expiry](sessions-and-expiry.md) — Manage panel lifecycles and clean up inactive sessions.
