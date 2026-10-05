@@ -19,6 +19,7 @@
  */
 
 import type { Flow } from '../flow/token.js';
+import { entryScreen } from '../flow/define.js';
 import { viewOf } from '../commit/commit.js';
 import { createCommit } from '../commit/commit.js';
 import { createMakeUi } from '../commit/ui.js';
@@ -139,7 +140,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			ownerId: row.ownerId,
 			messageRef: { channelId: row.channelId, messageId: row.messageId },
 			data,
-			screen: token.definition.first,
+			screen: entryScreen(token.definition, data),
 			ttlMs: token.definition.ttlMs,
 			remount: token.definition.remount,
 			rehydrate: { ref: row.ref },
@@ -209,6 +210,9 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		const data = def.rehydrate !== undefined && mountOptions.rehydrateRef !== undefined
 			? ((await def.rehydrate(mountOptions.rehydrateRef)) as TData | undefined) ?? seeded()
 			: seeded();
+		// The entry screen resolves once, on the seed: a resolver `first`
+		// picks the landing screen before any draw exists.
+		const first = entryScreen(def, data);
 
 		// Draft session: same shape the store will create, messageRef pending.
 		// It exists only so viewOf/wrap have a full session to read; it is
@@ -232,7 +236,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 					id: generateId(),
 					flowId,
 					moduleId,
-					screen: def.first,
+					screen: first,
 					history: [],
 					modalNonce: generateId(),
 					actions: {},
@@ -250,7 +254,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		};
 		const firstTree = viewOf(draft);
 		const materialized = materializeTree(firstTree);
-		const payload = renderV2Message(firstTree, id, `${moduleId}/${def.first}`, materialized.stampOf);
+		const payload = renderV2Message(firstTree, id, `${moduleId}/${first}`, materialized.stampOf);
 
 		const ref = await send(mountOptions.to, payload); // throws -> no session, caller owns the failure
 
@@ -261,7 +265,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			ownerId: mountOptions.ownerId,
 			messageRef: ref,
 			data,
-			screen: def.first,
+			screen: first,
 			ttlMs: def.ttlMs,
 			...(ceiling !== undefined ? { expiresAt: at + ceiling } : {}),
 			remount: def.remount,

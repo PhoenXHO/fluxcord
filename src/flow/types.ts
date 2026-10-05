@@ -104,8 +104,14 @@ export type FlowComponent<TData = unknown> = (
 /** What defineFlow accepts; TData is the flow's one shared bag type. */
 export interface FlowOptions<TData, TScreens extends string = string> {
 	readonly screens: Readonly<Record<TScreens, Screen<TData, TScreens>>>;
-	/** Where the journey starts. */
-	readonly first: TScreens;
+	/**
+	 * Where the journey starts. A screen key, or a resolver over the
+	 * session's seed: the resolver runs once at birth (mount, revive and
+	 * `event.call` alike) before any draw exists, so a flow can land on a
+	 * state-dependent entry screen with no flicker. The resolved key must
+	 * name a screen; it throws at birth when it does not.
+	 */
+	readonly first: TScreens | ((data: TData) => TScreens);
 	/**
 	 * The flow's fresh data bag: declare its shape here, next to the
 	 * screens that use it. Every session gets its own clone, so two panels
@@ -167,8 +173,8 @@ export interface FlowDefinition<TData = never> {
 	readonly screens: Readonly<Record<string, Screen<TData>>>;
 	/** All screen ids. */
 	readonly screenIds: readonly string[];
-	/** The screen the flow opens at. */
-	readonly first: string;
+	/** The entry screen: a key, or a resolver over the session's seed (resolved by {@link entryScreen} at birth). */
+	readonly first: string | ((data: TData) => string);
 	/**
 	 * The flow's fresh bag, from `FlowOptions.initialData`. Erased to
 	 * `unknown` here. Carried as-is: freezing the definition never freezes

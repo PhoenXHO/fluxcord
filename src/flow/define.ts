@@ -94,3 +94,26 @@ export function defineFlow<TData = void, const TScreens extends string = string>
 	};
 	return Object.freeze(definition);
 }
+
+/**
+ * Resolves the flow's entry screen: a resolver `first` runs on the
+ * session's seed, so a state-dependent landing screen is decided before
+ * any draw exists. Validates the result against the screens map either
+ * way; a key naming no screen throws at birth.
+ *
+ * @param definition The flow's definition.
+ * @param data The session's seeded bag (initialData, a rehydrated bag, or
+ *   the call's cloned args).
+ * @returns The screen id the session opens at.
+ */
+export function entryScreen(definition: FlowDefinition, data: unknown): string {
+	// The erased definition types the resolver's parameter as never; the
+	// seed crossing this boundary is the definition-boundary erase.
+	const key = typeof definition.first === 'function'
+		? (definition.first as (d: unknown) => string)(data)
+		: definition.first;
+	if (definition.screens[key] === undefined) {
+		throw new Error(`entryScreen: the flow's first resolved to '${key}', which is no screen of this flow (screens: ${definition.screenIds.join(', ')})`);
+	}
+	return key;
+}

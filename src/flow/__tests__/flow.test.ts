@@ -34,7 +34,7 @@ import type {
 	PolicyPort,
 	PolicyRequest,
 } from '../../pipeline/types.js';
-import { defineFlow } from '../define.js';
+import { defineFlow, entryScreen } from '../define.js';
 import { viewOf } from '../../commit/commit.js';
 import { screen, subview } from '../screen.js';
 import { kitFor } from '../../tree/kit.js';
@@ -78,6 +78,21 @@ describe('defineFlow - validations', () => {
 		expect(Object.isFrozen(def)).toBe(true);
 		expect(Object.isFrozen(def.screens)).toBe(true);
 		expect(Object.isFrozen(def.initialData)).toBe(false);
+	});
+
+	it('a resolver first picks the entry screen from the seed, and a bad key throws at birth', () => {
+		const journey = defineFlow<{ connected: boolean }, 'gate' | 'hub'>({
+			screens: { gate: { view: () => view({}, text('gate')) }, hub: { view: () => view({}, text('hub')) } },
+			first: (data) => (data.connected ? 'hub' : 'gate'),
+		});
+		expect(entryScreen(journey, { connected: true })).toBe('hub');
+		expect(entryScreen(journey, { connected: false })).toBe('gate');
+
+		const bad = defineFlow({
+			screens: { only: { view: () => view({}, text('only')) } },
+			first: (() => 'nope') as unknown as () => 'only',
+		});
+		expect(() => entryScreen(bad, undefined)).toThrow(/no screen of this flow/);
 	});
 
 	it('builds a stateless flow when initialData is omitted', () => {

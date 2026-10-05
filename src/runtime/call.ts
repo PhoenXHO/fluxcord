@@ -27,6 +27,7 @@
 
 import { setPath } from '../flow/lens.js';
 import type { Flow, MountToken } from '../flow/token.js';
+import { entryScreen } from '../flow/define.js';
 import type { CommitPhase } from '../commit/commit.js';
 import type { SessionQueue } from '../pipeline/queue.js';
 import type { CallEngine, EventTools } from '../pipeline/types.js';
@@ -121,7 +122,7 @@ export function createCall(options: CallOptions): CallEngine {
 				id: generateId(),
 				flowId: token.flowId,
 				moduleId: token.moduleId,
-				screen: token.definition.first,
+				screen: entryScreen(token.definition, bag),
 				history: [],
 				modalNonce: generateId(),
 				actions: {},

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- A flow's `first` accepts a resolver `(data) => screenKey`, evaluated once at session birth on the seeded bag (mount, revive and `event.call` alike), so a flow can land on a state-dependent entry screen with no flicker. A static or resolved key naming no screen throws at birth.
 - Flows call flows like functions: `await event.call(childFlow, { as: 'slot', args })` runs the child on its own frame (own screen history, own bag nested under `slot` in the parent's data), parks the caller until the child exits, and resolves with the child's return value. A throw inside a called flow rejects the caller's `await`, so an author's `try`/`catch` owns the crash. A session dying mid-call drops the in-flight call without settling; a revived session restarts at the root's first screen.
 
 ### Fixed

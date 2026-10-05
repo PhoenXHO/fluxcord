@@ -37,7 +37,7 @@ const CHILD_TOKEN: MountToken<ChildData> = {
 		first: 'child-main',
 		ttlMs: MINUTE,
 		remount: 'coexist',
-		screens: {},
+		screens: { 'child-main': {} as never },
 	} as unknown as FlowDefinition<ChildData>,
 };
 
@@ -48,7 +48,7 @@ const ROOT_TOKEN: MountToken = {
 		first: 'root',
 		ttlMs: DEFAULT_TTL_MS,
 		remount: 'coexist',
-		screens: {},
+		screens: { root: {} as never },
 	} as unknown as FlowDefinition,
 };
 
