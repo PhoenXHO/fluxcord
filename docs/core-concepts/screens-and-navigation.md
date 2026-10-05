@@ -70,6 +70,15 @@ export const diceFlow = flow('dice', {
 
 This structure is similar to the about flow we made earlier, but notice how the keys in the `screens` map match the exact screen name strings we passed into `go`. TypeScript enforces this strictness, so a typo like `go('ruls')` fails to compile instead of failing at click time.
 
+When `first` is a function, it receives the session's seed and returns the screen to open at. fluxcord runs it once when the session is born, before anything renders, so a panel can open on the screen its data calls for. A wizard whose seed says the user already finished it opens at its overview instead of replaying the welcome step. A revived session runs the same resolver on the restored data, so it lands on the screen its state calls for. Whatever the resolver returns has to name a screen; a resolver (or a static `first`) naming a missing screen throws when the session is born, not at draw time.
+
+```ts
+export const onboardingFlow = flow<OnboardingData>('onboarding', {
+    screens: { welcome: welcomeScreen, overview: overviewScreen },
+    first: (data) => (data.finished ? 'overview' : 'welcome'),
+});
+```
+
 ## The command
 
 Finally, we export a slash command that mounts our dice flow:

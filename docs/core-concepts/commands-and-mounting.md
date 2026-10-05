@@ -97,7 +97,7 @@ Command specifications also support a `devOnly` flag to designate development ut
 
 ## Flow catalog registration
 
-When you have flows that aren't mounted by any command, your module can register them directly using its optional `flows` field. Those flows connect to programmatic doors such as `bot.mount`, which opens a panel wherever your custom logic decides one should appear, as described in [Live panels](live-panels.md). The example bot's campfire is exactly that shape: the module lists the flow, and `main` opens the panel once on boot:
+When you have flows that aren't mounted by any command, your module can register them directly using its optional `flows` field. Those flows connect to programmatic doors such as `bot.mount`, which opens a panel wherever your custom logic decides one should appear, as described in [Live panels](live-panels.md). The field is for doors only: a flow called from another flow of the same module needs no entry at all, because the call carries the module identity with it. The example bot's campfire is the door shape: the module lists the flow, and `main` opens the panel once on boot:
 
 ```tsx
 // examples/src/index.ts
