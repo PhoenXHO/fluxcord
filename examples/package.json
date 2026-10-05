@@ -6,7 +6,8 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"start": "node --env-file=.env dist/index.js",
-		"dev": "node --watch --env-file=.env dist/index.js"
+		"dev": "node --watch --env-file=.env dist/index.js",
+		"stop": "powershell -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='node.exe'\\\" | Where-Object { $_.CommandLine -like '*dist/index.js*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\""
 	},
 	"dependencies": {
 		"discord.js": "^14.25.1",

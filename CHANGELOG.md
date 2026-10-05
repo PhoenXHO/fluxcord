@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Flows call flows like functions: `await event.call(childFlow, { as: 'slot', args })` runs the child on its own frame (own screen history, own bag nested under `slot` in the parent's data), parks the caller until the child exits, and resolves with the child's return value. A throw inside a called flow rejects the caller's `await`, so an author's `try`/`catch` owns the crash. A session dying mid-call drops the in-flight call without settling; a revived session restarts at the root's first screen.
 
+### Fixed
+
+- The bridge's interaction binding is per dispatch (through `AsyncLocalStorage`), replacing the global dispatch mutex. A parked `event.call` used to hold that mutex for the child's whole lifetime, deadlocking every later interaction on the bot. The caller's click is now also acked right before the park (`PlatformPort.ack`), so entering a child flow no longer leaves a stuck spinner past Discord's response window.
+- A modal submit lenses to its opener's slot: in a called flow, the submit's `mutate` now writes the child's bag instead of silently landing on the root data, where neither the child's screens nor the parent's could see it.
+
 ### Changed
 
 - Breaking: the subflow system is removed (`subflow()` plugs, the `subflows` option, `<at>.` screen-name namespacing). Open a child with `await event.call(...)` instead; a called flow's screens are addressed through its own frame, and stale parent-screen clicks bounce as before.

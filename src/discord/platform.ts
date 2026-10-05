@@ -11,13 +11,13 @@
  * 2. Interaction binding: `replyToActor` and `showModal` need the live
  *    interaction object (a raw id cannot be replied to: the token lives on
  *    the object), but the runtime holds one singleton platform port. The
- *    bridge binds the interaction for the duration of one dispatch, which
- *    works because the dispatch core's per-session queue resolves only when
- *    the whole job (handler included) finishes, so `await core(incoming)`
- *    covers every reply/modal the handler triggers. Concurrent interactions
- *    would race the singleton binding, so dispatches serialize on a chain
- *    (mutex). The per-session FIFO still governs within a session; the
- *    mutex trades a little cross-session latency for correctness.
+ *    bridge binds the interaction per dispatch through AsyncLocalStorage,
+ *    so concurrent dispatches each see their own binding and no mutex is
+ *    needed. That is load-bearing under the call model: a parked
+ *    `event.call` holds its dispatch open while the child flow's clicks
+ *    arrive, and serializing on one chain would deadlock every later
+ *    interaction behind the parked parent. Cross-dispatch ordering is the
+ *    per-session FIFO's business, and it already lives in the core.
  *
  * 3. Success ack: a component click that was neither replied to (denial or
  *    error copy) nor deferred is `deferUpdate()`d when its dispatch
@@ -26,7 +26,10 @@
  *    didn't respond" failure painted onto whatever button now sits first in
  *    the row. Content keeps flowing through edits; the ack only closes
  *    Discord's response window. A modal counts as the answer itself, so
- *    those dispatches skip the ack.
+ *    those dispatches skip the ack. A parked dispatch is the one late
+ *    finisher: its click is acked eagerly by the call engine through
+ *    `ack` right before the park, because that dispatch's own end-of-job
+ *    ack would land minutes past the window.
  *
  * Ephemeral panels ride the interaction line: an ephemeral reply is
  * unreachable through its channel, so the only way to edit it is the
@@ -44,6 +47,7 @@
  * @module discord/platform
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { MessageFlags } from 'discord.js';
 import type {
 	ChatInputCommandInteraction,
@@ -125,10 +129,13 @@ export interface UiBridge {
 export function createUiBridge(client: Client, options: BridgeOptions = {}): UiBridge {
 	const log = options.logger ?? SILENT;
 	// --- Interaction binding (see module doc, job 2) ---------------------------
-	let bound: UiComponentInteraction | null = null;
-	/** True while the dispatch in flight answered with a modal (an ack would kill it). */
-	let modalOpen = false;
-	let chain: Promise<unknown> = Promise.resolve();
+	/**
+	 * Per-dispatch interaction state. Every dispatch runs inside its own
+	 * store, so replyToActor, showModal and ack always see the interaction
+	 * of the dispatch they were called from, and a parked dispatch never
+	 * blocks another dispatch's binding.
+	 */
+	const scopes = new AsyncLocalStorage<{ interaction: UiComponentInteraction; modalOpen: boolean }>();
 	/**
 	 * Ephemeral lines (see module doc): `messageId` -> the command
 	 * interaction whose webhook is the only door to that ephemeral reply.
@@ -138,8 +145,8 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 	const lines = new Map<string, ChatInputCommandInteraction>();
 
 	async function replyToActor(text: string): Promise<void> {
-		const interaction = bound;
-		if (interaction === null) {
+		const interaction = scopes.getStore()?.interaction;
+		if (interaction === undefined) {
 			log.warn(`replyToActor outside a dispatch window, text dropped: "${text.slice(0, 80)}"`);
 			return;
 		}
@@ -162,8 +169,9 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 	}
 
 	async function showModal(payload: V2ModalPayload): Promise<void> {
-		const interaction = bound;
-		if (interaction === null) {
+		const scope = scopes.getStore();
+		const interaction = scope?.interaction;
+		if (scope === undefined || interaction === undefined) {
 			log.warn('showModal outside a dispatch window: modal dropped');
 			return;
 		}
@@ -176,7 +184,23 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 		// Raw-API payload handed to d.js verbatim: the builders exist to emit
 		// exactly this wire shape.
 		await interaction.showModal(payload as unknown as ModalComponentData);
-		modalOpen = true;
+		scope.modalOpen = true;
+	}
+
+	/**
+	 * Closes Discord's response window for the in-flight interaction before
+	 * its dispatch finishes. The call engine calls this right before a
+	 * dispatch parks on `event.call`, because that dispatch only completes
+	 * when the child exits, far past the window. No-op outside a dispatch,
+	 * after a reply, after a defer, or once a modal is open (the modal is
+	 * the answer; an ack would kill it).
+	 */
+	async function ack(): Promise<void> {
+		const scope = scopes.getStore();
+		const interaction = scope?.interaction;
+		if (scope === undefined || interaction === undefined) return;
+		if (scope.modalOpen || interaction.replied || interaction.deferred) return;
+		await interaction.deferUpdate().catch((err: unknown) => log.debug('ack deferUpdate failed', err));
 	}
 
 	// --- Delivery (see module doc, job 1) ----------------------------------------
@@ -263,14 +287,12 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 		interaction: UiComponentInteraction,
 		core: (incoming: IncomingEvent) => Promise<void>,
 	): Promise<void> {
-		const run = chain.then(async () => {
-			const incoming = flattenInteraction(interaction);
-			if (incoming === undefined) {
-				log.warn(`Interaction without a backing message dropped (customId '${interaction.customId.slice(0, 40)}')`);
-				return;
-			}
-			bound = interaction;
-			modalOpen = false;
+		const incoming = flattenInteraction(interaction);
+		if (incoming === undefined) {
+			log.warn(`Interaction without a backing message dropped (customId '${interaction.customId.slice(0, 40)}')`);
+			return;
+		}
+		await scopes.run({ interaction, modalOpen: false }, async () => {
 			try {
 				await core(incoming);
 			} finally {
@@ -278,18 +300,15 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 				// interaction itself (denial copy, error copy, modal) the window
 				// is closed; otherwise close it now: the content already went
 				// out as edits, this is bookkeeping so Discord doesn't render
-				// the click as a failed one.
-				if (!modalOpen && !interaction.replied && !interaction.deferred) {
-					await interaction.deferUpdate().catch((err) => log.debug('deferUpdate ack failed', err));
+				// the click as a failed one. A parked dispatch is exempt by
+				// construction: the call engine's ack already deferred it.
+				const scope = scopes.getStore();
+				if (scope !== undefined && !scope.modalOpen && !interaction.replied && !interaction.deferred) {
+					await interaction.deferUpdate().catch((err: unknown) => log.debug('deferUpdate ack failed', err));
 				}
-				bound = null;
 			}
 		});
-		// The chain swallows outcomes so a failed dispatch never jams the mutex;
-		// the caller still sees the original rejection via `run`.
-		chain = run.then(() => undefined, () => undefined);
-		await run;
 	}
 
-	return { platform: { replyToActor, showModal, editMessage }, sendToChannel, replySender, dispatch };
+	return { platform: { replyToActor, showModal, ack, editMessage }, sendToChannel, replySender, dispatch };
 }

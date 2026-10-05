@@ -414,6 +414,14 @@ export interface PlatformPort {
 	editMessage(ref: MessageRef, payload: V2MessagePayload): Promise<void>;
 	/** The bridge's modal-open seam: the commit phase renders, the bridge opens. */
 	showModal(payload: V2ModalPayload): Promise<void>;
+	/**
+	 * Closes Discord's response window for the in-flight interaction. The
+	 * call engine acks a caller's click right before its dispatch parks on
+	 * `event.call`, because that dispatch only finishes when the child
+	 * exits, far past the window. Optional: bridges without interaction
+	 * acks omit it.
+	 */
+	ack?(): Promise<void>;
 }
 
 /**
@@ -422,7 +430,7 @@ export interface PlatformPort {
  * (`redraw`, `commitParting`); the runtime composes the full `PlatformPort`
  * from both.
  */
-export type BridgePort = Pick<PlatformPort, 'replyToActor' | 'editMessage' | 'showModal'>;
+export type BridgePort = Pick<PlatformPort, 'replyToActor' | 'editMessage' | 'showModal' | 'ack'>;
 
 /** One clickable in an action map: its handler plus the control's label text for diagnostics. */
 export interface ActionRecord<TData = unknown> {

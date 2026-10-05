@@ -96,7 +96,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	});
 	// The call engine needs store, queue and commit; the toolkit needs the
 	// engine's exit seam. Order is fixed by those edges.
-	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken });
+	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken, ack: options.platform.ack });
 	const makeUi = createMakeUi({ screens, exit: callEngine.exit });
 	// The host supplies the bridge (editMessage, replyToActor, showModal);
 	// the commit phase owns redraw and the parting edit. Compose them once;

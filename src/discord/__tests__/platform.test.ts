@@ -1,9 +1,10 @@
 /**
  * Bridge platform tests: the jobs that are real logic and worth unit
  * coverage: interaction binding (replyToActor/showModal reach the live
- * interaction of the dispatch in flight), the success ack (every unanswered
- * interaction is deferUpdated once its dispatch ends), and dispatch
- * serialization (the singleton binding never sees two dispatches at once).
+ * interaction of the dispatch in flight, and a parked dispatch never
+ * blocks another one's binding), the success ack (every unanswered
+ * interaction is deferUpdated once its dispatch ends, and the eager ack
+ * covers a dispatch about to park), and the ack verb's own guards.
  * Delivery seams (editMessage/sendToChannel/replySender) are thin Discord
  * glue, asserted here on fakes, proven live by the pilot.
  *
@@ -33,7 +34,11 @@ function fakeButton(overrides: Record<string, unknown> = {}): Record<string, unk
 		deferred: false,
 		reply: vi.fn(async () => undefined),
 		followUp: vi.fn(async () => undefined),
-		deferUpdate: vi.fn(async () => undefined),
+		// d.js flips `deferred` on a real interaction; the fake mirrors that
+		// so an eager ack actually suppresses the end-of-job ack.
+		deferUpdate: vi.fn(async function (this: Record<string, unknown>) {
+			this.deferred = true;
+		}),
 		showModal: vi.fn(async () => undefined),
 		...overrides,
 	};
@@ -158,36 +163,63 @@ describe('success ack', () => {
 
 		expect(button.deferUpdate).toHaveBeenCalledTimes(1);
 	});
+
+	it('ack() defers the in-flight interaction mid-dispatch, and the final ack skips it', async () => {
+		const bridge = createUiBridge(fakeClient());
+		const button = fakeButton();
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			await bridge.platform.ack?.();
+		});
+
+		expect(button.deferUpdate).toHaveBeenCalledTimes(1);
+	});
+
+	it('ack() skips when a modal is open (an ack would kill it)', async () => {
+		const bridge = createUiBridge(fakeClient());
+		const button = fakeButton();
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			await bridge.platform.showModal({ title: 'Form', components: [] } as never);
+			await bridge.platform.ack?.();
+		});
+
+		expect(button.deferUpdate).not.toHaveBeenCalled();
+	});
+
+	it('ack() outside a dispatch is a silent no-op', async () => {
+		const bridge = createUiBridge(fakeClient());
+		await expect(bridge.platform.ack?.()).resolves.toBeUndefined();
+	});
 });
 
-describe('dispatch serialization', () => {
-	it('never runs two dispatches concurrently (the singleton binding stays race-free)', async () => {
+describe('dispatch binding', () => {
+	it('concurrent dispatches bind their own interactions (a parked dispatch blocks nothing)', async () => {
 		const bridge = createUiBridge(fakeClient());
 		const first = fakeButton({ customId: 'ui2:s1:lotto/main#a' });
 		const second = fakeButton({ customId: 'ui2:s1:lotto/main#b' });
 
 		let releaseFirst!: () => void;
 		const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
-		const order: string[] = [];
 
 		const firstRun = bridge.dispatch(first as unknown as UiComponentInteraction, async () => {
-			order.push('first-start');
+			// Parked mid-dispatch, the way event.call parks its parent: the
+			// second dispatch must run to completion beside it.
 			await firstGate;
-			order.push('first-end');
+			await bridge.platform.replyToActor('parked reply');
 		});
 		const secondRun = bridge.dispatch(second as unknown as UiComponentInteraction, async () => {
-			order.push('second-start');
+			await bridge.platform.showModal({ title: 'Second', components: [] } as never);
 		});
-
-		// Give the second dispatch its turn on the microtask queue: it must
-		// still be waiting behind the first.
-		await Promise.resolve();
-		await Promise.resolve();
-		expect(order).toEqual(['first-start']);
+		await secondRun;
+		expect(second.showModal).toHaveBeenCalledTimes(1);
 
 		releaseFirst();
-		await Promise.all([firstRun, secondRun]);
-		expect(order).toEqual(['first-start', 'first-end', 'second-start']);
+		await firstRun;
+		// The parked dispatch's binding survived: its reply went to ITS
+		// interaction, not the second dispatch's.
+		expect(first.reply).toHaveBeenCalledWith(expect.objectContaining({ content: 'parked reply' }));
+		expect(second.reply).not.toHaveBeenCalled();
 	});
 
 	it('flattens before handing to the core, and drops messageless interactions', async () => {
@@ -202,7 +234,7 @@ describe('dispatch serialization', () => {
 		expect(core).toHaveBeenCalledTimes(1);
 	});
 
-	it('keeps the mutex alive after a failing dispatch', async () => {
+	it('a failing dispatch does not poison the next', async () => {
 		const bridge = createUiBridge(fakeClient());
 		const failing = vi.fn(async (): Promise<void> => { throw new Error('core bug'); });
 		const after = fakeButton({ customId: 'ui2:s1:lotto/main#b' });

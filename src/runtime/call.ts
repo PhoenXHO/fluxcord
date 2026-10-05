@@ -44,6 +44,11 @@ export interface CallOptions {
 	readonly queue: SessionQueue;
 	/** Draw arm for the child's first screen. */
 	readonly commit: Pick<CommitPhase, 'redraw'>;
+	/**
+	 * Acks the caller's click right before the park; see
+	 * PlatformPort.ack. Omitted when the host's bridge has no ack.
+	 */
+	readonly ack?: () => Promise<void>;
 	/** The boot catalog's flow-to-token map: the flows `event.call` may open. */
 	readonly byToken: ReadonlyMap<object, MountToken>;
 }
@@ -138,6 +143,9 @@ export function createCall(options: CallOptions): CallEngine {
 			// clicks start fresh instead of deadlocking behind the parked
 			// parent.
 			await options.commit.redraw(session);
+			// The parked dispatch finishes only when the child exits, far past
+			// Discord's response window, so the caller's click is acked here.
+			if (options.ack !== undefined) await options.ack();
 			options.queue.suspend(session.id);
 			return result;
 		},

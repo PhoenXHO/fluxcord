@@ -56,6 +56,7 @@ function world(commitOverride?: (session: Session<unknown>) => Promise<void>): {
 	call: ReturnType<typeof createCall>;
 	tools: EventTools;
 	phaseResets: () => number;
+	acks: () => number;
 	PLATFORM: PlatformPort;
 } {
 	const store = createSessionStore();
@@ -84,9 +85,17 @@ function world(commitOverride?: (session: Session<unknown>) => Promise<void>): {
 			redraws.push(s);
 		}),
 	};
-	const call = createCall({ store, queue, commit, byToken: new Map([[CHILD_FLOW, CHILD_TOKEN as MountToken]]) });
-
 	let phaseResets = 0;
+	let acks = 0;
+	const call = createCall({
+		store,
+		queue,
+		commit,
+		byToken: new Map([[CHILD_FLOW, CHILD_TOKEN as MountToken]]),
+		ack: async (): Promise<void> => {
+			acks += 1;
+		},
+	});
 	const tools: EventTools = {
 		ui: {
 			go: () => undefined,
@@ -103,7 +112,7 @@ function world(commitOverride?: (session: Session<unknown>) => Promise<void>): {
 			phaseResets++;
 		},
 	};
-	return { store, session, queue, realQueue, suspended, redraws, call, tools, phaseResets: (): number => phaseResets, PLATFORM };
+	return { store, session, queue, realQueue, suspended, redraws, call, tools, phaseResets: (): number => phaseResets, acks: (): number => acks, PLATFORM };
 }
 
 describe('call - parking', () => {
@@ -124,6 +133,8 @@ describe('call - parking', () => {
 		(w.session.data.picker as ChildData & { list: number[] }).list.push(2);
 		expect(args.list).toEqual([1]);
 		expect(w.redraws).toEqual([w.session]);
+		// The caller's click is acked right before the park.
+		expect(w.acks()).toBe(1);
 		expect(w.suspended).toEqual([w.session.id]);
 
 		// The promise stays pending until an exit presses resolve.
