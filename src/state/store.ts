@@ -212,6 +212,7 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 						modalNonce: generateId(),
 						actions: {},
 						slot: [],
+						token: input.token,
 					},
 				],
 				pending: new Map(),

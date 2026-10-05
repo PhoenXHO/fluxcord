@@ -12,11 +12,9 @@
  */
 
 import type { Flow } from '../flow/token.js';
-import type { ViewSession } from '../flow/types.js';
 import type { V2MessagePayload, V2ModalPayload } from '../render/v2.js';
 import type { FlowFrame, MessageRef, Session } from '../state/types.js';
-import type { ScreenKit } from '../tree/kit.js';
-import type { ComponentResult, ViewNode } from '../tree/types.js';
+import type { ComponentResult } from '../tree/types.js';
 
 // used in docs
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -455,57 +453,6 @@ export interface PartingOptions {
 	readonly note?: string;
 	/** Replaces the default parting screen entirely. No data: a builder; element roots fold engine-side. */
 	readonly view?: () => ComponentResult;
-}
-
-/**
- * The flow-level facts dispatch and the commit phase need from a screen's
- * owning flow. The real FlowDefinition (flow/types) satisfies this
- * structurally after type erase; registry entries carry this form so
- * pipeline code never imports flow/ (no cycles).
- */
-export interface FlowContext {
-	/** Draws around every screen's content (components compose into this). */
-	readonly wrap?: (tree: ViewNode, session: Session<unknown>, kit: ScreenKit<unknown, string>) => ComponentResult;
-	/** The flow's parting copy, consulted before the framework defaults. */
-	readonly parting?: PartingOptions;
-	/**
-	 * The mounting command's invocation path: the default parting hint for
-	 * a command-mounted flow. An explicit parting.command always wins.
-	 * Absent for job-mounted flows.
-	 */
-	readonly commandHint?: string;
-	/** Decides error copy per failure from its own screens; undefined = default copy. */
-	readonly onError?: (report: ErrorReport) => string | undefined;
-}
-
-/** One screen: its view template, keyed '<moduleId>/<screenId>'. */
-export interface RegisteredScreen<TData = unknown> {
-	/**
-	 * Pure template: session data in, view tree out. The second parameter
-	 * is the erased screen kit; the third is the session's read-only
-	 * facts (see {@link ViewSession}). Authored views receive all three
-	 * typed through `screen()` factories (flow/screen.ts). The return is
-	 * the element union (TSX roots are flat); the commit phase folds it
-	 * to a view node at the one draw seam.
-	 */
-	readonly view: (data: TData, controls: ScreenKit<unknown, string>, session: ViewSession) => ComponentResult;
-	/** The owning flow's consultation slice. Absent on hand-built test screens; real registration always sets it. */
-	readonly flow?: FlowContext;
-}
-
-/**
- * Resolves '<moduleId>/<screenId>' to that screen. The core treats it as a
- * plain lookup table; population (and the type-safe erase from a module's
- * own TData) belongs to the flow and manifest wiring.
- */
-export interface ScreenRegistry {
-	/**
-	 * Resolves a screen key to the screen's view template.
-	 * 
-	 * @param viewKey `'<moduleId>/<screenId>'`, as stamped on the wire.
-	 * @returns The screen, or undefined when unregistered.
-	 */
-	resolve(viewKey: string): RegisteredScreen | undefined;
 }
 
 /**

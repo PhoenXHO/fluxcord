@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { button, container, link, modal, optionSelect, row, text, view } from '../builders.js';
 import { coerceChildren, normalizeModalRoot, normalizeViewRoot } from '../normalize.js';
-import type { ContainerChild } from '../types.js';
+import type { ContainerChild, ViewChild } from '../types.js';
 
 /** Identity-bound fixture: the handler object itself is the binding. */
 const handler = (): void => {};
@@ -34,22 +34,22 @@ describe('normalizeViewRoot - root shapes', () => {
 describe('normalizeViewRoot - bare control wrapping', () => {
 	it('wraps a bare select that is the only view child', () => {
 		const select = pick();
-		expect(normalizeViewRoot(view({}, select))).toEqual(view({}, row({}, select)));
+		expect(normalizeViewRoot(view({}, force<ViewChild>(select)))).toEqual(view({}, row({}, select)));
 	});
 
 	it('wraps a bare button that is the only view child', () => {
 		const btn = go();
-		expect(normalizeViewRoot(view({}, btn))).toEqual(view({}, row({}, btn)));
+		expect(normalizeViewRoot(view({}, force<ViewChild>(btn)))).toEqual(view({}, row({}, btn)));
 	});
 
 	it('wraps a bare link the same way', () => {
-		const manual = view({}, docs());
+		const manual = view({}, force<ViewChild>(docs()));
 		expect(normalizeViewRoot(manual)).toEqual(view({}, row({}, docs())));
 	});
 
 	it('gives each bare control its own row instead of merging them', () => {
 		const select = pick();
-		const result = normalizeViewRoot(view({}, go(), docs(), select));
+		const result = normalizeViewRoot(view({}, force<ViewChild>(go()), force<ViewChild>(docs()), force<ViewChild>(select)));
 		expect(result.children).toEqual([row({}, go()), row({}, docs()), row({}, select)]);
 	});
 
@@ -57,7 +57,7 @@ describe('normalizeViewRoot - bare control wrapping', () => {
 		const select = pick();
 		const note = text('call a number');
 		const actions = row({}, go());
-		const result = normalizeViewRoot(view({}, note, select, actions));
+		const result = normalizeViewRoot(view({}, note, force<ViewChild>(select), actions));
 		expect(result.children[0]).toBe(note);
 		expect(result.children[1]).toEqual(row({}, select));
 		expect(result.children[2]).toBe(actions);
@@ -83,7 +83,7 @@ describe('normalizeViewRoot - bare control wrapping', () => {
 
 	it('preserves the view title when wrapping', () => {
 		const select = pick();
-		expect(normalizeViewRoot(view({ title: 'T' }, select))).toEqual(view({ title: 'T' }, row({}, select)));
+		expect(normalizeViewRoot(view({ title: 'T' }, force<ViewChild>(select)))).toEqual(view({ title: 'T' }, row({}, select)));
 	});
 
 	it('leaves a manual select row untouched, identity included', () => {

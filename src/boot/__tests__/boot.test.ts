@@ -63,12 +63,11 @@ describe('flow', () => {
 });
 
 describe('buildFlowCatalog', () => {
-	it("assembles '<module>/<name>', keys screens '<module>/<screen>', and indexes both by flowId and authored flow", () => {
+	it("assembles '<module>/<name>' and indexes both by flowId and authored flow", () => {
 		const t = makeFlow();
 		const catalog = buildFlowCatalog([{ module: 'panel', flow: t }]);
-		expect(Object.keys(catalog.entries)).toEqual(['panel/main']);
-		expect(catalog.entries['panel/main']?.view).toBeDefined();
-		expect(catalog.byFlowId.get('panel/host')).toBeDefined();
+		const token = catalog.byFlowId.get('panel/host');
+		expect(token?.definition.screens.main).toBeDefined();
 		expect(catalog.byToken.get(t)?.flowId).toBe('panel/host');
 		expect(catalog.tokens).toHaveLength(1);
 	});
@@ -80,19 +79,17 @@ describe('buildFlowCatalog', () => {
 			initialData: { count: 0 },
 		});
 		const catalog = buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'other', flow: other }]);
-		expect(Object.keys(catalog.entries).sort()).toEqual(['other/extra', 'panel/main']);
-		expect(catalog.byFlowId.get('panel/host')).toBeDefined();
-		expect(catalog.byFlowId.get('other/host')).toBeDefined();
+		expect([...catalog.byFlowId.keys()].sort()).toEqual(['other/host', 'panel/host']);
 	});
 
-	it('merges entries across flows and throws on a duplicate flowId', () => {
+	it('merges flows across registrations and throws on a duplicate flowId', () => {
 		const other = flow<PanelData>('other', {
 			screens: { extra: { view: () => view({}, text('e')) } },
 			first: 'extra',
 			initialData: { count: 0 },
 		});
 		const catalog = buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: other }]);
-		expect(Object.keys(catalog.entries).sort()).toEqual(['panel/extra', 'panel/main']);
+		expect([...catalog.byFlowId.keys()].sort()).toEqual(['panel/host', 'panel/other']);
 
 		// Same module + same name: the flowId guard fires.
 		const twin = flow<PanelData>('host', {
@@ -103,13 +100,15 @@ describe('buildFlowCatalog', () => {
 		expect(() => buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: twin }])).toThrow(/declared twice/);
 	});
 
-	it('throws when one screen key belongs to two flows (validateFlows passthrough)', () => {
+	it('screen ids are per-flow: two flows of one module may reuse them', () => {
 		const evil = flow<PanelData>('twin', {
 			screens: { main: { view: () => view({}, text('m')) } },
 			first: 'main',
 			initialData: { count: 0 },
 		});
-		expect(() => buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: evil }])).toThrow(/screen 'panel\/main'/);
+		const catalog = buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: evil }]);
+		expect(catalog.byFlowId.get('panel/host')?.definition.screens.main).toBeDefined();
+		expect(catalog.byFlowId.get('panel/twin')?.definition.screens.main).toBeDefined();
 	});
 });
 

@@ -180,7 +180,7 @@ function world(options: {
 	async function click(sessionId: string, messageId: string, overrides: Partial<IncomingEvent> = {}): Promise<void> {
 		await runtime.dispatch({
 			kind: EventKind.Button,
-			customId: encodeActionId({ sessionId, screenKey: 'panel/main', actionHash: actionHash(handler) }),
+			customId: encodeActionId({ sessionId, screenKey: `panel/${panelFlow.id}/main`, actionHash: actionHash(handler) }),
 			actorId: OWNER_ID,
 			channelId: CHANNEL_ID,
 			messageId,

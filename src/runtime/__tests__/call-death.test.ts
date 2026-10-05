@@ -43,6 +43,17 @@ const CHILD_TOKEN: MountToken<ChildData> = {
 	} as unknown as FlowDefinition<ChildData>,
 };
 
+const ROOT_TOKEN: MountToken = {
+	flowId: 'mod/root',
+	moduleId: 'mod',
+	definition: {
+		first: 'root',
+		ttlMs: MINUTE,
+		remount: 'coexist',
+		screens: {},
+	} as unknown as FlowDefinition,
+};
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 /** One macrotask turn: a dropped pending call must survive it unsettled. */
 const tick = async (): Promise<void> => sleep(0);
@@ -83,6 +94,7 @@ function deathWorld(): {
 		screen: 'root',
 		ttlMs: MINUTE,
 		remount: RemountPolicy.Coexist,
+		token: ROOT_TOKEN,
 	});
 	const call = createCall({
 		store,
@@ -155,6 +167,7 @@ describe('death paths drop pending calls without settling', () => {
 			screen: 'root',
 			ttlMs: MINUTE,
 			remount: RemountPolicy.Replace,
+			token: ROOT_TOKEN,
 		});
 		await tick();
 
@@ -177,6 +190,7 @@ describe('death paths drop pending calls without settling', () => {
 			screen: 'root',
 			ttlMs: MINUTE,
 			remount: RemountPolicy.Coexist,
+			token: ROOT_TOKEN,
 		});
 		await tick();
 

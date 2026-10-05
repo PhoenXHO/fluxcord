@@ -21,15 +21,12 @@
 
 import { EndReason } from '../state/types.js';
 import type { RehydrateStore, Session } from '../state/types.js';
-import type { ScreenRegistry } from '../pipeline/types.js';
 import type { CommitPhase } from './commit.js';
 
 export interface OnEndOptions {
 	readonly commit: CommitPhase;
 	/** Present when the host app backed rehydration; close deletes the row. */
 	readonly rehydrate?: RehydrateStore;
-	/** Resolves the dying session's flow for its parting overrides; omit = framework default copy. */
-	readonly screens?: ScreenRegistry;
 	/** The flow's onSessionEnd hook delivery, resolved per dying session by the runtime. */
 	readonly onSessionEnd?: (session: Session<unknown>, reason: EndReason) => void;
 	/** Routes commit failures on death paths; the store hook cannot await. */
@@ -61,9 +58,10 @@ export function createOnEnd(options: OnEndOptions): OnEnd {
 		}
 		// Expiry: rehydratable messages stay untouched for late-click revive.
 		if (session.rehydrate === undefined) {
-			const key = `${session.moduleId}/${session.screen}`;
-			const flow = options.screens?.resolve(key)?.flow;
-			options.commit.commitParting(session.messageRef, flow?.parting, flow?.commandHint).catch(fail);
+			// Parting copy belongs to the root flow: the root frame's token
+			// carries its parting bundle and command hint.
+			const root = session.frames[0];
+			options.commit.commitParting(session.messageRef, root.token.definition.parting, root.token.commandHint).catch(fail);
 		}
 	};
 }

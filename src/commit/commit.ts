@@ -22,10 +22,11 @@
 import { renderV2Message } from '../render/v2.js';
 import type { V2MessagePayload } from '../render/v2.js';
 import { getPath } from '../flow/lens.js';
+import type { Screen } from '../flow/types.js';
 import { activeFrame } from '../state/types.js';
 import type { MessageRef, Session } from '../state/types.js';
-import type { PartingOptions, PlatformPort, ScreenRegistry } from '../pipeline/types.js';
-import type { ViewNode } from '../tree/types.js';
+import type { PartingOptions, PlatformPort } from '../pipeline/types.js';
+import type { ComponentResult, ViewNode } from '../tree/types.js';
 import { kitFor } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
 import { validateTree } from '../tree/validate.js';
@@ -51,21 +52,19 @@ export interface CommitPhase {
 export interface CommitOptions {
 	/** The bridge's message-edit seam. */
 	readonly platform: Pick<PlatformPort, 'editMessage'>;
-	/** Resolves screen keys to screens. */
-	readonly screens: ScreenRegistry;
 }
 
 /**
- * Resolves the session's current screen and runs its view template on
- * the bag, then the flow's wrap draws around the result. Shared by the
- * commit phase (redraw/freeze) and mount's first render (which passes a
- * draft session, same shape, messageRef still pending until the send
- * returns).
+ * Resolves the top frame's own screen (the frame carries its flow's
+ * token) and runs its view template on the bag, then the flow's wrap
+ * draws around the result. Shared by the commit phase (redraw/freeze)
+ * and mount's first render (which passes a draft session, same shape,
+ * messageRef still pending until the send returns).
  */
-export function viewOf(session: Session<unknown>, screens: ScreenRegistry): ViewNode {
+export function viewOf(session: Session<unknown>): ViewNode {
 	const frame = activeFrame(session);
-	const key = `${frame.moduleId}/${frame.screen}`;
-	const screen = screens.resolve(key);
+	const key = `${frame.flowId}/${frame.screen}`;
+	const screen = (frame.token.definition.screens as Readonly<Record<string, Screen>>)[frame.screen];
 	if (screen === undefined) {
 		throw new Error(`no screen registered for '${key}'`);
 	}
@@ -76,8 +75,9 @@ export function viewOf(session: Session<unknown>, screens: ScreenRegistry): View
 	// view node here, one place; validateTree polices the result below.
 	// Same for the composed wrap's result.
 	let tree = normalizeViewRoot(screen.view(bag, kitFor(session), session));
-	if (screen.flow?.wrap !== undefined) {
-		tree = normalizeViewRoot(screen.flow.wrap(tree, session, kitFor(session)));
+	const wrap = frame.token.definition.wrap as ((tree: ViewNode, session: Session<unknown>, kit: ReturnType<typeof kitFor>) => ComponentResult) | undefined;
+	if (wrap !== undefined) {
+		tree = normalizeViewRoot(wrap(tree, session, kitFor(session)));
 	}
 	// The pipeline's one validation point: redraws, the freeze, and mount's
 	// first frame all funnel through here, so an illegal tree fails loudly
@@ -110,19 +110,19 @@ export function createCommit(options: CommitOptions): CommitPhase {
 				Object.entries(materialized.actions).map(([hash, record]) => [hash, { ...record, slot: frame.slot }]),
 			)
 			: materialized.actions;
-		return renderV2Message(tree, session.id, `${frame.moduleId}/${frame.screen}`, materialized.stampOf);
+		return renderV2Message(tree, session.id, `${frame.flowId}/${frame.screen}`, materialized.stampOf);
 	}
 
 	return {
 		async redraw(session: Session<unknown>): Promise<void> {
-			await options.platform.editMessage(session.messageRef, draw(session, viewOf(session, options.screens)));
+			await options.platform.editMessage(session.messageRef, draw(session, viewOf(session)));
 		},
 
 		async commitFreeze(session: Session<unknown>): Promise<void> {
 			if (done.has(session.messageRef.messageId)) return;
 			// The frozen tree carries no controls: harvesting it empties the
 			// action map, closing the message for clicks.
-			await options.platform.editMessage(session.messageRef, draw(session, freezeTree(viewOf(session, options.screens))));
+			await options.platform.editMessage(session.messageRef, draw(session, freezeTree(viewOf(session))));
 			done.add(session.messageRef.messageId);
 		},
 

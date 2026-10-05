@@ -26,7 +26,6 @@ export * from './boot/build.js'; // buildFlowCatalog, FlowCatalog, FlowRegistrat
 export * from './boot/scan.js'; // coverageScan
 export * from './runtime/create.js'; // createUiRuntime
 export * from './runtime/types.js'; // UiRuntime, RuntimeOptions, MountTarget
-export * from './flow/registry.js'; // asScreenRegistry, screenEntries
 export * from './commit/commit.js'; // createCommit, viewOf (advanced)
 export * from './state/store.js'; // createSessionStore, SessionStore (advanced)
 

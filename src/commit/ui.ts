@@ -35,7 +35,7 @@ import { activeFrame } from '../state/types.js';
 import type { FlowFrame, Session } from '../state/types.js';
 import type { ComponentResult } from '../tree/types.js';
 import { normalizeModalRoot } from '../tree/normalize.js';
-import type { EventTools, PlatformPort, ScreenRegistry, UiToolkit } from '../pipeline/types.js';
+import type { EventTools, PlatformPort, UiToolkit } from '../pipeline/types.js';
 
 export interface MakeUiOptions {
 	/**
@@ -44,8 +44,6 @@ export interface MakeUiOptions {
 	 * closes the session (the store's onEnd wiring does the farewell).
 	 */
 	readonly exit: (session: Session<unknown>, value: unknown, final?: ComponentResult) => void;
-	/** Resolves screen keys for the ui.go/push target validation. Omit for no validation. */
-	readonly screens?: ScreenRegistry;
 }
 
 /** Builds the event-bound toolkit: ui effects plus the task/mutate hooks. */
@@ -62,8 +60,8 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 		// handlers (factories) can. Fail loud rather than navigate to
 		// nothing.
 		const resolve = (verb: 'go' | 'push', frame: FlowFrame, view: string): string => {
-			if (options.screens !== undefined && options.screens.resolve(`${frame.moduleId}/${view}`) === undefined) {
-				throw new Error(`ui.${verb}('${view}') targets no screen in module '${frame.moduleId}' (a renamed screen key?)`);
+			if (frame.token.definition.screens[view] === undefined) {
+				throw new Error(`ui.${verb}('${view}') targets no screen of flow '${frame.flowId}' (a renamed screen key?)`);
 			}
 			return view;
 		};

@@ -1,8 +1,7 @@
 /**
- * Flow layer tests: defineFlow's validations, the lens, the registry
- * erase helper, and the pipeline integration through the action map:
- * resolution after a draw, stale semantics, the error copy hook, and
- * parting bundles on both death paths.
+ * Flow layer tests: defineFlow's validations, the lens, and the pipeline
+ * integration through the action map: resolution after a draw, stale
+ * semantics, the error copy hook, and parting bundles on both death paths.
  *
  * @module flow/__tests__/flow
  */
@@ -34,21 +33,33 @@ import type {
 	PolicyDecision,
 	PolicyPort,
 	PolicyRequest,
-	RegisteredScreen,
 } from '../../pipeline/types.js';
 import { defineFlow } from '../define.js';
 import { viewOf } from '../../commit/commit.js';
 import { screen, subview } from '../screen.js';
 import { kitFor } from '../../tree/kit.js';
 import { getPath, lensSession, setPath } from '../lens.js';
-import { asScreenRegistry, screenEntries } from '../registry.js';
-import { validateFlows } from '../validate.js';
+import { flow } from '../token.js';
+import type { MountToken } from '../token.js';
+import { buildFlowCatalog } from '../../boot/build.js';
+import type { FlowDefinition } from '../types.js';
 import type { ViewSession } from '../types.js';
 
 interface LottoData {
 	count: number;
 	picker: { chosen: string };
 }
+
+/** Hand-built token for a raw definition: the frame resolves its screens through it. */
+const tokenFor = <T,>(definition: FlowDefinition<T>, flowId: string): MountToken =>
+	({ flowId, moduleId: flowId.slice(0, flowId.indexOf('/')), definition }) as unknown as MountToken;
+
+/** Minimal token for sessions that never draw: the store only files it on the root frame. */
+const BARE_TOKEN: MountToken = {
+	flowId: 'lotto/lotto',
+	moduleId: 'lotto',
+	definition: { first: 'main', ttlMs: DEFAULT_TTL_MS, remount: 'coexist', screens: {} },
+} as unknown as MountToken;
 
 describe('defineFlow - validations', () => {
 	it('builds screens with the framework defaults, carrying the declared initialData', () => {
@@ -141,7 +152,7 @@ describe('the drawn session', () => {
 			initialData: { count: 0, picker: { chosen: 'none' } },
 		});
 		const session = createSessionStore().create<LottoData>({
-			flowId: 'lotto',
+			flowId: 'lotto/lotto',
 			moduleId: 'lotto',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
@@ -149,9 +160,10 @@ describe('the drawn session', () => {
 			screen: 'main',
 			ttlMs: DEFAULT_TTL_MS,
 			remount: 'coexist',
+			token: tokenFor(def, 'lotto/lotto'),
 		});
 
-		const tree = viewOf(session, asScreenRegistry(screenEntries('lotto', def)));
+		const tree = viewOf(session);
 
 		// The live session went in, the same object reached the view...
 		expect(seen[0]).toBe(session);
@@ -172,7 +184,7 @@ describe('the drawn session', () => {
 			initialData: { count: 0, picker: { chosen: 'none' } },
 		});
 		const session = createSessionStore().create<LottoData>({
-			flowId: 'lotto',
+			flowId: 'lotto/lotto',
 			moduleId: 'lotto',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
@@ -180,8 +192,9 @@ describe('the drawn session', () => {
 			screen: 'main',
 			ttlMs: DEFAULT_TTL_MS,
 			remount: 'coexist',
+			token: tokenFor(def, 'lotto/lotto'),
 		});
-		expect(() => viewOf(session, asScreenRegistry(screenEntries('lotto', def)))).toThrow(/rule 22/);
+		expect(() => viewOf(session)).toThrow(/rule 22/);
 	});
 });
 
@@ -205,7 +218,7 @@ describe('the lens', () => {
 
 	it('lensSession redirects data to the slot and forwards everything else live', () => {
 		const session = createSessionStore().create<LottoData>({
-			flowId: 'lotto',
+			flowId: 'lotto/lotto',
 			moduleId: 'lotto',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
@@ -213,6 +226,7 @@ describe('the lens', () => {
 			screen: 'main',
 			ttlMs: DEFAULT_TTL_MS,
 			remount: 'coexist',
+			token: BARE_TOKEN,
 		});
 		const lens = lensSession<{ chosen: string }>(session, ['picker']);
 
@@ -227,36 +241,6 @@ describe('the lens', () => {
 
 		activeFrame(session).screen = 'picker.pick'; // navigation writes the frame
 		expect(lens.screen).toBe('picker.pick'); // and the lens forwards the read
-	});
-});
-
-describe('registry population and cross-flow validation', () => {
-	const flow = defineFlow<LottoData>({
-		screens: { main: { view: () => view({}, text('m')) } },
-		first: 'main',
-		initialData: { count: 0, picker: { chosen: 'none' } },
-		parting: { command: 'lotto' },
-	});
-
-	it('screenEntries keys entries and carries the flow slice', () => {
-		const entries = screenEntries('lotto', flow);
-
-		expect(Object.keys(entries)).toEqual(['lotto/main']);
-		expect(entries['lotto/main']?.flow?.parting).toEqual({ command: 'lotto' });
-		expect(asScreenRegistry(entries).resolve('lotto/main')).toBe(entries['lotto/main']);
-	});
-
-	it('validateFlows throws when two flows declare the same screen key', () => {
-		const other = defineFlow<unknown>({ screens: { main: { view: () => view({}, text('o')) } }, first: 'main', initialData: {} });
-		expect(() => validateFlows([
-			{ moduleId: 'lotto', flowId: 'lottoWizard', definition: flow },
-			{ moduleId: 'lotto', flowId: 'otherWizard', definition: other },
-		])).toThrow(/lotto\/main.*lottoWizard.*otherWizard/);
-
-		expect(() => validateFlows([
-			{ moduleId: 'lotto', definition: flow },
-			{ moduleId: 'raffle', definition: other },
-		])).not.toThrow();
 	});
 });
 
@@ -303,7 +287,6 @@ interface World {
 	clock: { now: number; advance: (ms: number) => number };
 	store: SessionStore;
 	session: Session<LottoData>;
-	entries: Record<string, RegisteredScreen>;
 	policy: PolicyPort & { authorize: Mock };
 	platform: PlatformPort;
 	commit: CommitPhase;
@@ -355,7 +338,7 @@ function world(options: WorldOptions = {}): World {
 		throw new Error('boom');
 	};
 
-	const flow = defineFlow<LottoData>({
+	const lotto = flow<LottoData>('lotto', {
 		screens: {
 			main: screen<LottoData>()((data) => view(
 				{},
@@ -382,9 +365,9 @@ function world(options: WorldOptions = {}): World {
 		parting: { command: 'lotto', note: 'The lotto ended.' },
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 	});
+	const catalog = buildFlowCatalog([{ module: 'lotto', flow: lotto }]);
+	const token = catalog.byFlowId.get('lotto/lotto')!;
 
-	const entries: Record<string, RegisteredScreen> = { ...screenEntries('lotto', flow) };
-	const screens = asScreenRegistry(entries);
 	const platform: PlatformPort = {
 		replyToActor: vi.fn(async (textValue: string): Promise<void> => {
 			replies.push(textValue);
@@ -401,13 +384,13 @@ function world(options: WorldOptions = {}): World {
 		}),
 		showModal: vi.fn(async (): Promise<void> => undefined),
 	};
-	const commit = createCommit({ platform, screens });
+	const commit = createCommit({ platform });
 	const store = createSessionStore({
 		now: () => clock.now,
-		onEnd: createOnEnd({ commit, screens }),
+		onEnd: createOnEnd({ commit }),
 	});
 	const session = store.create<LottoData>({
-		flowId: 'lotto',
+		flowId: 'lotto/lotto',
 		moduleId: 'lotto',
 		ownerId: 'u1',
 		messageRef: { channelId: 'c1', messageId: 'm1' },
@@ -415,6 +398,7 @@ function world(options: WorldOptions = {}): World {
 		screen: 'main',
 		ttlMs: DEFAULT_TTL_MS,
 		remount: 'coexist',
+		token,
 	});
 	const policy = {
 		authorize: vi.fn(async (_request: PolicyRequest): Promise<PolicyDecision> => ({ allowed: true })),
@@ -423,7 +407,7 @@ function world(options: WorldOptions = {}): World {
 		store,
 		policy,
 		platform,
-		screens,
+		reviveIndex: catalog.byFlowId,
 		tryRevive: vi.fn(async () => undefined),
 		makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit }),
 		call: {
@@ -450,7 +434,7 @@ function world(options: WorldOptions = {}): World {
 	function click(label: string, overrides: Partial<IncomingEvent> = {}): Promise<void> {
 		return dispatch({
 			kind: EventKind.Button,
-			customId: encodeActionId({ sessionId: session.id, screenKey: `lotto/${session.screen}`, actionHash: hashOf(label) }),
+			customId: encodeActionId({ sessionId: session.id, screenKey: `lotto/lotto/${session.screen}`, actionHash: hashOf(label) }),
 			actorId: 'u1',
 			channelId: 'c1',
 			messageId: 'm1',
@@ -459,7 +443,7 @@ function world(options: WorldOptions = {}): World {
 	}
 
 	return {
-		clock, store, session, entries, policy, platform, commit,
+		clock, store, session, policy, platform, commit,
 		calls, replies, partings, edits, errors, draw, hashOf, click,
 	};
 }
@@ -478,7 +462,7 @@ describe('dispatch - flow integration through the frame', () => {
 	it('a hash the frame does not carry is stale: one snap redraw, no error, no run', async () => {
 		const w = world();
 		await w.draw();
-		const stray = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(() => { }) });
+		const stray = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(() => { }) });
 
 		await w.click('bump', { customId: stray });
 
@@ -524,7 +508,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 		await w.click('boom');
 		expect(w.replies).toEqual(['flow copy']);
-		expect(seen[0].screen).toBe('lotto/main');
+		expect(seen[0].screen).toBe('lotto/lotto/main');
 		expect(seen[0].action).toBe('boom');
 
 		await w.click('boom'); // hook again: replies accumulate per failure
@@ -571,7 +555,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 	it('a dead click edits the message into the flow\'s parting bundle', async () => {
 		const w = world();
-		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/main', actionHash: actionHash(() => { }) });
+		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/lotto/main', actionHash: actionHash(() => { }) });
 
 		await w.click('bump', { customId: id });
 
@@ -613,7 +597,7 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 		draw: () => Promise<void>;
 		clickStamp: (stamp: string) => Promise<void>;
 	} {
-		const flow = defineFlow<ListData>({
+		const list = flow<ListData>('list', {
 			screens: {
 				main: screen<ListData>()((data) => view(
 					{},
@@ -624,7 +608,8 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			first: 'main',
 			initialData: { picked: [] },
 		});
-		const screens = asScreenRegistry(screenEntries('list', flow));
+		const catalog = buildFlowCatalog([{ module: 'list', flow: list }]);
+		const token = catalog.byFlowId.get('list/list')!;
 		const platform: PlatformPort = {
 			replyToActor: vi.fn(async (): Promise<void> => undefined),
 			redraw: vi.fn(async (): Promise<void> => undefined),
@@ -632,10 +617,10 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			editMessage: vi.fn(async (_ref: unknown, _payload: unknown): Promise<void> => undefined),
 			showModal: vi.fn(async (): Promise<void> => undefined),
 		};
-		const commit = createCommit({ platform, screens });
-		const store = createSessionStore({ onEnd: createOnEnd({ commit, screens }) });
+		const commit = createCommit({ platform });
+		const store = createSessionStore({ onEnd: createOnEnd({ commit }) });
 		const session = store.create<ListData>({
-			flowId: 'list',
+			flowId: 'list/list',
 			moduleId: 'list',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
@@ -643,13 +628,14 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			screen: 'main',
 			ttlMs: DEFAULT_TTL_MS,
 			remount: 'coexist',
+			token,
 		});
 		const policy = { authorize: vi.fn(async (_request: PolicyRequest): Promise<PolicyDecision> => ({ allowed: true })) };
 		const dispatch = createDispatch({
 			store,
 			policy,
 			platform,
-			screens,
+			reviveIndex: catalog.byFlowId,
 			tryRevive: vi.fn(async () => undefined),
 			makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit }),
 			call: {
@@ -668,7 +654,7 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 		function clickStamp(stamp: string): Promise<void> {
 			return dispatch({
 				kind: EventKind.Button,
-				customId: encodeActionId({ sessionId: session.id, screenKey: 'list/main', actionHash: stamp }),
+				customId: encodeActionId({ sessionId: session.id, screenKey: 'list/list/main', actionHash: stamp }),
 				actorId: 'u1',
 				channelId: 'c1',
 				messageId: 'm1',

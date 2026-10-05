@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { MountToken } from '../../flow/token.js';
 import { createSessionStore, isExpired } from '../store.js';
 import { activeFrame, DEFAULT_TTL_MS, EndReason, RemountPolicy } from '../types.js';
 import type { CreateSessionInput, RehydrateRow, RehydrateStore } from '../types.js';
 
 const MINUTE = 60_000;
+
+// Minimal token: the store only files it on the root frame.
+const TOKEN = { flowId: 'lotto/host', moduleId: 'lotto' } as unknown as MountToken;
 
 /** Injectable clock: deterministic time, advanced by hand. */
 function clock(): { now: () => number; advance: (ms: number) => void } {
@@ -31,6 +35,7 @@ function input(overrides: Partial<CreateSessionInput<LottoData>> = {}): CreateSe
 		screen: 'main',
 		ttlMs: 30 * MINUTE,
 		remount: RemountPolicy.Coexist,
+		token: TOKEN,
 		...overrides,
 	};
 }

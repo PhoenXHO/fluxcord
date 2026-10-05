@@ -18,7 +18,6 @@
  * @module runtime/create
  */
 
-import { asScreenRegistry } from '../flow/registry.js';
 import type { Flow } from '../flow/token.js';
 import { viewOf } from '../commit/commit.js';
 import { createCommit } from '../commit/commit.js';
@@ -69,13 +68,11 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			// The error unit itself failed; nothing is left to tell.
 		}
 	};
-	const screens = asScreenRegistry(options.flows.entries);
-	const commit = createCommit({ platform: options.platform, screens });
+	const commit = createCommit({ platform: options.platform });
 	const store = createSessionStore({
 		...(options.now !== undefined ? { now: options.now } : {}),
 		onEnd: createOnEnd({
 			commit,
-			screens,
 			// The flow's onSessionEnd hook, resolved per dying session from
 			// the catalog. Caught here: a throwing cleanup is logged, never
 			// allowed to break the death path it rides (store.end is sync).
@@ -97,7 +94,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	// The call engine needs store, queue and commit; the toolkit needs the
 	// engine's exit seam. Order is fixed by those edges.
 	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken, ack: options.platform.ack });
-	const makeUi = createMakeUi({ screens, exit: callEngine.exit });
+	const makeUi = createMakeUi({ exit: callEngine.exit });
 	// The host supplies the bridge (editMessage, replyToActor, showModal);
 	// the commit phase owns redraw and the parting edit. Compose them once;
 	// dispatch, mount and the toolkit all see this one port.
@@ -144,6 +141,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			ttlMs: token.definition.ttlMs,
 			remount: token.definition.remount,
 			rehydrate: { ref: row.ref },
+			token,
 		});
 	}
 
@@ -151,7 +149,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		store,
 		policy: options.policy,
 		platform,
-		screens,
+		reviveIndex: options.flows.byFlowId,
 		tryRevive,
 		makeUi,
 		call: callEngine,
@@ -237,6 +235,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 					modalNonce: generateId(),
 					actions: {},
 					slot: [],
+					token: registered,
 				},
 			],
 			pending: new Map(),
@@ -247,7 +246,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 				return this.frames[this.frames.length - 1].history;
 			},
 		};
-		const firstTree = viewOf(draft, screens);
+		const firstTree = viewOf(draft);
 		const materialized = materializeTree(firstTree);
 		const payload = renderV2Message(firstTree, id, `${moduleId}/${def.first}`, materialized.stampOf);
 
@@ -265,6 +264,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			...(ceiling !== undefined ? { expiresAt: at + ceiling } : {}),
 			remount: def.remount,
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrate: { ref: mountOptions.rehydrateRef } } : {}),
+			token: registered,
 		});
 		// The message went out carrying firstTree's controls; the root
 		// frame's action map must be that tree's materialization, or its own

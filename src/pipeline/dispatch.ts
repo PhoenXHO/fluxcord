@@ -45,7 +45,7 @@ import type { SessionStore } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
 import type { Session } from '../state/types.js';
 import { getPath, lensSession } from '../flow/lens.js';
-import type { Flow } from '../flow/token.js';
+import type { Flow, MountToken } from '../flow/token.js';
 import { EventKind, ErrorSource } from './types.js';
 import type {
 	ActionEvent,
@@ -54,11 +54,9 @@ import type {
 	ErrorHandler,
 	ErrorReport,
 	EventTools,
-	FlowContext,
 	IncomingEvent,
 	PlatformPort,
 	PolicyPort,
-	ScreenRegistry,
 	TryRevive,
 } from './types.js';
 import { createSessionQueue } from './queue.js';
@@ -101,8 +99,12 @@ export interface DispatchOptions {
 	readonly policy: PolicyPort;
 	/** The outgoing side: actor replies, redraws, parting edits. */
 	readonly platform: PlatformPort;
-	/** Resolves screen keys to screens. */
-	readonly screens: ScreenRegistry;
+	/**
+	 * The revive index (`flowId` -> token). Dead-session parting resolves
+	 * the wire key's flowId through it, so a dead click carries the same
+	 * goodbye the sweeper would have left.
+	 */
+	readonly reviveIndex: ReadonlyMap<string, MountToken>;
 	/** The dead-click revive seam. */
 	readonly tryRevive: TryRevive;
 	/**
@@ -214,7 +216,7 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 	interface FailureSite {
 		readonly screenKey: string;
 		readonly action?: string;
-		readonly flow?: FlowContext;
+		readonly onError?: (report: ErrorReport) => string | undefined;
 	}
 
 	/**
@@ -243,9 +245,9 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 			reply: (text: string) => options.platform.replyToActor(text),
 		};
 		let suggestedReply: string | undefined;
-		if (site?.flow?.onError !== undefined) {
+		if (site?.onError !== undefined) {
 			try {
-				suggestedReply = site.flow.onError(report);
+				suggestedReply = site.onError(report);
 			} catch (hookError) {
 				console.error('[fluxcord] flow onError hook failed:', hookError);
 			}
@@ -266,17 +268,20 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 			reportFailure(new Error('dead path without a channelId; cannot commit the parting view'), incoming);
 			return;
 		}
-		// The click's address identifies the screen even on a dead session:
-		// its flow's parting bundle rides along, so a dead click and the
-		// sweeper produce the same goodbye. The command hint (from the
-		// mounting command) is the fallback copy when the flow stays silent.
-		const flow = address !== undefined
-			? options.screens.resolve(address.screenKey)?.flow
-			: undefined;
+		// The click's wire key carries the flowId (everything before the
+		// last '/'), so the revive index hands back the flow's parting
+		// bundle even with no session left: a dead click and the sweeper
+		// produce the same goodbye. The command hint (from the mounting
+		// command) is the fallback copy when the flow stays silent.
+		let token: MountToken | undefined;
+		if (address !== undefined) {
+			const flowId = address.screenKey.slice(0, address.screenKey.lastIndexOf('/'));
+			token = options.reviveIndex.get(flowId);
+		}
 		await options.platform.commitParting(
 			{ channelId: incoming.channelId, messageId: incoming.messageId },
-			flow?.parting,
-			flow?.commandHint,
+			token?.definition.parting,
+			token?.commandHint,
 		);
 	}
 
@@ -313,9 +318,8 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				return;
 			}
 
-			const screenKey = `${frame.moduleId}/${frame.screen}`;
-			const screen = options.screens.resolve(screenKey);
-			if (screen === undefined) {
+			const screenKey = `${frame.flowId}/${frame.screen}`;
+			if (frame.token.definition.screens[frame.screen] === undefined) {
 				throw new Error(`no screen registered for '${screenKey}'`);
 			}
 
@@ -350,7 +354,7 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				}
 				record = found;
 			}
-			site = { screenKey, action: record.label, flow: screen.flow };
+			site = { screenKey, action: record.label, onError: frame.token.definition.onError };
 
 			const decision = await options.policy.authorize({
 				actorId: incoming.actorId,

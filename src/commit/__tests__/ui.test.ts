@@ -9,16 +9,27 @@
 
 import { describe, expect, it } from 'vitest';
 import { createMakeUi } from '../ui.js';
+import { buildFlowCatalog } from '../../boot/build.js';
+import { flow } from '../../flow/token.js';
 import { createSessionStore } from '../../state/store.js';
 import { activeFrame, DEFAULT_TTL_MS } from '../../state/types.js';
 import { input, modal, text, view } from '../../tree/builders.js';
-import type { RegisteredScreen, ScreenRegistry, PlatformPort, UiToolkit } from '../../pipeline/types.js';
+import type { PlatformPort, UiToolkit } from '../../pipeline/types.js';
 import type { Session } from '../../state/types.js';
 import type { ComponentResult } from '../../tree/types.js';
 import type { ActionAddress } from '../../render/id-codec.js';
 
-const ADDRESS = { sessionId: 's1', screenKey: 'm/menu', actionHash: 'h0' } as ActionAddress;
+const ADDRESS = { sessionId: 's1', screenKey: 'm/f/menu', actionHash: 'h0' } as ActionAddress;
 const PLATFORM = {} as PlatformPort;
+
+// Real token: the verbs resolve their targets through the frame's screens.
+const TOKEN = buildFlowCatalog([{
+	module: 'm',
+	flow: flow<void, 'menu' | 'counter' | 'picker'>('f', {
+		first: 'menu',
+		screens: { menu: { view: () => text('menu') }, counter: { view: () => text('counter') }, picker: { view: () => text('picker') } },
+	}),
+}]).byFlowId.get('m/f')!;
 
 /** A session on a known screen with hand-set history: the verb's starting state. */
 function onScreen(
@@ -28,7 +39,7 @@ function onScreen(
 ): { session: Session<Record<string, never>>; ui: UiToolkit } {
 	const store = createSessionStore();
 	const session = store.create<Record<string, never>>({
-		flowId: 'f',
+		flowId: 'm/f',
 		moduleId: 'm',
 		ownerId: 'u1',
 		messageRef: { channelId: 'c1', messageId: 'm1' },
@@ -36,17 +47,11 @@ function onScreen(
 		screen,
 		ttlMs: DEFAULT_TTL_MS,
 		remount: 'replace',
+		token: TOKEN,
 	});
 	activeFrame(session).history = [...history];
 	const { ui } = createMakeUi({ exit: () => {} })(session, ADDRESS, platform);
 	return { session, ui };
-}
-
-/** A registry that resolves exactly the given '<module>/<screen>' keys. */
-function registry(keys: readonly string[]): ScreenRegistry {
-	return {
-		resolve: (key) => (keys.includes(key) ? {} as unknown as RegisteredScreen : undefined),
-	};
 }
 
 describe('ui.go (smart)', () => {
@@ -136,23 +141,23 @@ describe('the backstop (stringly targets)', () => {
 	it('go throws on a target that resolves to no screen', () => {
 		const store = createSessionStore();
 		const session = store.create<Record<string, never>>({
-			flowId: 'f', moduleId: 'm', ownerId: 'u1',
+			flowId: 'm/f', moduleId: 'm', ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
-			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
+			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace', token: TOKEN,
 		});
-		const { ui } = createMakeUi({ exit: () => {}, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
-		expect(() => ui.go('nope')).toThrow(/targets no screen in module/);
+		const { ui } = createMakeUi({ exit: () => {} })(session, ADDRESS, PLATFORM);
+		expect(() => ui.go('nope')).toThrow(/targets no screen of flow/);
 	});
 
 	it('push throws the same way', () => {
 		const store = createSessionStore();
 		const session = store.create<Record<string, never>>({
-			flowId: 'f', moduleId: 'm', ownerId: 'u1',
+			flowId: 'm/f', moduleId: 'm', ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
-			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
+			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace', token: TOKEN,
 		});
-		const { ui } = createMakeUi({ exit: () => {}, screens: registry(['m/menu', 'm/counter']) })(session, ADDRESS, PLATFORM);
-		expect(() => ui.push('nope')).toThrow(/targets no screen in module/);
+		const { ui } = createMakeUi({ exit: () => {} })(session, ADDRESS, PLATFORM);
+		expect(() => ui.push('nope')).toThrow(/targets no screen of flow/);
 	});
 });
 
@@ -167,9 +172,9 @@ describe('ui.exit - the injected seam', () => {
 	function world(): ExitWorld {
 		const store = createSessionStore();
 		const session = store.create<Record<string, never>>({
-			flowId: 'f', moduleId: 'm', ownerId: 'u1',
+			flowId: 'm/f', moduleId: 'm', ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
-			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace',
+			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace', token: TOKEN,
 		});
 		const exits: ExitWorld['exits'] = [];
 		const { ui } = createMakeUi({

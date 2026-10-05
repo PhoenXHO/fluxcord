@@ -20,6 +20,7 @@
 
 import type { ViewNode } from '../tree/types.js';
 import type { ActionHandler, ActionRecord, PermissionPolicy } from '../pipeline/types.js';
+import type { MountToken } from '../flow/token.js';
 
 // --- Live-message shapes ---------------------------------------------------------
 
@@ -114,6 +115,13 @@ export interface FlowFrame {
 	 * flow. Dispatch lenses the frame's handlers and views to this path.
 	 */
 	slot: readonly string[];
+	/**
+	 * The flow's assembled token: screens, wrap, parting copy, hooks and
+	 * command hint travel with the frame, so drawing, navigation and the
+	 * death paths read this frame's own flow and no global registry
+	 * exists. Fixed at frame creation.
+	 */
+	readonly token: MountToken;
 }
 
 /**
@@ -222,6 +230,8 @@ export interface CreateSessionInput<TData> {
 	readonly expiresAt?: number;
 	/** The flow's remount policy ({@link RemountPolicy}). */
 	readonly remount: RemountPolicy;
+	/** The flow's assembled token; the root frame carries it. */
+	readonly token: MountToken;
 	/** Present when the flow opted into rehydration. */
 	readonly rehydrate?: {
 		/** The flow's pointer into its own database, e.g. `'lotto:8421'`. */

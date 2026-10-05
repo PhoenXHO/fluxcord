@@ -165,7 +165,7 @@ describe('renderV2Message - select', () => {
 			options: [{ label: 'A', value: 'a', default: true }, { label: 'B', value: 'b' }],
 			values: ['b'],
 		});
-		const replacedWire = render(view({}, row({}, replaced))).components[0].components as unknown as [{
+		const replacedWire = (render(view({}, row({}, replaced))).components[0] as { components: unknown }).components as unknown as [{
 			options: { value: string; default?: boolean }[];
 		}];
 		expect(replacedWire[0].options).toEqual([
@@ -178,7 +178,7 @@ describe('renderV2Message - select', () => {
 			options: [{ label: 'A', value: 'a', default: true }],
 			values: ['zz'],
 		});
-		const fallbackWire = render(view({}, row({}, fallback))).components[0].components as unknown as [{
+		const fallbackWire = (render(view({}, row({}, fallback))).components[0] as { components: unknown }).components as unknown as [{
 			options: { value: string; default?: boolean }[];
 		}];
 		expect(fallbackWire[0].options).toEqual([{ label: 'A', value: 'a', default: true }]);
@@ -191,7 +191,7 @@ describe('renderV2Message - select', () => {
 			values: ['a', 'c'],
 			maxSelected: 2,
 		});
-		const wire = render(view({}, row({}, select))).components[0].components as unknown as [{
+		const wire = (render(view({}, row({}, select))).components[0] as { components: unknown }).components as unknown as [{
 			options: { value: string; default?: boolean }[];
 		}];
 		expect(wire[0].options).toEqual([

@@ -41,6 +41,17 @@ const CHILD_TOKEN: MountToken<ChildData> = {
 	} as unknown as FlowDefinition<ChildData>,
 };
 
+const ROOT_TOKEN: MountToken = {
+	flowId: 'mod/root',
+	moduleId: 'mod',
+	definition: {
+		first: 'root',
+		ttlMs: DEFAULT_TTL_MS,
+		remount: 'coexist',
+		screens: {},
+	} as unknown as FlowDefinition,
+};
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 /** One macrotask turn: queue chains settle in microtasks, the gate release needs a real turn. */
 const tick = async (): Promise<void> => sleep(0);
@@ -69,6 +80,7 @@ function world(commitOverride?: (session: Session<unknown>) => Promise<void>): {
 		screen: 'root',
 		ttlMs: DEFAULT_TTL_MS,
 		remount: 'coexist',
+		token: ROOT_TOKEN,
 	});
 	const realQueue = createSessionQueue();
 	const suspended: string[] = [];

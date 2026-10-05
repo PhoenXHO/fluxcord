@@ -119,6 +119,7 @@ export function createCall(options: CallOptions): CallEngine {
 				modalNonce: generateId(),
 				actions: {},
 				slot,
+				token,
 			};
 			// The parked promise. Its resolve/reject are the buttons: they
 			// sit in session.pending under the child frame's id until an

@@ -16,6 +16,7 @@ import { activeFrame } from '../../state/types.js';
 import type { Session } from '../../state/types.js';
 import { text, view } from '../../tree/builders.js';
 import type { ViewNode } from '../../tree/types.js';
+import type { MountToken } from '../../flow/token.js';
 import type { Dispatch } from '../dispatch.js';
 import { DEFAULT_DENY_MESSAGE, DEFAULT_ERROR_MESSAGE, createDispatch } from '../dispatch.js';
 import { EventKind } from '../types.js';
@@ -26,8 +27,6 @@ import type {
 	PlatformPort,
 	PolicyDecision,
 	PolicyPort,
-	RegisteredScreen,
-	ScreenRegistry,
 } from '../types.js';
 
 interface LottoData {
@@ -79,7 +78,7 @@ interface World {
 	policy: PolicyPort & { decide(next: PolicyDecision): void };
 	platform: PlatformPort;
 	calls: string[];
-	screens: ScreenRegistry;
+	token: MountToken;
 	tryRevive: Mock;
 	errors: ErrorReport[];
 	dispatch: Dispatch;
@@ -89,9 +88,18 @@ interface World {
 /** The wired world: real store + one registered screen + recorded everything. */
 function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: boolean } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
+	// Hand-built token: dispatch never renders, it only checks screen
+	// membership and reads the flow's onError. Unfrozen so tests patch it.
+	const definition = {
+		first: 'main',
+		ttlMs: 30 * 60 * 1000,
+		remount: 'coexist',
+		screens: { main: { view: (): ViewNode => lottoView } },
+	};
+	const token = { flowId: 'lotto/lotto', moduleId: 'lotto', definition } as unknown as MountToken;
 	const store = createSessionStore({ now: () => clock.now });
 	const session = store.create<LottoData>({
-		flowId: 'lotto',
+		flowId: 'lotto/lotto',
 		moduleId: 'lotto',
 		ownerId: OWNER_ID,
 		messageRef: { channelId: CHANNEL_ID, messageId: MESSAGE_ID },
@@ -99,15 +107,12 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		screen: 'main',
 		ttlMs: 30 * 60 * 1000,
 		remount: 'coexist',
+		token,
 	});
 
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
 	const policy = fakePolicy();
 	const { platform, calls } = fakePlatform();
-	const screens: ScreenRegistry = {
-		resolve: (viewKey: string): RegisteredScreen | undefined =>
-			viewKey === 'lotto/main' ? { view: () => lottoView } : undefined,
-	};
 	// The action map a real commit phase would have written: the drawn
 	// message carried one button, 'join', bound to the spy. Tests that
 	// want a stale map empty it by hand.
@@ -137,7 +142,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		store,
 		policy,
 		platform,
-		screens,
+		reviveIndex: new Map([['lotto/lotto', token]]),
 		tryRevive,
 		makeUi: () => tools,
 		// No call engine under test here: handlers that call throw, and the
@@ -164,7 +169,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 	function click(overrides: Partial<IncomingEvent> = {}): Promise<void> {
 		return dispatch({
 			kind: EventKind.Button,
-			customId: encodeActionId({ sessionId: session.id, screenKey: 'lotto/main', actionHash: actionHash(handler) }),
+			customId: encodeActionId({ sessionId: session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(handler) }),
 			actorId: OWNER_ID,
 			channelId: CHANNEL_ID,
 			messageId: MESSAGE_ID,
@@ -172,7 +177,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		});
 	}
 
-	return { clock, store, session, handler, tools, policy, platform, calls, screens, tryRevive, errors, dispatch, click };
+	return { clock, store, session, handler, tools, policy, platform, calls, token, tryRevive, errors, dispatch, click };
 }
 
 describe('dispatch - allow path', () => {
@@ -209,7 +214,7 @@ describe('dispatch - allow path', () => {
 	it('passes modal inputs through, keyed by authored input id', async () => {
 		const w = world();
 		activeFrame(w.session).modalHandler = w.handler; // what showModal records when the modal opens
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${activeFrame(w.session).modalNonce}`, inputs: { amount: '10' } });
 
 		expect(w.handler.mock.calls[0][0].inputs).toEqual({ amount: '10' });
@@ -220,7 +225,7 @@ describe('dispatch - allow path', () => {
 		activeFrame(w.session).modalHandler = w.handler;
 		// A ui.go() before showModal strands the old address; the submit
 		// still finds its handler because routing never read the hash.
-		const elsewhere = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/confirm', actionHash: actionHash(() => { }) });
+		const elsewhere = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/confirm', actionHash: actionHash(() => { }) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${elsewhere}~${activeFrame(w.session).modalNonce}`, inputs: { amount: '10' } });
 
 		expect(w.handler).toHaveBeenCalledTimes(1);
@@ -233,18 +238,18 @@ describe('dispatch - allow path', () => {
 		// The shape event.call builds: the top frame owns a slot, and the
 		// opener's action record carries it.
 		frame.slot = ['delivery'];
-		(w.session.data as Record<string, unknown>).delivery = {};
-		frame.actions[actionHash(w.handler)] = { handler: w.handler, label: 'set-address', slot: ['delivery'] };
+		(w.session.data as unknown as Record<string, unknown>).delivery = {};
+		frame.actions = { ...frame.actions, [actionHash(w.handler)]: { handler: w.handler, label: 'set-address', slot: ['delivery'] } };
 		frame.modalHandler = w.handler;
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${frame.modalNonce}`, inputs: { address: '221B' } });
 
 		const event = w.handler.mock.calls[0][0];
 		event.mutate((d: Record<string, unknown>) => {
 			d.address = '221B';
 		});
-		expect((w.session.data as Record<string, unknown>).delivery).toEqual({ address: '221B' });
-		expect((w.session.data as Record<string, unknown>).address).toBeUndefined();
+		expect((w.session.data as unknown as Record<string, unknown>).delivery).toEqual({ address: '221B' });
+		expect((w.session.data as unknown as Record<string, unknown>).address).toBeUndefined();
 	});
 
 	it('slides the TTL window: a click touches the session', async () => {
@@ -294,9 +299,7 @@ describe('dispatch - the error socket', () => {
 	it('a framework failure with the flow\'s chosen copy replies with it', async () => {
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		const w = world({ omitErrorHandler: true });
-		w.screens.resolve = (viewKey: string): RegisteredScreen | undefined => viewKey === 'lotto/main'
-			? { view: (): ViewNode => lottoView, flow: { onError: (): string => 'flow words' } }
-			: undefined;
+		(w.token.definition as { onError?: (report: ErrorReport) => string }).onError = (): string => 'flow words';
 		w.policy.authorize = vi.fn(async (): Promise<PolicyDecision> => {
 			throw new Error('policy exploded');
 		});
@@ -320,8 +323,8 @@ describe('dispatch - the permission choke point', () => {
 			ownerId: OWNER_ID,
 			guildId: 'guild-1',
 			channelId: CHANNEL_ID,
-			flowId: 'lotto',
-			view: 'lotto/main',
+			flowId: 'lotto/lotto',
+			view: 'lotto/lotto/main',
 		});
 	});
 
@@ -335,8 +338,8 @@ describe('dispatch - the permission choke point', () => {
 			ownerId: OWNER_ID,
 			guildId: 'guild-1',
 			channelId: CHANNEL_ID,
-			flowId: 'lotto',
-			view: 'lotto/main',
+			flowId: 'lotto/lotto',
+			view: 'lotto/lotto/main',
 		});
 	});
 
@@ -351,8 +354,8 @@ describe('dispatch - the permission choke point', () => {
 			ownerId: OWNER_ID,
 			guildId: 'guild-1',
 			channelId: CHANNEL_ID,
-			flowId: 'lotto',
-			view: 'lotto/main',
+			flowId: 'lotto/lotto',
+			view: 'lotto/lotto/main',
 			actionPolicy: gate,
 		});
 	});
@@ -362,7 +365,7 @@ describe('dispatch - the permission choke point', () => {
 		const gate = { owner: { ownerOnly: false } };
 		activeFrame(w.session).modalHandler = w.handler; // what showModal records when the modal opens
 		activeFrame(w.session).modalPolicy = gate; // and the opener's policy alongside it
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${activeFrame(w.session).modalNonce}`, inputs: {} });
 
 		expect(w.policy.authorize).toHaveBeenCalledTimes(1);
@@ -420,7 +423,7 @@ describe('dispatch - auto-redraw', () => {
 describe('dispatch - dead paths', () => {
 	it('unknown session: revive consulted, then parting edit', async () => {
 		const w = world();
-		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ customId: id });
 
 		expect(w.tryRevive).toHaveBeenCalledWith('zzzzzzzz', MESSAGE_ID);
@@ -481,7 +484,7 @@ describe('dispatch - dead paths', () => {
 
 	it('modal submit without a nonce suffix: same malformed path', async () => {
 		const w = world();
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: id });
 
 		expect(w.errors).toHaveLength(1);
@@ -490,7 +493,7 @@ describe('dispatch - dead paths', () => {
 
 	it('dead path without a channelId: logged, nothing committed', async () => {
 		const w = world();
-		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ customId: id, channelId: undefined });
 
 		expect(w.errors).toHaveLength(1);
@@ -512,7 +515,7 @@ describe('dispatch - staleness (the frame wins)', () => {
 	it('stale modal submit (nonce mismatch): redraw, run nothing', async () => {
 		const w = world();
 		activeFrame(w.session).modalHandler = w.handler;
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~stale1234`, inputs: { amount: '10' } });
 
 		expect(w.calls).toEqual(['redraw:main']);
@@ -521,7 +524,7 @@ describe('dispatch - staleness (the frame wins)', () => {
 
 	it('modal submit with no recorded opener: stale semantics - redraw, run nothing', async () => {
 		const w = world();
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${activeFrame(w.session).modalNonce}`, inputs: { amount: '10' } });
 
 		expect(w.calls).toEqual(['redraw:main']);
@@ -560,7 +563,7 @@ describe('dispatch - the error socket', () => {
 	it('routes pipeline failures as source framework, no session attached', async () => {
 		const w = world();
 		activeFrame(w.session).screen = 'ghost';
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/ghost', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/ghost', actionHash: actionHash(w.handler) });
 		await w.click({ customId: id });
 
 		expect(w.errors).toHaveLength(1);
@@ -580,7 +583,7 @@ describe('dispatch - the error socket', () => {
 		// Framework failures log but never reply: "try again" advice would be useless.
 		w.calls.length = 0;
 		activeFrame(w.session).screen = 'ghost';
-		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/ghost', actionHash: actionHash(w.handler) });
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/ghost', actionHash: actionHash(w.handler) });
 		await w.click({ customId: id });
 		expect(w.calls).toEqual([]);
 		log.mockRestore();
@@ -632,7 +635,7 @@ describe('dispatch - the per-session line', () => {
 	it('different sessions never block each other', async () => {
 		const w = world();
 		const other = w.store.create<LottoData>({
-			flowId: 'lotto',
+			flowId: 'lotto/lotto',
 			moduleId: 'lotto',
 			ownerId: 'user-2',
 			messageRef: { channelId: CHANNEL_ID, messageId: 'message-2' },
@@ -640,6 +643,7 @@ describe('dispatch - the per-session line', () => {
 			screen: 'main',
 			ttlMs: 30 * 60 * 1000,
 			remount: 'coexist',
+			token: w.token,
 		});
 		activeFrame(other).actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join' } };
 
@@ -653,7 +657,7 @@ describe('dispatch - the per-session line', () => {
 		});
 
 		const blocked = w.click();
-		const otherId = encodeActionId({ sessionId: other.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		const otherId = encodeActionId({ sessionId: other.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
 		const free = w.click({ customId: otherId, actorId: 'user-2', messageId: 'message-2' });
 
 		// The other session's handler completes while the first is parked.
