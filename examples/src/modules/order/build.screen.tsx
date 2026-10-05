@@ -50,7 +50,7 @@ const customize = action<OrderData>()(e => {
 // and the child's bag nests under the slot named by `as`. While the child
 // runs, its screens own the message.
 const openDelivery = action<OrderData>()(async e => {
-	await e.call(deliveryFlow, { as: 'delivery' });
+	await e.call(deliveryFlow, { as: 'delivery', args: e.session.data.delivery });
 });
 
 function headline({ size }: OrderData): string {

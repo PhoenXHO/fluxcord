@@ -227,6 +227,26 @@ describe('dispatch - allow path', () => {
 		expect(w.handler.mock.calls[0][0].inputs).toEqual({ amount: '10' });
 	});
 
+	it('a modal submit lenses to the opener\'s slot, so a called flow\'s modal writes its own bag', async () => {
+		const w = world();
+		const frame = activeFrame(w.session);
+		// The shape event.call builds: the top frame owns a slot, and the
+		// opener's action record carries it.
+		frame.slot = ['delivery'];
+		(w.session.data as Record<string, unknown>).delivery = {};
+		frame.actions[actionHash(w.handler)] = { handler: w.handler, label: 'set-address', slot: ['delivery'] };
+		frame.modalHandler = w.handler;
+		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
+		await w.click({ kind: EventKind.ModalSubmit, customId: `${id}~${frame.modalNonce}`, inputs: { address: '221B' } });
+
+		const event = w.handler.mock.calls[0][0];
+		event.mutate((d: Record<string, unknown>) => {
+			d.address = '221B';
+		});
+		expect((w.session.data as Record<string, unknown>).delivery).toEqual({ address: '221B' });
+		expect((w.session.data as Record<string, unknown>).address).toBeUndefined();
+	});
+
 	it('slides the TTL window: a click touches the session', async () => {
 		const w = world();
 		w.clock.advance(10 * 60 * 1000);

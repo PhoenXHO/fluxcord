@@ -332,10 +332,15 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 					if (!justRevived) await options.platform.redraw(session);
 					return;
 				}
+				// The opener's slot rides along: the submit must lens to the
+				// same bag slice the opening click did, or a modal in a called
+				// flow would write to the root bag and lose the data.
+				const opener = frame.actions[address.actionHash];
 				record = {
 					handler: frame.modalHandler,
-					label: frame.actions[address.actionHash]?.label ?? 'modal',
+					label: opener?.label ?? 'modal',
 					...(frame.modalPolicy !== undefined ? { policy: frame.modalPolicy } : {}),
+					...(opener?.slot !== undefined ? { slot: opener.slot } : {}),
 				};
 			} else {
 				const found = frame.actions[address.actionHash];

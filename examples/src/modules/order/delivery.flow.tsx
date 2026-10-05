@@ -27,7 +27,7 @@ const setAddress = action<DeliveryData>()(e => {
 	if (e.kind !== EventKind.ModalSubmit) {
 		void e.ui.showModal(
 			<modal title="Delivery address">
-				<input id="address" label="Where to?" required maxLength={100} placeholder="Street and number" />
+				<input id="address" label="Where to?" required maxLength={100} placeholder="Street and number" value={e.session.data.address} />
 			</modal>,
 		);
 		return;
