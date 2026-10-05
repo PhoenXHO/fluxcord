@@ -6,12 +6,12 @@ import { counterCommand } from './modules/counter.js';
 import { diceCommand } from './modules/dice.js';
 import { orderCommand } from './modules/order/index.js';
 import { campfireFlow } from './modules/campfire.js';
-import { staffCommand, staffPolicy } from './modules/staff.js';
+import { staffCommand, staffFacts } from './modules/staff.js';
 import { timerCommand } from './modules/timer.js';
 import { rehydrateStore } from './rehydrate-store.js';
 
 const bot = createBot({
-	policy: staffPolicy,
+	policy: staffFacts,
 	rehydrate: rehydrateStore,
 	modules: [
 		{ name: 'about', commands: [aboutCommand] },

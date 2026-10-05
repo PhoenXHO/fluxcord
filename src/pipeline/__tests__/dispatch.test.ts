@@ -18,6 +18,7 @@ import { text, view } from '../../tree/builders.js';
 import type { ViewNode } from '../../tree/types.js';
 import type { MountToken } from '../../flow/token.js';
 import type { Dispatch } from '../dispatch.js';
+import { policy } from '../policy.js';
 import { DEFAULT_DENY_MESSAGE, DEFAULT_ERROR_MESSAGE, createDispatch } from '../dispatch.js';
 import { EventKind } from '../types.js';
 import type {
@@ -345,7 +346,7 @@ describe('dispatch - the permission choke point', () => {
 
 	it('a control-declared gate rides the one question as actionPolicy', async () => {
 		const w = world();
-		const gate = { owner: { ownerOnly: false } };
+		const gate = policy.owner();
 		activeFrame(w.session).actions = { [actionHash(w.handler)]: { handler: w.handler, label: 'join', policy: gate } };
 		await w.click({ guildId: 'guild-1' });
 
@@ -362,7 +363,7 @@ describe('dispatch - the permission choke point', () => {
 
 	it('a modal submit consults under the gate the opening button carried', async () => {
 		const w = world();
-		const gate = { owner: { ownerOnly: false } };
+		const gate = policy.owner();
 		activeFrame(w.session).modalHandler = w.handler; // what showModal records when the modal opens
 		activeFrame(w.session).modalPolicy = gate; // and the opener's policy alongside it
 		const id = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });

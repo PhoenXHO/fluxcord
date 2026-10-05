@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { policy } from '../../pipeline/policy.js';
 import { actionHash } from '../../render/action-hash.js';
 import { button, container, optionSelect, row, text, view } from '../../tree/builders.js';
 import { kitFor } from '../../tree/kit.js';
@@ -99,19 +100,19 @@ describe('materializeTree - the action map', () => {
 	});
 
 	it('a control-declared policy rides its record; undeclared stays absent', () => {
-		const gate = { owner: { ownerOnly: false } };
+		const gate = policy.owner();
 		const open = button({ onClick: (): void => {}, label: 'Open', policy: gate });
 		const plain = button({ onClick: (): void => {}, label: 'Plain' });
 		const picked = optionSelect({
 			onSelect: (): void => {},
 			options: [{ label: 'A', value: 'a' }],
-			policy: { owner: { ownerOnly: true, allowAdminOverride: true } },
+			policy: policy.privilege('mod'),
 		});
 		const { actions, stampOf } = materializeTree(view({}, row({}, open, plain, picked)));
 
 		expect(actions[stampOf(open)].policy).toBe(gate);
 		expect('policy' in actions[stampOf(plain)]).toBe(false);
-		expect(actions[stampOf(picked)].policy).toEqual({ owner: { ownerOnly: true, allowAdminOverride: true } });
+		expect(actions[stampOf(picked)].policy).toEqual(policy.privilege('mod'));
 	});
 
 	it('an untagged control carries no slot: dispatch falls back to the screen lens', () => {

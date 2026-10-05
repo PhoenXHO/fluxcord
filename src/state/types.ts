@@ -19,7 +19,7 @@
  */
 
 import type { ViewNode } from '../tree/types.js';
-import type { ActionHandler, ActionRecord, PermissionPolicy } from '../pipeline/types.js';
+import type { ActionHandler, ActionRecord, Policy } from '../pipeline/types.js';
 import type { MountToken } from '../flow/token.js';
 
 // --- Live-message shapes ---------------------------------------------------------
@@ -108,7 +108,7 @@ export interface FlowFrame {
 	 * opened, so the gate cannot be looked up again at submit time; it is
 	 * snapshotted next to `modalHandler` and the submit answers under it.
 	 */
-	modalPolicy?: PermissionPolicy;
+	modalPolicy?: Policy;
 	/**
 	 * The bag path this frame's data lives at under the root bag: empty
 	 * for the root frame, one more key per `event.call` that opened this

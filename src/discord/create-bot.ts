@@ -9,9 +9,10 @@
  * cover) and `mount` (programmatic panels). The standalone pieces remain
  * exported for custom hosts; they are just no longer the front door.
  *
- * The shipped permission default is ownership: a panel belongs to
- * whoever opened it and everyone else gets a denial. A `policy` option
- * replaces it with any PolicyPort engine.
+ * The shipped permission default is open: nothing is gated unless a
+ * policy says so. A `policy` option either names the privilege facts the
+ * shipped engine evaluates against, or replaces the engine with any
+ * PolicyPort.
  *
  * The conventional environment variables spare the common host any
  * plumbing: an omitted `token`, `guildId` or `devGuildId` option falls
@@ -27,7 +28,9 @@ import { buildFlowCatalog } from '../boot/build.js';
 import { moduleFlowRegistrations } from '../command/harvest.js';
 import type { FlowSourceModule } from '../command/harvest.js';
 import type { Flow } from '../flow/token.js';
-import { DEFAULT_DENY_MESSAGE, defaultOnError } from '../pipeline/dispatch.js';
+import { defaultOnError } from '../pipeline/dispatch.js';
+import { createDefaultPolicyEngine, isPolicyPort } from '../pipeline/policy.js';
+import type { PrivilegeFacts } from '../pipeline/policy.js';
 import { ErrorSource } from '../pipeline/types.js';
 import type { ErrorHandler, PolicyPort } from '../pipeline/types.js';
 import type { RehydrateStore } from '../state/types.js';
@@ -82,8 +85,13 @@ export interface CreateBotOptions {
 	 * feeds the default path. Omit for the default bulk `set()`.
 	 */
 	readonly registerCommands?: (client: Client<true>, commands: readonly CommandRegistration[]) => Promise<void>;
-	/** The permission engine behind every click. Default: the panel's owner only. */
-	readonly policy?: PolicyPort;
+	/**
+	 * The permission layer. Pass the facts object (`{ privileges }`) and
+	 * the shipped engine evaluates the authored policy vocabulary against
+	 * it; pass your own `PolicyPort` and the engine is out entirely.
+	 * Default: nothing is gated.
+	 */
+	readonly policy?: PolicyPort | PrivilegeFacts;
 	/** Gateway intents for the built client. Default: `[Guilds]`. */
 	readonly intents?: readonly GatewayIntentBits[];
 	/**
@@ -115,13 +123,14 @@ export interface Bot {
 	readonly mount: <TData>(flow: Flow<TData>, options: MountOptions) => Promise<MountHandle<TData>>;
 }
 
-/** The shipped permission engine: a panel belongs to whoever opened it. */
-const ownerOnlyPolicy: PolicyPort = {
-	authorize: (request) =>
-		request.actorId === request.ownerId
-			? Promise.resolve({ allowed: true })
-			: Promise.resolve({ allowed: false, denyMessage: DEFAULT_DENY_MESSAGE }),
-};
+/** The shipped posture when the host declares no policy anywhere: nothing is gated. */
+const openPolicy: PolicyPort = { authorize: () => Promise.resolve({ allowed: true }) };
+
+/** Facts object in, engine out; a custom port passes through unchanged; nothing declared means nothing is gated. */
+function normalizePolicy(value: PolicyPort | PrivilegeFacts | undefined): PolicyPort {
+	if (value === undefined) return openPolicy;
+	return isPolicyPort(value) ? value : createDefaultPolicyEngine(value);
+}
 
 /**
  * Builds the whole host around one options object. Nothing logs in here;
@@ -149,7 +158,7 @@ export function createBot(options: CreateBotOptions): Bot {
 	const runtime = createUiRuntime({
 		platform: bridge.platform,
 		sendToChannel: bridge.sendToChannel,
-		policy: options.policy ?? ownerOnlyPolicy,
+		policy: normalizePolicy(options.policy),
 		flows,
 		...(options.rehydrate !== undefined ? { rehydrate: options.rehydrate } : {}),
 		...(options.onError !== undefined ? { onError: options.onError } : {}),

@@ -14,7 +14,7 @@
 
 import { NodeKind } from './vocab.js';
 import type { ButtonStyle, InputStyle, SelectEntity, SeparatorSpacing } from './vocab.js';
-import type { ActionHandler, PermissionPolicy } from '../pipeline/types.js';
+import type { ActionHandler, Policy } from '../pipeline/types.js';
 
 // Properties of each node type are read-only because the tree is immutable
 
@@ -87,7 +87,7 @@ export interface ButtonNode {
 	 * The button's policy, which defines who can interact with it.
 	 * If present, the button's policy overrides the flow's own policy.
 	 */
-	readonly policy?: PermissionPolicy;
+	readonly policy?: Policy;
 
 	/**
 	 * Draw-phase ownership tag, set by the commit phase's slot-tagging
@@ -224,7 +224,7 @@ export interface SelectNode {
 	readonly disabled?: boolean;
 
 	/** This control's own identity gate: same contract as ButtonNode.policy. */
-	readonly policy?: PermissionPolicy;
+	readonly policy?: Policy;
 }
 
 /** Popup root (shown from an interaction, never rendered as a message). */

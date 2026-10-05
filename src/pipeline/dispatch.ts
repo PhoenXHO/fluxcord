@@ -366,6 +366,7 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				// top frame's, not the session's root identity.
 				flowId: frame.flowId,
 				view: screenKey,
+				...(frame.token.meta?.policy !== undefined ? { flowPolicy: frame.token.meta.policy } : {}),
 				...(record.policy !== undefined ? { actionPolicy: record.policy } : {}),
 			});
 			if (!decision.allowed) {

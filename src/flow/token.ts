@@ -25,7 +25,7 @@
  * @module flow/token
  */
 
-import type { PermissionPolicy } from '../pipeline/types.js';
+import type { Policy } from '../pipeline/types.js';
 import type { EndReason } from '../state/types.js';
 import type { MountHandle } from '../runtime/types.js';
 import { defineFlow } from './define.js';
@@ -54,7 +54,7 @@ export interface FlowMeta<TData = unknown> {
 	 * other legal home, and declaring in both is a load-time error
 	 * (one home per gate).
 	 */
-	readonly policy?: PermissionPolicy;
+	readonly policy?: Policy;
 	/**
 	 * Runs inside `mount`, once the session is fully born: screen
 	 * landed, frame written, rehydrate row saved. This is the flow's

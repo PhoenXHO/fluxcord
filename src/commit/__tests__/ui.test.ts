@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { policy } from '../../pipeline/policy.js';
 import { createMakeUi } from '../ui.js';
 import { buildFlowCatalog } from '../../boot/build.js';
 import { flow } from '../../flow/token.js';
@@ -214,7 +215,7 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 	it('captures the opener record\'s policy next to the handler', async () => {
 		const w = onScreen('menu', [], SHOW);
 		const handler = (): void => { };
-		const gate = { owner: { ownerOnly: false } };
+		const gate = policy.owner();
 		activeFrame(w.session).actions = { h0: { handler, label: 'open', policy: gate } };
 
 		await w.ui.showModal(DIALOG);
@@ -227,7 +228,7 @@ describe('ui.showModal - the opener\'s gate rides along', () => {
 		const w = onScreen('menu', [], SHOW);
 		const handler = (): void => { };
 		activeFrame(w.session).actions = { h0: { handler, label: 'open' } };
-		activeFrame(w.session).modalPolicy = { owner: { ownerOnly: true } }; // a previous modal's gate
+		activeFrame(w.session).modalPolicy = policy.privilege('mod'); // a previous modal's gate
 
 		await w.ui.showModal(DIALOG);
 

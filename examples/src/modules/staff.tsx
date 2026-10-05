@@ -1,16 +1,13 @@
-// Staff-only panels behind one grouped command. The permission knob from
-// the command chapter guards the door; the engine below guards every
-// click after it, and declared gates (the policy prop) ride to it as
-// data on the request.
-//
-// The engine never sees session data: requests carry identity and the
-// clicked control's declared gate, nothing else. So the role picks live
-// in the module-level store below, which stands in for the database a
-// real bot would query. They die with the process, on purpose: this is
-// a demo of the seam, not of persistence.
+// Staff-only panels behind one grouped command. The gate travels on the
+// flows and controls as inert data; the facts below bind the privilege
+// names to the role IDs the pickers collect. The engine never sees
+// session data: requests carry identity and the nearest declared gate.
+// The picks live in the module-level store, which stands in for the
+// database a real bot would query. They die with the process, on
+// purpose: this is a demo of the seam, not of persistence.
 import { PermissionFlagsBits } from 'discord.js';
-import { action, command, ErrorSource, flow, hasAnyRole, isOwner, mounts, screen } from 'fluxcord';
-import type { PolicyPort } from 'fluxcord';
+import { action, command, ErrorSource, flow, mounts, policy, screen } from 'fluxcord';
+import type { PrivilegeFacts } from 'fluxcord';
 
 // --- The badge store: the engine's own truth --------------------------------------
 
@@ -18,6 +15,10 @@ const roleConfig = {
 	staff: [] as readonly string[],
 	admin: [] as readonly string[],
 };
+
+// Names only: the gate rides the flows and controls, the facts at the
+// bottom bind the names to role IDs.
+const staffGate = policy.any(policy.owner(), policy.privilege('mod'), policy.privilege('admin'));
 
 // The picker keeps no bag: the store above is the one source, and the
 // screen reads it back through defaultIds on the next draw.
@@ -32,8 +33,8 @@ const pickAdmin = action()(e => {
 const rolesScreen = screen()((_data, { Select }) => (
 	<view>
 		<text>
-			Who counts as staff, and who can resolve tickets? New picks apply to fresh panels right away; a
-			panel that is already open adopts them on its next draw.
+			Who counts as staff, and who can resolve tickets? New picks apply on the very next click, even
+			panel that is already open.
 		</text>
 		<Select roles placeholder="Staff roles" onSelect={pickStaff} defaultIds={[...roleConfig.staff]} />
 		<Select roles placeholder="Admin roles (may resolve tickets)" onSelect={pickAdmin} defaultIds={[...roleConfig.admin]} />
@@ -43,7 +44,7 @@ const rolesScreen = screen()((_data, { Select }) => (
 const rolesFlow = flow('roles', {
 	screens: { picker: rolesScreen },
 	first: 'picker',
-});
+}, { policy: staffGate });
 
 // --- The ticket desk ---------------------------------------------------------------
 
@@ -81,7 +82,7 @@ const deskScreen = screen<TicketData>()((data, { Button }) => (
 				label="Resolve the next"
 				success
 				disabled={data.open === 0}
-				policy={{ roles: { mode: 'allow', roleIds: [...roleConfig.admin] } }}
+				policy={policy.privilege('admin', { deny: 'Admins only.' })}
 			/>
 			<Button onClick={pingAssignee} label="Ping the assignee" secondary disabled={data.open === 0 || data.pinged} />
 		</row>
@@ -99,26 +100,19 @@ export const ticketsFlow = flow<TicketData>('tickets', {
 		}
 		return undefined;
 	},
-});
+}, { policy: staffGate });
 
-// --- The engine --------------------------------------------------------------------
+// --- The facts: where the names meet the role IDs ---------------------------------
 
-// Answers the one question per click: a control that declared its own
-// gate answers to that gate alone; everything else opens to the panel's
-// owner or the staff roles. The identity checks are fluxcord's exported
-// request helpers; the engine only decides what they mean.
-export const staffPolicy: PolicyPort = {
-	authorize(request) {
-		const gate = request.actionPolicy;
-		if (gate?.roles?.roleIds !== undefined) {
-			return hasAnyRole(request, gate.roles.roleIds)
-				? Promise.resolve({ allowed: true })
-				: Promise.resolve({ allowed: false, denyMessage: 'Admins only.' });
-		}
-		if (isOwner(request) || hasAnyRole(request, roleConfig.staff)) {
-			return Promise.resolve({ allowed: true });
-		}
-		return Promise.resolve({ allowed: false, denyMessage: 'Staff only.' });
+// The shipped engine asks per click and never caches, so a picker
+// change applies to the next click on any open panel.
+export const staffFacts: PrivilegeFacts = {
+	async privileges(_actorId, _guildId, roleIds) {
+		const ids = roleIds ?? [];
+		const names = new Set<string>();
+		if (ids.some(id => roleConfig.admin.includes(id))) names.add('admin');
+		if (ids.some(id => roleConfig.staff.includes(id))) names.add('mod');
+		return [...names];
 	},
 };
 

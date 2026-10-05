@@ -255,30 +255,37 @@ export interface PolicyRequest {
 	/**
 	 * The clicker's role IDs, when the platform supplied them: the generic
 	 * roles socket. The framework assigns no meaning; the app maps IDs to
-	 * its own admin/mod/config concepts.
+	 * its own concepts. The shipped engine never reads it: privileges are
+	 * the host's naming layer over roles.
 	 */
 	readonly actorRoleIds?: readonly string[];
 	/**
-	 * The session's owner, as identity only: `ownerOnly` rules compare the
-	 * actor against the user who started the session. Access control is
-	 * still per-event policy.
+	 * The session's owner, as identity only: `policy.owner()` compares the
+	 * actor against the user who started the session. Absent on door
+	 * requests (a command run before any session exists), where owner is
+	 * vacuously false.
 	 */
-	readonly ownerId: string;
+	readonly ownerId?: string;
 	/** The interaction's guild; absent in DMs. */
 	readonly guildId?: string;
 	/** The channel the interaction fired in. */
 	readonly channelId?: string;
 	/** The owning flow's full id (`'<moduleId>/<name>'`). */
 	readonly flowId: string;
-	/** '<moduleId>/<screenId>' of the screen the event is delivered to. */
+	/** '<flowId>/<screenId>' of the screen the event is delivered to. */
 	readonly view: string;
 	/**
-	 * The clicked control's own policy, when it declared one (the `policy`
-	 * prop). Replaces the flow's authored entry for this action alone; a
-	 * control may widen or narrow its own identity gate. Guild layers
-	 * (global + module) still apply underneath.
+	 * The flow's own gate (the flow's `meta.policy`), as the frame's token
+	 * carries it. The shipped engine evaluates it whenever the control
+	 * declared no policy of its own; nearest policy wins.
 	 */
-	readonly actionPolicy?: PermissionPolicy;
+	readonly flowPolicy?: Policy;
+	/**
+	 * The clicked control's own policy, when it declared one (the `policy`
+	 * prop). Replaces the flow's gate for this action alone; a control may
+	 * widen or narrow its own identity gate.
+	 */
+	readonly actionPolicy?: Policy;
 }
 
 /** The app engine's answer. */
@@ -290,95 +297,25 @@ export interface PolicyDecision {
 }
 
 // --- Authored policy vocabulary ----------------------------------------------------
-// The declaration shape flows and controls author (the policy prop on
-// buttons/selects, a flow's catalog entry). The framework carries these
-// objects across its seams; everything downstream of a declaration
-// (resolution, merge, evaluation) stays on the host side of the line,
-// behind the PolicyPort.
+// What flows and controls author (the policy prop, a flow's meta gate, a
+// command's door gate). Inert values, built through the `policy`
+// namespace; the shipped engine evaluates them over the host's
+// privilege facts, and a custom PolicyPort may evaluate or ignore them.
 
 /**
- * How a layer policy should combine with lower-precedence layers.
- *
- * - `merge` (default): this layer's rules are merged with lower layers, with deny rules taking precedence over allow.
- * - `replace`: this layer completely replaces lower layers, ignoring them entirely.
- *   This is useful for "override" policies that want to ignore global defaults.
+ * One inert permission gate. Build with the {@link policy} namespace:
+ * `policy.owner()`, `policy.privilege('mod')`, `policy.allow`, `policy.deny`,
+ * `policy.any(...)`, `policy.all(...)`. Combinators nest to arbitrary
+ * depth; there is no negation. Every variant except allow carries an
+ * optional deny message, shown to the actor instead of the generic copy.
  */
-export type PolicyMergeMode = 'merge' | 'replace';
-
-/**
- * Access-list mode for users/channels/roles direct policy sections.
- *
- * - `allow`: only items in the list pass this section.
- * - `deny`: items in the list are blocked by this section.
- */
-export type AccessListMode = 'allow' | 'deny';
-
-/** Owner/session-based access controls. */
-export interface PermissionOwnerPolicy {
-	/** Restrict action to the flow/page owner. */
-	ownerOnly?: boolean;
-	/** Allow bot admins to bypass ownerOnly. */
-	allowAdminOverride?: boolean;
-	/** Allow bot mods to bypass ownerOnly (implies admin override). */
-	allowModOverride?: boolean;
-}
-
-/** User allow/deny controls (by Discord user ID). */
-export interface PermissionUsersPolicy {
-	/** How to interpret `userIds`. */
-	mode?: AccessListMode;
-	/** IDs evaluated according to `mode`. */
-	userIds?: string[];
-	/** Allow bot admins to bypass this user section. */
-	allowAdminBypass?: boolean;
-	/** Allow bot mods to bypass this user section (implies admin bypass). */
-	allowModBypass?: boolean;
-}
-
-/** Channel allow/deny controls (by Discord channel ID). */
-export interface PermissionChannelsPolicy {
-	/** How to interpret `channelIds`. */
-	mode?: AccessListMode;
-	channelIds?: string[];
-	/** Allow bot admins to bypass this channel section. */
-	allowAdminBypass?: boolean;
-	/** Allow bot mods to bypass this channel section (implies admin bypass). */
-	allowModBypass?: boolean;
-}
-
-/** Role-based controls (by Discord role ID). */
-export interface PermissionRolesPolicy {
-	/** How to interpret `roleIds`. */
-	mode?: AccessListMode;
-	roleIds?: string[];
-	/** Allow bot admins to bypass this role section. */
-	allowAdminBypass?: boolean;
-	/** Allow bot mods to bypass this role section (implies admin bypass). */
-	allowModBypass?: boolean;
-}
-
-/** Message rendering hints for denied outcomes. */
-export interface PermissionResponsePolicy {
-	/** Optional human-readable label for denial context. */
-	reasonLabel?: string;
-	/** Optional user hint for how to proceed. */
-	hint?: string;
-}
-
-/**
- * Raw policy object declared at any layer: a flow's entry in a policies
- * catalog, or a control's own gate via the `policy` prop.
- *
- * `mode` controls whether this layer merges into parents (default) or replaces them.
- */
-export interface PermissionPolicy {
-	mode?: PolicyMergeMode;
-	owner?: PermissionOwnerPolicy;
-	users?: PermissionUsersPolicy;
-	channels?: PermissionChannelsPolicy;
-	roles?: PermissionRolesPolicy;
-	response?: PermissionResponsePolicy;
-}
+export type Policy =
+	| { readonly kind: 'owner'; readonly denyMessage?: string }
+	| { readonly kind: 'privilege'; readonly name: string; readonly denyMessage?: string }
+	| { readonly kind: 'any'; readonly of: readonly Policy[]; readonly denyMessage?: string }
+	| { readonly kind: 'all'; readonly of: readonly Policy[]; readonly denyMessage?: string }
+	| { readonly kind: 'deny'; readonly denyMessage?: string }
+	| { readonly kind: 'allow' };
 
 /** The injected permission seam: the host's engine answers; the framework only asks. */
 export interface PolicyPort {
@@ -436,7 +373,7 @@ export interface ActionRecord<TData = unknown> {
 	/** The control's label (a button's label, a select's placeholder); logs and error reports only, never on the wire. */
 	readonly label: string;
 	/** The control's own gate, when it declared one, rides the record to the policy consult. */
-	readonly policy?: PermissionPolicy;
+	readonly policy?: Policy;
 	/**
 	 * Draw-phase ownership tag copied from the frame: the bag path the
 	 * handler lenses to at click time. `[]` is a real tag meaning the root
