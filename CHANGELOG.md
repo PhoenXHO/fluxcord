@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Breaking: frames carry their flow's token, so the screen-registry exports (`asScreenRegistry`, `screenEntries`) are gone and the wire screen key is `flowId/screen`. Parting copy always comes from the root flow's token.
+- `event.call` opens a same-module flow with no manifest listing: the caller's frame names the module and the child's identity assembles at call time. The manifest `flows` field is doors only (host mounts and cross-module calls).
 - Breaking: the subflow system is removed (`subflow()` plugs, the `subflows` option, `<at>.` screen-name namespacing). Open a child with `await event.call(...)` instead; a called flow's screens are addressed through its own frame, and stale parent-screen clicks bounce as before.
 - Breaking: `ui.close` merged into `ui.exit(options?)`: `{ value }` returns to the caller below the root, `{ final }` is the goodbye view at the root (`final` below the root throws), and bare `exit()` just leaves.
 - Breaking: `Flow` gained a second type parameter, the exit value: `Flow<TData, TExit>`, `void` by default. Annotate a flow constant as `Flow<MyData, MyExit>` and the caller's `await event.call(...)` is typed.

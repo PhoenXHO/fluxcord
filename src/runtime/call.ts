@@ -100,10 +100,17 @@ export function createCall(options: CallOptions): CallEngine {
 					throw new Error(`event.call: flow '${frame.flowId}' already awaits a call (one call per frame)`);
 				}
 			}
-			const token = options.byToken.get(flow);
-			if (token === undefined) {
-				throw new Error(`event.call: flow '${flow.id}' is not in the boot catalog, list it in its module's manifest flows`);
-			}
+			// Doors first: a listed flow (a cross-module door, or a host or
+			// command mount) carries the catalog's assembled identity. An
+			// unlisted flow is a same-module call: the caller's frame names
+			// the module, so the token assembles right here and no manifest
+			// entry is needed. Flows know the flows they call.
+			const token = options.byToken.get(flow) ?? Object.freeze({
+				flowId: `${frame.moduleId}/${flow.id}`,
+				moduleId: frame.moduleId,
+				definition: flow.definition,
+				...(flow.meta !== undefined ? { meta: flow.meta } : {}),
+			});
 			const slot = [...frame.slot, callOptions.as];
 			// The child's bag: the caller's args, else the child's own seed.
 			// Cloned either way, so parent and child never share mutable

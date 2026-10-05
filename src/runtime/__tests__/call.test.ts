@@ -174,11 +174,22 @@ describe('call - parking', () => {
 		await expect(parked).resolves.toBe('done');
 	});
 
-	it('throws when the flow is missing from the boot catalog', async () => {
+	it('an unlisted flow assembles its token from the calling frame, so same-module calls need no listing', async () => {
 		const w = world();
-		const stranger = { id: 'mod/stranger' } as unknown as Flow<unknown, unknown>;
-		await expect(w.call.call(w.session, w.session.frames[0], w.tools, stranger, { as: 'x' })).rejects.toThrow(/is not in the boot catalog/);
-		expect(w.session.frames).toHaveLength(1);
+		const engine = createCall({ store: w.store, queue: w.realQueue, commit: { redraw: async () => undefined }, byToken: new Map() });
+		const bare = { id: 'child', definition: CHILD_TOKEN.definition } as unknown as Flow<unknown, unknown>;
+
+		const parked = engine.call(w.session, w.session.frames[0], w.tools, bare, { as: 'picker', args: { n: 1 } });
+		await tick();
+
+		const child = w.session.frames[1];
+		expect(child.flowId).toBe('mod/child');
+		expect(child.token.flowId).toBe('mod/child');
+		expect(child.token.moduleId).toBe('mod');
+		expect(child.token.definition).toBe(CHILD_TOKEN.definition);
+
+		await engine.exit(w.session, 'done');
+		await expect(parked).resolves.toBe('done');
 	});
 
 	it('throws when the calling frame already holds a pending call', async () => {

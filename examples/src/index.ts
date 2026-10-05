@@ -5,7 +5,6 @@ import { aboutCommand } from './modules/about.js';
 import { counterCommand } from './modules/counter.js';
 import { diceCommand } from './modules/dice.js';
 import { orderCommand } from './modules/order/index.js';
-import { deliveryFlow } from './modules/order/delivery.flow.js';
 import { campfireFlow } from './modules/campfire.js';
 import { staffCommand, staffPolicy } from './modules/staff.js';
 import { timerCommand } from './modules/timer.js';
@@ -18,7 +17,7 @@ const bot = createBot({
 		{ name: 'about', commands: [aboutCommand] },
 		{ name: 'counter', commands: [counterCommand] },
 		{ name: 'dice', commands: [diceCommand] },
-		{ name: 'order', commands: [orderCommand], flows: [deliveryFlow] },
+		{ name: 'order', commands: [orderCommand] },
 		// The campfire has no command: it mounts below, once, on boot.
 		{ name: 'campfire', flows: [campfireFlow] },
 		{ name: 'staff', commands: [staffCommand] },

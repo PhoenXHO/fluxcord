@@ -73,11 +73,13 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		...(options.now !== undefined ? { now: options.now } : {}),
 		onEnd: createOnEnd({
 			commit,
-			// The flow's onSessionEnd hook, resolved per dying session from
-			// the catalog. Caught here: a throwing cleanup is logged, never
+			// The flow's onSessionEnd hook, carried by the dying session's
+			// root frame token. Caught here: a throwing cleanup is logged, never
 			// allowed to break the death path it rides (store.end is sync).
 			onSessionEnd: (session, reason) => {
-				const hook = options.flows.byFlowId.get(session.flowId)?.meta?.onSessionEnd;
+				// The root frame carries the flow's token: the hook resolves from
+				// the dying session itself, no catalog lookup.
+				const hook = session.frames[0].token.meta?.onSessionEnd;
 				if (hook === undefined) return;
 				try {
 					hook({ sessionId: session.id, messageId: session.messageRef.messageId, flowId: session.flowId, reason });
