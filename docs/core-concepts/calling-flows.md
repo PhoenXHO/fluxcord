@@ -34,7 +34,7 @@ const setAddress = action<DeliveryData>()(e => {
     if (e.kind !== EventKind.ModalSubmit) {
         void e.ui.showModal(
             <modal title="Delivery address">
-                <input id="address" label="Where to?" required maxLength={100} placeholder="Street and number" />
+                <input id="address" label="Where to?" required maxLength={100} placeholder="Street and number" value={e.session.data.address} />
             </modal>,
         );
         return;
@@ -71,9 +71,11 @@ Because this code never mentions tacos, you can reuse it anywhere; a called flow
 // This handler calls another flow, which becomes the child of the
 // current flow. The parent stays parked at the await until the child
 // exits, and the child's bag nests under the slot named by `as`. While
-// the child runs, its screens own the message.
+// the child runs, its screens own the message. The args pass the
+// slot's current values, so a return visit opens with the previous
+// choices in place.
 const openDelivery = action<OrderData>()(async e => {
-    await e.call(deliveryFlow, { as: 'delivery' });
+    await e.call(deliveryFlow, { as: 'delivery', args: e.session.data.delivery });
 });
 ```
 
@@ -104,10 +106,10 @@ if (delivery.when !== undefined) {
 }
 ```
 
-The call can also seed the child with values through `args`:
+The call can also seed the child with values through `args`, which is what the build screen passes so a return visit opens with the previous choices in place:
 
 ```tsx
-await e.call(deliveryFlow, { as: 'delivery', args: { ...data.delivery } });
+await e.call(deliveryFlow, { as: 'delivery', args: e.session.data.delivery });
 ```
 
 The `args` property seeds the child bag, which is how a return visit opens with previous choices in place; omitted `args` means the child starts from its own `initialData`. Either way the child receives a fresh clone, so frames never share mutable state and a push inside the child's arrays never leaks to the parent.

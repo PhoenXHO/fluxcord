@@ -115,6 +115,9 @@ To catch malformed requests on your side, fluxcord validates modal constraints e
 
 Two platform behaviors are especially worth noting. First, Discord implements a `required` checkbox as a single-item checkbox group so that submission stays locked until checked; that makes `<checkbox required>` ideal whenever you need an explicit consent gate before a user continues. Note the shape wrinkle from the submit section: a consent check reads the `['on']` array rather than comparing against `true`. Second, fluxcord stamps a fresh internal ID every time a modal opens, so an abandoned half-typed draft can never bleed into your pre-filled values on the next open.
 
+> [!NOTE]
+> Discord keeps a draft per modal id, so a half-typed dialog would normally reopen exactly as the user left it if they don't submit it. fluxcord opens every modal under a fresh id instead, which trades that implicit draft for flexibility. Keeping the draft becomes an explicit choice: the `value` prop prefills the field with whatever you pass, such as the last saved answer.
+
 Submissions also inherit authorization context automatically: fluxcord routes the submit through whichever policy gate protected the launcher button, ensuring an owner-only trigger produces an owner-only submit handler. The [Permission gates](permission-gates.md) chapter gives the full picture.
 
 ## Next steps
