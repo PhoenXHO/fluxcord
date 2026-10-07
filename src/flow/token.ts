@@ -48,11 +48,11 @@ export interface SessionEnd {
 export interface FlowMeta<TData = unknown> {
 	/**
 	 * The flow's default gate, declared where the flow lives: the
-	 * same idea as a control's policy prop, one level up. A static
-	 * object only; a resolver needs request context a declaration
-	 * does not have. The module's `policies.ts` `flows` map is the
-	 * other legal home, and declaring in both is a load-time error
-	 * (one home per gate).
+	 * same idea as a control's policy prop, one level up. The shipped
+	 * engine evaluates it whenever the clicked control declares no
+	 * policy of its own (nearest policy wins), and it rides the
+	 * frame's token, so a static object only — a resolver needs
+	 * request context a declaration does not have.
 	 */
 	readonly policy?: Policy;
 	/**

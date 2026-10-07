@@ -1,10 +1,10 @@
 /**
  * The dev coverage scan: render every view against its flow's own
  * initialData, report views that throw. Pure; the host calls it in dev
- * boots. Policy coverage is not scanned here: every flow must carry an
- * entry in its module's policies catalog, and the app-side loader fails
- * the boot on a missing (or dead) entry, a static check stronger than
- * any tree walk.
+ * boots. Policy gates are not scanned here: they are inert values the
+ * host's engine evaluates per click, so there is nothing to walk
+ * statically — the one boot check that exists is the duplicate-flowId
+ * throw in the catalog build.
  *
  * @module boot/scan
  */
