@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `Back` below the root no longer renders disabled on an empty history: "wherever you came from" is the parent, so the click exits the flow, ending the session at the root or resuming the caller's `event.call`. The root keeps the disabled state, and with history the click pops one entry as before.
+
+### Fixed
+
+- An edit against a message deleted out of-band (manual delete, channel purge, Discord's own reaping of an expired ephemeral) ends quietly instead of surfacing as a framework failure: the bridge treats Discord's 10008 (Unknown Message) answer as "nothing to save", and an ephemeral line whose message is gone is dropped.
+
 ## [0.2.0] - 2026-10-07
 
 ### Added
