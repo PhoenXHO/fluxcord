@@ -20,6 +20,8 @@ import type { MountToken } from '../../flow/token.js';
 import type { Dispatch } from '../dispatch.js';
 import { policy } from '../policy.js';
 import { DEFAULT_DENY_MESSAGE, DEFAULT_ERROR_MESSAGE, createDispatch } from '../dispatch.js';
+import { createLaunch } from '../../runtime/launch.js';
+import { createSessionQueue } from '../queue.js';
 import { EventKind } from '../types.js';
 import type {
 	ErrorReport,
@@ -65,6 +67,9 @@ function fakePlatform(): { platform: PlatformPort; calls: string[] } {
 		}),
 		editMessage: vi.fn(async (): Promise<void> => undefined),
 		showModal: vi.fn(async (): Promise<void> => undefined),
+		ack: vi.fn(async (): Promise<void> => {
+			calls.push('ack');
+		}),
 	};
 	return { platform, calls };
 }
@@ -87,7 +92,7 @@ interface World {
 }
 
 /** The wired world: real store + one registered screen + recorded everything. */
-function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: boolean } = {}): World {
+function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: boolean; ackAfterMs?: number } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	// Hand-built token: dispatch never renders, it only checks screen
 	// membership and reads the flow's onError. Unfrozen so tests patch it.
@@ -155,6 +160,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 			exit: () => {},
 			crash: () => false,
 		},
+		launch: createLaunch({ store, queue: createSessionQueue(), platform }),
 		...(options.omitErrorHandler !== true
 			? {
 				onError: (report: ErrorReport): void => {
@@ -164,6 +170,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 			}
 			: {}),
 		now: () => clock.now,
+		...(options.ackAfterMs !== undefined ? { ackAfterMs: options.ackAfterMs } : {}),
 	});
 
 	/** A button click on 'join' (or any action/view/session override). */
@@ -667,5 +674,23 @@ describe('dispatch - the per-session line', () => {
 		await blocked;
 
 		expect(w.handler).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('the ack race timer', () => {
+	it('acks early when the handler outlasts the threshold', async () => {
+		const w = world({ ackAfterMs: 5 });
+		w.handler.mockImplementationOnce(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+		});
+		await w.click();
+		expect(w.platform.ack as Mock).toHaveBeenCalledTimes(1);
+	});
+
+	it('never acks when the handler settles inside the window', async () => {
+		const w = world({ ackAfterMs: 5 });
+		await w.click();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(w.platform.ack as Mock).not.toHaveBeenCalled();
 	});
 });

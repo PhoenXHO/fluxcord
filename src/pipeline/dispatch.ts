@@ -67,6 +67,9 @@ import type { SessionQueue } from './queue.js';
 /** Deny copy when the app's decision carries none. */
 export const DEFAULT_DENY_MESSAGE = "You don't have permission to do that.";
 
+/** How long a dispatch may run before its interaction acks early (see DispatchOptions.ackAfterMs). */
+export const DEFAULT_ACK_AFTER_MS = 2_000;
+
 /** Generic handler-failure copy: details go to the log through the error socket, never to the user. */
 export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Try again; if it keeps failing, ping a host.';
 
@@ -137,6 +140,19 @@ export interface DispatchOptions {
 	readonly onError?: ErrorHandler;
 	/** Injectable clock for honest expiry tests. */
 	readonly now?: () => number;
+	/**
+	 * How long a dispatch may run before its interaction acks early
+	 * (deferUpdate): Discord closes a component interaction's response
+	 * window after 3s, so a handler outlasting the window renders as
+	 * "didn't respond in time" even though the edit lands later. The race
+	 * timer acks at the threshold instead; copy sent after the early ack
+	 * rides followUp (the bridge's replyToActor branches on deferred).
+	 * Default: 2s (of the 3s window). Handlers that open modals should
+	 * open them inside the window: a modal cannot open on an already
+	 * acked interaction. With launch-and-notify, launching handlers
+	 * return instantly and the timer never fires for them.
+	 */
+	readonly ackAfterMs?: number;
 	/**
 	 * Shared per-session queue. The runtime injects one so mount handles
 	 * (handle.redraw) line up behind the same per-session FIFO as clicks;
@@ -290,6 +306,18 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 	}
 
 	async function deliver(address: ActionAddress, nonce: string | undefined, incoming: IncomingEvent): Promise<void> {
+		// The ack race timer: armed per dispatch, cleared when the dispatch
+		// settles. Firing means the work outlasted the threshold, so the
+		// interaction acks early (deferUpdate) and the user never sees
+		// "didn't respond"; the bridge's end-of-dispatch ack then skips
+		// (already deferred) and later copy rides followUp. With no ack on
+		// the port (test cores, non-interactive hosts) there is nothing to
+		// arm. A firing ack is best-effort: it must never reject dispatch.
+		const race = options.platform.ack === undefined
+			? undefined
+			: setTimeout((): void => {
+				void options.platform.ack?.()?.catch(() => undefined);
+			}, options.ackAfterMs ?? DEFAULT_ACK_AFTER_MS);
 		let site: FailureSite | undefined;
 		try {
 			const existing = options.store.get(address.sessionId);
@@ -454,6 +482,8 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 			}
 		} catch (error) {
 			reportFailure(error, incoming, ErrorSource.Framework, undefined, undefined, site);
+		} finally {
+			if (race !== undefined) clearTimeout(race);
 		}
 	}
 
