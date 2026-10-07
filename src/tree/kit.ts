@@ -86,9 +86,12 @@ export interface ScreenKit<TData = unknown, TKeys extends string = string> {
 	/** One select, two shapes: `options` (or `<option>` children) for a static list, one entity flag (`roles`) for a Discord source. */
 	Select(props: KitSelectProps<TData, TKeys>): SelectNode;
 	/**
-	 * The smart back button: one tag, no wiring. Disabled whenever the
-	 * drawing session's history is empty, pops one entry on click. The
-	 * disabled state is the engine's: props cannot override it.
+	 * The smart back button: one tag, no wiring. Disabled at the root when
+	 * the drawing session's history is empty; below the root, an empty
+	 * history turns Back into an exit (the flow ends and the caller's
+	 * `event.call` resumes), since where you came from is the parent.
+	 * With history, it pops one entry on click. The disabled state is the
+	 * engine's: props cannot override it.
 	 */
 	Back(props: KitBackProps<TData, TKeys>): ButtonNode;
 	/**
@@ -107,12 +110,18 @@ export interface ScreenKit<TData = unknown, TKeys extends string = string> {
 /**
  * The erased kit for one draw. Session-blind members (`Button`, `Select`,
  * `handler`) are the thin adapters they always were; `Back` closes over
- * the drawing session's history, so it renders disabled on an entry
+ * the drawing session's history, so it renders disabled on a root entry
  * screen and generates its own pop handler. Views receive the product as
  * their second parameter; the slot-tagged variants come from the commit
  * phase's `screenKitAt`.
+ *
+ * @param session The drawing session's view facts (live `history`).
+ * @param options `canExit` marks a called flow (frames under the top
+ *   exist): with an empty history, Back exits the flow and wakes the
+ *   caller instead of rendering disabled.
  */
-export function kitFor(session: Pick<ViewSession, 'history'>): ScreenKit {
+export function kitFor(session: Pick<ViewSession, 'history'>, options: { readonly canExit?: boolean } = {}): ScreenKit {
+	const { canExit } = options;
 	return {
 		Button: (props): ButtonNode => {
 			const { children, ...rest } = props as { readonly children?: unknown };
@@ -165,13 +174,19 @@ export function kitFor(session: Pick<ViewSession, 'history'>): ScreenKit {
 				|| rest.success !== undefined || rest.danger !== undefined;
 			const run: ActionHandler = async (event) => {
 				await onLeave?.(event);
+				// Below the root with nothing to pop, Back means "wherever you
+				// came from": the caller. The root keeps the disabled state.
+				if (canExit && session.history.length === 0) {
+					event.ui.exit();
+					return;
+				}
 				event.ui.back();
 			};
 			return button({
 				...(hasFlag ? {} : { secondary: true }),
 				...rest,
 				label: label ?? 'Back',
-				disabled: session.history.length === 0,
+				disabled: session.history.length === 0 && !canExit,
 				onClick: run,
 			} as ButtonProps);
 		},

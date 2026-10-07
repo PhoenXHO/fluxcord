@@ -74,10 +74,10 @@ export function viewOf(session: Session<unknown>): ViewNode {
 	// Views return the element union (TSX roots type flat), folded to a
 	// view node here, one place; validateTree polices the result below.
 	// Same for the composed wrap's result.
-	let tree = normalizeViewRoot(screen.view(bag, kitFor(session), session));
+	let tree = normalizeViewRoot(screen.view(bag, kitFor(session, { canExit: session.frames.length > 1 }), session));
 	const wrap = frame.token.definition.wrap as ((tree: ViewNode, session: Session<unknown>, kit: ReturnType<typeof kitFor>) => ComponentResult) | undefined;
 	if (wrap !== undefined) {
-		tree = normalizeViewRoot(wrap(tree, session, kitFor(session)));
+		tree = normalizeViewRoot(wrap(tree, session, kitFor(session, { canExit: session.frames.length > 1 })));
 	}
 	// The pipeline's one validation point: redraws, the freeze, and mount's
 	// first frame all funnel through here, so an illegal tree fails loudly

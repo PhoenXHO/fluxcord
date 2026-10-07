@@ -12,9 +12,9 @@ import type { ActionEvent } from '../../pipeline/types.js';
 import { kitFor } from '../kit.js';
 import type { ButtonNode } from '../types.js';
 
-/** A minimal fake event: Back's handler only touches ui.back. */
-function fakeEvent(back: () => void): ActionEvent<never, string> {
-	return { ui: { back } } as unknown as ActionEvent<never, string>;
+/** A minimal fake event: Back's handler only touches ui.back and ui.exit. */
+function fakeEvent(back: () => void, exit?: () => void): ActionEvent<never, string> {
+	return { ui: { back, exit } } as unknown as ActionEvent<never, string>;
 }
 
 describe('kitFor Back - draw', () => {
@@ -48,6 +48,42 @@ describe('kitFor Back - draw', () => {
 	it('the disabled state is final: props cannot re-enable an empty history', () => {
 		const node = kitFor({ history: [] }).Back({ disabled: false } as never);
 		expect(node.disabled).toBe(true);
+	});
+
+	it('canExit enables an empty-history Back below the root: the click exits the flow', async () => {
+		const back = vi.fn();
+		const exit = vi.fn();
+		const node: ButtonNode = kitFor({ history: [] }, { canExit: true }).Back({});
+
+		expect(node.disabled).toBe(false);
+		await node.onClick(fakeEvent(back, exit));
+
+		expect(exit).toHaveBeenCalledTimes(1);
+		expect(back).not.toHaveBeenCalled();
+	});
+
+	it('with history and canExit the click still pops instead of exiting', async () => {
+		const back = vi.fn();
+		const exit = vi.fn();
+		const node: ButtonNode = kitFor({ history: ['hub'] }, { canExit: true }).Back({});
+
+		await node.onClick(fakeEvent(back, exit));
+
+		expect(back).toHaveBeenCalledTimes(1);
+		expect(exit).not.toHaveBeenCalled();
+	});
+
+	it('onLeave runs before the exit too', async () => {
+		const order: string[] = [];
+		const exit = vi.fn();
+		const node: ButtonNode = kitFor({ history: [] }, { canExit: true }).Back({
+			onLeave: () => { order.push('leave'); },
+		});
+
+		await node.onClick(fakeEvent(() => {}, exit));
+
+		expect(order).toEqual(['leave']);
+		expect(exit).toHaveBeenCalledTimes(1);
 	});
 });
 

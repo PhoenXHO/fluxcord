@@ -49,6 +49,9 @@ Similar to the `Button` component, the `Back` component comes from the screen ki
 > [!NOTE]
 > When a user runs `/dice` for the first time, their history stack starts empty, with nowhere to go back to. The menu's `Back` button therefore renders in a disabled state. Once there is at least one screen in the stack, the button becomes active on the destination screen. You never manage the disabled state yourself.
 
+> [!TIP]
+> The empty-history rule reads differently below the root. In a flow another flow opened through `event.call`, an empty history means "wherever you came from" is the parent, so `Back` ends the flow and resumes the caller instead of rendering disabled; at the root, the same state keeps the button disabled, since there is no parent to return to. The [Calling flows](calling-flows.md) chapter covers the call model.
+
 ## Navigation verbs: `go`, `push`, and `back`
 
 The event's `ui` toolkit provides three navigation verbs, though `go` is the one you'll reach for most. Here's how they work:
