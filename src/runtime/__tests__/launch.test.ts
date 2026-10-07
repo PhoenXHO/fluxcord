@@ -223,4 +223,45 @@ describe('the launch engine', () => {
 		await vi.waitFor(() => expect(h.session.data.n).toBe(1));
 		expect(h.session.lastActivityAt).toBe(before);
 	});
+
+	it('a chatty job coalesces its redraws to the drain pace', async () => {
+		const h = harness();
+		h.redraw.mockImplementation(async () => {
+			await sleep(10);
+		});
+		await h.launch(h.session, h.frame, async (job) => {
+			for (let i = 1; i <= 6; i += 1) {
+				job.mutate((data) => {
+					data.n = i;
+				});
+			}
+		});
+		await vi.waitFor(() => expect(h.session.data.n).toBe(6));
+		await sleep(25);
+		// Six writes, but at most one edit in flight plus one trailing
+		// round: the FIFO never waits behind a rate-limited edit.
+		expect(h.redraw).toHaveBeenCalledTimes(2);
+	});
+
+	it('the drain stops when the frame leaves the stack mid-edit', async () => {
+		const h = harness();
+		h.redraw.mockImplementation(async () => {
+			await sleep(20);
+		});
+		await h.launch(h.session, h.frame, async (job) => {
+			job.mutate((data) => {
+				data.n = 1;
+			});
+			await sleep(5);
+			job.mutate((data) => {
+				data.n = 2;
+			});
+			h.session.frames.pop();
+			await sleep(60);
+		});
+		await sleep(30);
+		// Round one rendered; round two's guard (the frame is no longer on
+		// top) stopped the drain instead of rendering past the death.
+		expect(h.redraw).toHaveBeenCalledTimes(1);
+	});
 });
