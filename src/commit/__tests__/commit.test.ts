@@ -212,6 +212,22 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 }
 
 describe('the draw pipeline (redraw)', () => {
+	it('drops an identical redraw: a no-op handler edit lands once', async () => {
+		const w = world();
+		// Click 1: the handler changes nothing; the redraw sends (nothing recorded yet).
+		await w.click();
+		// Click 2: still nothing changed; the identical payload drops.
+		await w.click();
+		// A real change sends again.
+		w.handler.mockImplementationOnce(async (event: ActionEvent<LottoData>) => {
+			event.mutate((data) => {
+				data.tickets += 1;
+			});
+		});
+		await w.click();
+		expect(w.edits).toHaveLength(2);
+	});
+
 	it('a click that mutates redraws from the mutated data - one edit, V2 payload', async () => {
 		const w = world();
 		w.handler.mockImplementationOnce(async (): Promise<void> => {

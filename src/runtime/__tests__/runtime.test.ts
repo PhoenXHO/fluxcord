@@ -551,9 +551,10 @@ describe('revive - dead clicks through the runtime', () => {
 		expect(w.handler).toHaveBeenCalledTimes(1);
 		expect(w.handler.mock.calls[0][0].session.data).toEqual({ count: 77 });
 		expect(w.handler.mock.calls[0][0].session.id).toBe(handle.sessionId);
-		// Two edits: the revive draw (builds the frame, snaps the client to the
-		// rehydrated screen), then the post-handler auto-redraw.
-		expect(w.edits).toEqual([handle.messageId, handle.messageId]);
+		// One edit: the revive draw (builds the frame, snaps the client to the
+		// rehydrated screen). The post-handler auto-redraw renders the same
+		// pixels and drops: an identical payload must not burn a Discord edit.
+		expect(w.edits).toEqual([handle.messageId]);
 		expect(w.rows.has(handle.messageId)).toBe(true);
 
 		// Live again: a second click runs without reviving.

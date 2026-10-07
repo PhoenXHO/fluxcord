@@ -93,6 +93,14 @@ export function viewOf(session: Session<unknown>): ViewNode {
 export function createCommit(options: CommitOptions): CommitPhase {
 	/** Message ids that received their final edit: freeze or parting. */
 	const done = new Set<string>();
+	/**
+	 * Last payload sent per message id (serialized). An identical redraw
+	 * drops: a no-op handler mutate, a job write the current screen does
+	 * not render, any pixels-neutral pass must not burn a Discord edit.
+	 * Seeded empty, so a session's first redraw always sends (the mount's
+	 * first payload went out through the send arm, not this seam).
+	 */
+	const lastSent = new Map<string, string>();
 
 	/**
 	 * One draw: materialize the tree (stamping controls, building the
@@ -115,7 +123,11 @@ export function createCommit(options: CommitOptions): CommitPhase {
 
 	return {
 		async redraw(session: Session<unknown>): Promise<void> {
-			await options.platform.editMessage(session.messageRef, draw(session, viewOf(session)));
+			const payload = draw(session, viewOf(session));
+			const wire = JSON.stringify(payload);
+			if (lastSent.get(session.messageRef.messageId) === wire) return;
+			await options.platform.editMessage(session.messageRef, payload);
+			lastSent.set(session.messageRef.messageId, wire);
 		},
 
 		async commitFreeze(session: Session<unknown>): Promise<void> {
@@ -124,6 +136,8 @@ export function createCommit(options: CommitOptions): CommitPhase {
 			// action map, closing the message for clicks.
 			await options.platform.editMessage(session.messageRef, draw(session, freezeTree(viewOf(session))));
 			done.add(session.messageRef.messageId);
+			// No redraw can follow a final edit: drop the drop-guard's memory.
+			lastSent.delete(session.messageRef.messageId);
 		},
 
 		async commitParting(messageRef: MessageRef, parting?: PartingOptions, commandHint?: string): Promise<void> {
@@ -139,6 +153,7 @@ export function createCommit(options: CommitOptions): CommitPhase {
 			const materialized = materializeTree(tree);
 			await options.platform.editMessage(messageRef, renderV2Message(tree, messageRef.messageId, 'parting', materialized.stampOf));
 			done.add(messageRef.messageId);
+			lastSent.delete(messageRef.messageId);
 		},
 	};
 }
