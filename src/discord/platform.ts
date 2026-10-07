@@ -205,6 +205,14 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 
 	// --- Delivery (see module doc, job 1) ----------------------------------------
 
+	/**
+	 * Discord answers 10008 when the target message was deleted out-of-band
+	 * (manual delete, channel purge, Discord's own reaping). The message is
+	 * gone and there is nothing to save, so the edit ends quietly instead
+	 * of surfacing as a framework failure on a death path.
+	 */
+	const isUnknownMessage = (error: unknown): boolean => (error as { code?: unknown }).code === 10008;
+
 	async function editMessage(ref: MessageRef, payload: V2MessagePayload): Promise<void> {
 		// An ephemeral reply is only reachable through its line: route the
 		// edit through the command interaction's webhook while it lives.
@@ -214,7 +222,16 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 				lines.delete(ref.messageId);
 				throw new Error(`bridge editMessage: ephemeral line '${ref.messageId}' is past the interaction wall`);
 			}
-			await line.editReply(payload as unknown as MessageEditOptions);
+			try {
+				await line.editReply(payload as unknown as MessageEditOptions);
+			} catch (error) {
+				if (isUnknownMessage(error)) {
+					log.debug(`bridge editMessage: ephemeral line '${ref.messageId}' was already deleted`);
+					lines.delete(ref.messageId);
+					return;
+				}
+				throw error;
+			}
 			return;
 		}
 		const channel = await client.channels.fetch(ref.channelId);
@@ -222,7 +239,15 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 			throw new Error(`bridge editMessage: channel ${ref.channelId} is not a message channel`);
 		}
 		const message = await channel.messages.fetch(ref.messageId);
-		await message.edit(payload as unknown as MessageEditOptions);
+		try {
+			await message.edit(payload as unknown as MessageEditOptions);
+		} catch (error) {
+			if (isUnknownMessage(error)) {
+				log.debug(`bridge editMessage: message '${ref.messageId}' was already deleted`);
+				return;
+			}
+			throw error;
+		}
 	}
 
 	async function sendToChannel(channelId: string, payload: V2MessagePayload): Promise<MessageRef> {
