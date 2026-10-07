@@ -90,7 +90,15 @@ export function createLaunch(options: LaunchOptions): LaunchEngine {
 						// the job died with it. In the stack but not on top = the
 						// user is elsewhere: the write lands, no render.
 						if (!session.frames.includes(frame)) return;
-						fn(frame.slot.length > 0 ? getPath(session.data, frame.slot) : session.data);
+						try {
+							fn(frame.slot.length > 0 ? getPath(session.data, frame.slot) : session.data);
+						} catch (error) {
+							// An authoring bug (an unseeded slot, a throwing fn) is a
+							// job failure like any other: the socket owns it, the
+							// queue line stays clean, no redraw follows.
+							reportJobFailure(error, session);
+							return;
+						}
 						if (activeFrame(session) === frame) {
 							await options.platform.redraw(session);
 						}
@@ -108,7 +116,12 @@ export function createLaunch(options: LaunchOptions): LaunchEngine {
 					await options.queue.enqueue(session.id, async () => {
 						if (!alive(session)) return;
 						if (!session.frames.includes(frame)) return;
-						setPath(session.data, [...frame.slot, as], value);
+						try {
+							setPath(session.data, [...frame.slot, as], value);
+						} catch (error) {
+							reportJobFailure(error, session);
+							return;
+						}
 						if (activeFrame(session) === frame) {
 							await options.platform.redraw(session);
 						}
