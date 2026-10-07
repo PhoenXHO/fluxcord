@@ -55,6 +55,8 @@ import type {
 	ErrorReport,
 	EventTools,
 	IncomingEvent,
+	JobHandle,
+	LaunchEngine,
 	PlatformPort,
 	PolicyPort,
 	TryRevive,
@@ -115,6 +117,8 @@ export interface DispatchOptions {
 	readonly makeUi: (session: Session<unknown>, address: ActionAddress, platform: PlatformPort) => EventTools;
 	/** The call engine: `event.call`'s machinery, shared with `ui.exit` and the crash path. */
 	readonly call: CallEngine;
+	/** The launch engine: `event.launch`'s machinery for detached tracked work. */
+	readonly launch: LaunchEngine;
 	/**
 	 * The error socket. Omit it and the shipped default runs (log everything,
 	 * generic actor reply for handler failures); provide it and the default
@@ -408,6 +412,10 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 					// pattern as the registry's type erase.
 					call: ((flow: Flow<unknown, unknown>, callOptions: { readonly as: string; readonly args?: unknown }) =>
 						options.call.call(session, frame, tools, flow, callOptions)) as ActionEvent['call'],
+					launch: ((
+						work: (job: JobHandle<unknown>) => Promise<unknown>,
+						launchOptions?: { readonly as?: string },
+					) => options.launch.launch(session, frame, work, launchOptions)) as ActionEvent['launch'],
 					task: tools.task,
 					mutate,
 				});

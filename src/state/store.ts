@@ -68,7 +68,7 @@ export interface SessionStore {
 	 *   The id is optional: it is pre-generated for the first payload of a mount,
 	 *   and carried through revive clicks; otherwise it is generated here.
 	 * @returns The new session, which is live and present in the store.
-	 * @throws On a non-finite or non-positive `ttlMs`.
+	 * @throws On a zero, negative or NaN `ttlMs`.
 	 */
 	create<TData>(input: CreateSessionInput<TData>): Session<TData>;
 	/** @returns The session if present, even expired. */
@@ -147,8 +147,8 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 
 	return {
 		create<TData>(input: CreateSessionInput<TData>): Session<TData> {
-			if (!Number.isFinite(input.ttlMs) || input.ttlMs <= 0) {
-				throw new Error(`ttlMs must be finite and positive, got ${String(input.ttlMs)}`);
+			if (Number.isNaN(input.ttlMs) || input.ttlMs <= 0) {
+				throw new Error(`ttlMs must be a positive number of milliseconds, or Infinity to never expire (got ${String(input.ttlMs)})`);
 			}
 			// The caller may pass an id it already has: mount needs one
 			// before the message exists (the first payload embeds it), and

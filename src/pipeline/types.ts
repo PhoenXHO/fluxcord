@@ -140,6 +140,29 @@ export interface ActionEvent<TData = unknown, TKeys extends string = string> {
 		options: { readonly as: K; readonly args?: TData[K] },
 	): Promise<TExit>;
 	/**
+	 * Launch detached work the framework tracks: this handler returns (and
+	 * the click acks) immediately, the panel stays interactive, and the
+	 * job's `job.mutate` edits land as ordinary queued redraws while the
+	 * work runs. The job is owned by this flow's frame: it dies quietly
+	 * when the flow exits or the session ends, its writes apply to the bag
+	 * even while the user is elsewhere (no render; the return navigation
+	 * redraws from the bag), and they never keep the session's TTL alive.
+	 * With `{ as }`, the work's settled value lands in `data.<as>` and
+	 * redraws; a rejection routes to the error socket and writes nothing.
+	 * The closure receives the mutate-only handle: no navigation, no
+	 * replies, no exits.
+	 *
+	 * A method on purpose: method parameters check bivariantly, which
+	 * keeps the erased `ActionEvent<never>` comparable with a fully typed
+	 * `ActionEvent<TData>` across the framework's type-erase boundary
+	 * (same seam as `call`).
+	 */
+	launch<K extends string & keyof TData>(
+		work: (job: JobHandle<TData>) => Promise<TData[K]>,
+		options: { readonly as: K },
+	): void;
+	launch(work: (job: JobHandle<TData>) => Promise<void> | void): void;
+	/**
 	 * The work hook: run fallible calls (services, APIs) here, before any
 	 * mutation. Throws if called after a mutate; the work phase ends when
 	 * the commit phase begins.
@@ -168,6 +191,38 @@ export interface EventTools<TData = unknown> {
 	 * through the parked call; ordinary handlers never need it.
 	 */
 	readonly resetPhase: () => void;
+}
+
+/**
+ * The handle a launched job receives. Writes only: every `mutate` applies
+ * one synchronous change to the flow's bag (the launching frame's slot
+ * path), serialized on the session's FIFO. No navigation, no replies, no
+ * exits: the job is the work; screens stay the handler's business.
+ */
+export interface JobHandle<TData = unknown> {
+	/** Applies one synchronous change to the flow's bag at the launching frame's slot path. */
+	mutate(fn: (data: TData) => void): void;
+}
+
+/**
+ * The engine behind `event.launch`. The runtime builds one (runtime/launch);
+ * dispatch binds it into each delivered event. Flow and bag types are erased
+ * here, same boundary as the call engine.
+ */
+export interface LaunchEngine {
+	/**
+	 * Starts detached work owned by the launching frame. The work runs
+	 * outside the session's queue; its writes re-enter the queue. A settle
+	 * with an `as` slot writes the value into the bag (redraw when the frame
+	 * is on screen); a throw routes to the error socket. The job dies
+	 * quietly when its frame leaves the stack or the session dies.
+	 */
+	launch(
+		session: Session<unknown>,
+		frame: FlowFrame,
+		work: (job: JobHandle<unknown>) => Promise<unknown>,
+		options?: { readonly as?: string },
+	): void;
 }
 
 /**

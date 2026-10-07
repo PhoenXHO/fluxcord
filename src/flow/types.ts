@@ -133,7 +133,7 @@ export interface FlowOptions<TData, TScreens extends string = string> {
 	 * with no chrome.
 	 */
 	readonly components?: readonly FlowComponent<TData>[];
-	/** The session's sliding TTL in milliseconds. Default: 30 minutes. Must be finite and positive; `Infinity` throws. */
+	/** The session's sliding TTL in milliseconds. Default: 30 minutes. A positive number, or `Infinity` to opt out of expiry entirely: the session lives until closed (an ephemeral surface's absolute ceiling still applies). */
 	readonly ttlMs?: number;
 	/** What a mount does when the owner already holds a live panel of this flow. Default: `'replace'` closes the old panel. */
 	readonly remount?: RemountPolicy;

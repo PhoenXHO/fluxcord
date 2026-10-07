@@ -46,7 +46,7 @@ function assertId(kind: string, id: string): void {
  *
  * @param options Screens, `first`, `initialData`, and the optional pieces.
  * @returns The frozen definition a flow carries.
- * @throws On an invalid screen id or a non-finite `ttlMs`.
+ * @throws On an invalid screen id or an invalid `ttlMs`.
  */
 export function defineFlow<TData = void, const TScreens extends string = string>(
 	options: FlowOptions<TData, TScreens>,
@@ -74,8 +74,8 @@ export function defineFlow<TData = void, const TScreens extends string = string>
 	}
 
 	const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
-	if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
-		throw new Error(`defineFlow: ttlMs must be a finite positive number of milliseconds (got ${ttlMs})`);
+	if (Number.isNaN(ttlMs) || ttlMs <= 0) {
+		throw new Error(`defineFlow: ttlMs must be a positive number of milliseconds, or Infinity to never expire (got ${String(ttlMs)})`);
 	}
 
 	const definition: FlowDefinition<TData> = {

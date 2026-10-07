@@ -104,11 +104,13 @@ describe('defineFlow - validations', () => {
 		expect(def.initialData).toBeUndefined();
 	});
 
-	it('rejects non-finite and non-positive ttlMs', () => {
+	it('rejects zero, negative and NaN ttlMs, and carries Infinity through', () => {
 		const screens = { main: { view: () => view({}, text('m')) } } as const;
-		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: Infinity })).toThrow(/ttlMs/);
 		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: 0 })).toThrow(/ttlMs/);
 		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: -1000 })).toThrow(/ttlMs/);
+		expect(() => defineFlow({ screens, first: 'main', initialData: {}, ttlMs: NaN })).toThrow(/ttlMs/);
+		const immortal = defineFlow({ screens, first: 'main', initialData: {}, ttlMs: Infinity });
+		expect(immortal.ttlMs).toBe(Infinity);
 	});
 
 	it('rejects screen ids the customId codec cannot carry', () => {

@@ -83,11 +83,18 @@ describe('create', () => {
 		random.mockRestore();
 	});
 
-	it('rejects a non-finite or non-positive ttlMs', () => {
+	it('rejects a zero, negative or NaN ttlMs', () => {
 		const store = createSessionStore();
-		expect(() => store.create(input({ ttlMs: Infinity }))).toThrow(/ttlMs/);
 		expect(() => store.create(input({ ttlMs: 0 }))).toThrow(/ttlMs/);
 		expect(() => store.create(input({ ttlMs: -1 }))).toThrow(/ttlMs/);
+		expect(() => store.create(input({ ttlMs: NaN }))).toThrow(/ttlMs/);
+	});
+
+	it('ttlMs Infinity opts out of expiry: the sweeper leaves the session alone', () => {
+		const store = createSessionStore();
+		const immortal = store.create(input({ ttlMs: Infinity }));
+		expect(store.sweep()).toBe(0);
+		expect(store.get(immortal.id)).toBe(immortal);
 	});
 });
 

@@ -28,6 +28,7 @@ import { createOnEnd } from '../commit/onEnd.js';
 import { createDispatch } from '../pipeline/dispatch.js';
 import { createSessionQueue } from '../pipeline/queue.js';
 import { createCall } from './call.js';
+import { createLaunch } from './launch.js';
 import { renderV2Message } from '../render/v2.js';
 import { createSessionStore, generateId, isExpired } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
@@ -106,6 +107,26 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		redraw: commit.redraw,
 		commitParting: commit.commitParting,
 	};
+	// The launch engine needs store, queue and the draw arm; its job
+	// failures route through the host's error unit like death-path
+	// failures do (no click bound, unit guarded).
+	const launchEngine = createLaunch({
+		store,
+		queue,
+		platform,
+		...(options.now !== undefined ? { now: options.now } : {}),
+		...(options.onError !== undefined
+			? {
+				onError: (error: unknown, session: Session<unknown>): void => {
+					try {
+						options.onError!({ error, source: ErrorSource.Framework, session, reply: (): Promise<void> => Promise.resolve() });
+					} catch (unitError) {
+						console.error('[fluxcord] onError unit threw:', unitError);
+					}
+				},
+			}
+			: {}),
+	});
 
 	/** Sends the first payload through the target arm; returns where it landed. */
 	async function send(target: MountTarget, payload: V2MessagePayload): Promise<MessageRef> {
@@ -156,6 +177,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		tryRevive,
 		makeUi,
 		call: callEngine,
+		launch: launchEngine,
 		queue,
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 		...(options.now !== undefined ? { now: options.now } : {}),
