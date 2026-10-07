@@ -21,7 +21,7 @@ export const orderFlow = flow<OrderData>('order', {
 ```
 
 > [!CAUTION]
-> The `ttlMs` option expects a finite, positive number. Passing `Infinity` throws immediately at definition time because an immortal session represents an unmanaged memory leak.
+> The `ttlMs` option expects a positive number of milliseconds, or `Infinity` to opt out of expiry entirely: an immortal session lives until closed, the sweeper never reaps it, and an ephemeral surface's absolute ceiling still applies. That is an informed choice about memory, so zero, negative and NaN values still throw at definition time. Job writes never slide the window either way, as the [Background work](background-work.md) chapter covers.
 
 To clean up inactive sessions, fluxcord runs a background sweeper every 15 seconds (`DEFAULT_SWEEP_INTERVAL_MS = 15_000`) using an unreferenced timer that will not prevent the process from closing. You can adjust this sweep interval if needed, though the default works for nearly every case because the deadline math remains exact regardless of when the sweep runs.
 

@@ -108,4 +108,4 @@ Finally, remember the architectural boundary: while an external service holding 
 
 ## Next steps
 
-Whenever a bot restarts, it forgets all active sessions in memory, which quickly becomes a problem for durable panels like a giveaway or a signup sheet. In the [persistence](persistence.md) chapter, we'll introduce the rehydrate store: the single place where fluxcord interacts with a database, showing how a delayed click can revive a panel from domain truth.
+External events are one way a panel moves on its own; the other is work the panel itself launches. In the [Background work](background-work.md) chapter, we'll meet `event.launch`: tracked background jobs whose edits redraw the screen while the user keeps clicking, plus the race timer that keeps slow handlers inside Discord's response window.

@@ -13,4 +13,5 @@ The getting-started chapters left you with a small but complete bot. The core-co
 - [Sessions and expiry](sessions-and-expiry.md) — Manage panel lifecycles and clean up inactive sessions.
 - [Errors](errors.md) — Decide what users see when a handler fails.
 - [Live panels](live-panels.md) — Hook into external events to trigger real-time panel updates.
+- [Background work](background-work.md) — Launch tracked background jobs and keep the panel interactive while they run.
 - [Persistence](persistence.md) — Save and restore active sessions across bot restarts.
