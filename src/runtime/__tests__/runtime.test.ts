@@ -94,6 +94,8 @@ function world(options: {
 	sweeper?: boolean;
 	/** Swap in a stateless flow (initialData omitted); its view ignores data. */
 	stateless?: boolean;
+	/** Adds a second screen with that id, so the landing tests can go() to it. */
+	extraScreen?: string;
 } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
@@ -115,6 +117,9 @@ function world(options: {
 						row({}, button({ onClick: handler, label: 'Join' })),
 					),
 				},
+				...(options.extraScreen !== undefined
+					? { [options.extraScreen]: { view: () => view({}, text('all set')) } }
+					: {}),
 			},
 			first: 'main',
 			// The flow-owned fresh bag: mount clones this per session.
@@ -298,6 +303,47 @@ describe('mount - the flow-owned bag', () => {
 			seen = data.count;
 		});
 		expect(seen).toBe(3);
+	});
+});
+
+describe('mount - handle.go, the post-load landing', () => {
+	it('lands the panel on a named screen and redraws once', async () => {
+		const w = world({ extraScreen: 'done' });
+		const handle = await w.mount();
+
+		await handle.go('done');
+
+		const [ , payload ] = vi.mocked(w.platform.editMessage).mock.calls.at(-1)!;
+		expect(textBodies(payload)).toContain('all set');
+	});
+
+	it('a click resolved against the landed screen with no matching control runs stale semantics', async () => {
+		const w = world({ extraScreen: 'done' });
+		const handle = await w.mount();
+		await handle.go('done');
+
+		// The done screen binds no Join: the old click's hash is missing
+		// from the landed action map, so it redraws (dropped: same pixels)
+		// and runs nothing.
+		const before = vi.mocked(w.platform.editMessage).mock.calls.length;
+		await w.click(handle.sessionId, handle.messageId);
+		expect(vi.mocked(w.platform.editMessage).mock.calls.length).toBe(before);
+		expect(w.handler).not.toHaveBeenCalled();
+	});
+
+	it('throws on a screen the flow does not have', async () => {
+		const w = world();
+		const handle = await w.mount();
+
+		await expect(handle.go('nope')).rejects.toThrow(/no screen of flow/);
+	});
+
+	it('resolves false when the session is gone', async () => {
+		const w = world({ extraScreen: 'done' });
+		const handle = await w.mount();
+		w.clock.advance(31 * MINUTE);
+
+		await expect(handle.go('done')).resolves.toBe(false);
 	});
 });
 

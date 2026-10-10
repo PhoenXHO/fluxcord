@@ -64,9 +64,11 @@ export interface MountOptions {
 }
 
 /**
- * What mount returns: identity for rehydration binding, plus redraw for
- * services that keep a panel updated over time. Close is deliberately
- * inside-only: ui.close from a handler.
+ * What mount returns: identity for rehydration binding, redraw for
+ * services that keep a panel updated over time, and go for the
+ * post-load landing — an async-mounted panel can finish loading, then
+ * land on the screen its data calls for. Close is deliberately
+ * inside-only: ui.exit from a handler.
  */
 export interface MountHandle<TData = unknown> {
 	readonly sessionId: string;
@@ -78,6 +80,15 @@ export interface MountHandle<TData = unknown> {
 	 * failure rejects to the caller; APIs throw, pipelines report.
 	 */
 	redraw(mutate?: (data: TData) => void): Promise<boolean>;
+	/**
+	 * Land the panel on a named screen of the mounting flow, serialized
+	 * with clicks on the same session's queue: the screen switches, the
+	 * in-section history resets, the modal nonce flips, and the screen
+	 * redraws once. Resolves false when the session is gone; throws on
+	 * a screen the flow does not have (an authoring bug, loud like the
+	 * nav verbs).
+	 */
+	go(screen: string): Promise<boolean>;
 }
 
 export interface RuntimeOptions {

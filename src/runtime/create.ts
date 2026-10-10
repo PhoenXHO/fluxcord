@@ -323,7 +323,22 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 					const live = store.get(session.id);
 					if (live === undefined || isExpired(live, now())) return false;
 					mutate?.(live.data as TData);
-					store.touch(session.id);
+					store.touch(live.id);
+					await commit.redraw(live);
+					return true;
+				}),
+			go: (screen: string): Promise<boolean> =>
+				queue.enqueue(session.id, async () => {
+					const live = store.get(session.id);
+					if (live === undefined || isExpired(live, now())) return false;
+					const frame = activeFrame(live);
+					if (frame.token.definition.screens[screen] === undefined) {
+						throw new Error(`handle.go: '${screen}' is no screen of flow '${frame.flowId}' (a renamed screen key?)`);
+					}
+					frame.screen = screen;
+					frame.history = [];
+					frame.modalNonce = generateId();
+					store.touch(live.id);
 					await commit.redraw(live);
 					return true;
 				}),

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `handle.go(screen)`, the post-load landing: an async-mounted panel can finish loading and land on the screen its data calls for. Serialized with clicks, history reset, nonce flipped, one redraw; throws on a screen the flow does not have, resolves false when the session is gone.
+
 ### Changed
 
 - `Back` below the root no longer renders disabled on an empty history: "wherever you came from" is the parent, so the click exits the flow, ending the session at the root or resuming the caller's `event.call`. The root keeps the disabled state, and with history the click pops one entry as before.
