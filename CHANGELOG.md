@@ -92,3 +92,9 @@ Initial release.
 - Host: `createBot`, the one-call boot (client, bridge, runtime, command registration, interaction listener), with `bot.mount` for programmatic panels targeting a channel, an interaction reply, or an existing message to rebind after restarts, `registerCommands` to replace the built-in registration wholesale, `DISCORD_TOKEN` / `DISCORD_GUILD_ID` env fallbacks, bring-your-own `client` and `intents`, and a `logger` seam for bridge anomalies.
 - Boot layer: `buildFlowCatalog`, `moduleFlowRegistrations`, and `coverageScan` boot validation.
 - Advanced seams for custom hosts: `createUiRuntime`, `createCommit` / `viewOf`, `createSessionStore`, `asScreenRegistry`, `createDispatch` / `defaultOnError`, the action-id codec (`encodeActionId`, `decodeActionId`, `isActionId`), `validateTree`, and the type vocabulary (`Session`, `MessageRef`, `EndReason`, node types, `PolicyPort`, render payloads).
+
+## [0.2.2] - 2026-10-11
+
+### Fixed
+
+- A modal open on a dead or already-answered interaction (10062 Unknown interaction, 40060 already acknowledged) drops quietly instead of surfacing as a framework failure: the panel is the user's real surface, and its next click is the retry.
