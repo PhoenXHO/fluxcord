@@ -473,12 +473,31 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 				return;
 			}
 
-			// Auto-redraw: exactly one edit per successful event, the final
-			// screen winning. Only while the session lives: close already
-			// froze the message, and expiry hands it to the sweeper's parting.
+			// Auto-redraw: exactly one edit per successful event, queued
+			// behind the session's FIFO instead of painted inline — a
+			// handler whose exit wakes a parked caller (event.call) lets
+			// that continuation navigate first, so chained calls paint
+			// only the screen they land on: the intermediate screen never
+			// reaches the wire, and the queued redraw renders whatever the
+			// chain settled on, dropped as identical when it changed
+			// nothing. Only while the session lives: close already froze
+			// the message, and expiry hands it to the sweeper's parting.
 			const alive = options.store.get(session.id) === session && !isExpired(session, now());
 			if (alive) {
-				await options.platform.redraw(session);
+				// Fire-and-forget: the deliver itself is a queue entry, and
+				// awaiting a nested enqueue here would chain the redraw after
+				// the deliver's own settle — waiting on itself. The redraw's
+				// failures still route to the error socket from inside the
+				// queued job.
+				void queue.enqueue(session.id, async () => {
+					const live = options.store.get(session.id) === session && !isExpired(session, now());
+					if (!live) return;
+					try {
+						await options.platform.redraw(session);
+					} catch (error) {
+						reportFailure(error, incoming, ErrorSource.Framework, undefined, undefined, site);
+					}
+				});
 			}
 		} catch (error) {
 			reportFailure(error, incoming, ErrorSource.Framework, undefined, undefined, site);

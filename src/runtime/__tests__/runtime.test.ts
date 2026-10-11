@@ -191,6 +191,9 @@ function world(options: {
 			messageId,
 			...overrides,
 		});
+		// The post-handler redraw is a queued job now: drain the line before
+		// the assertions look at edits.
+		await new Promise((resolve) => setImmediate(resolve));
 	}
 
 	return { clock, runtime, platform, edits, replies, rows, sent, handler, mount, click };

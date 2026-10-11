@@ -152,10 +152,14 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 	};
 
 	// The real call engine over the real queue: ui.exit at the root closes
-	// through the store exactly as production does.
+	// through the store exactly as production does. The queue is shared
+	// with dispatch and exposed as the tests' flush seam: the post-handler
+	// redraw is a queued job now, and clicking drains the line before
+	// asserting on edits.
+	const queue = createSessionQueue();
 	const call = createCall({
 		store,
-		queue: createSessionQueue(),
+		queue,
 		commit: { redraw: commit.redraw },
 		byToken: new Map(),
 	});
@@ -168,6 +172,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		tryRevive: async (): Promise<Session<unknown> | undefined> => undefined,
 		makeUi: createMakeUi({ exit: call.exit }),
 		call,
+		queue,
 		...(overrides.captureErrors === true ? { onError: (report: ErrorReport): void => { errors.push(report); } } : {}),
 		now: () => clock.now,
 	});
@@ -205,7 +210,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 			channelId: CHANNEL_ID,
 			messageId: MESSAGE_ID,
 			...clickOverrides,
-		});
+		}).then(() => queue.enqueue(session.id, async (): Promise<void> => undefined));
 	}
 
 	return { clock, store, session, handler, decide: (next) => (decision = next), edits, modals, replies, errors, onEndErrors, rows, click, currentEvent };

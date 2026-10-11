@@ -89,6 +89,7 @@ interface World {
 	errors: ErrorReport[];
 	dispatch: Dispatch;
 	click: (overrides?: Partial<IncomingEvent>) => Promise<void>;
+	queue: ReturnType<typeof createSessionQueue>;
 }
 
 /** The wired world: real store + one registered screen + recorded everything. */
@@ -144,6 +145,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		resetPhase: () => undefined,
 	};
 
+	const sessionQueue = createSessionQueue();
 	const dispatch = createDispatch({
 		store,
 		policy,
@@ -160,7 +162,8 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 			exit: () => {},
 			crash: () => false,
 		},
-		launch: createLaunch({ store, queue: createSessionQueue(), platform }),
+		launch: createLaunch({ store, queue: sessionQueue, platform }),
+		queue: sessionQueue,
 		...(options.omitErrorHandler !== true
 			? {
 				onError: (report: ErrorReport): void => {
@@ -185,7 +188,7 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		});
 	}
 
-	return { clock, store, session, handler, tools, policy, platform, calls, token, tryRevive, errors, dispatch, click };
+	return { clock, store, session, handler, tools, policy, platform, calls, token, tryRevive, errors, dispatch, click, queue: sessionQueue };
 }
 
 describe('dispatch - allow path', () => {
@@ -694,3 +697,26 @@ describe('the ack race timer', () => {
 		expect(w.platform.ack as Mock).not.toHaveBeenCalled();
 	});
 });
+
+describe('the queued post-handler redraw', () => {
+	it('waits for session work queued during the handler and paints the final state', async () => {
+		const w = world();
+		const order: string[] = [];
+		(w.platform.redraw as Mock).mockImplementation(async () => {
+			order.push('redraw');
+		});
+		w.handler.mockImplementationOnce(async () => {
+			// Simulates a parked caller's continuation (an event.call
+			// resume): queue work lands during the handler, and the
+			// post-handler redraw must wait its turn behind it.
+			void w.queue.enqueue(w.session.id, async () => {
+				w.session.data.tickets = 99;
+				order.push('work');
+			});
+		});
+
+		await w.click();
+		await vi.waitFor(() => expect(order).toEqual(['work', 'redraw']));
+	});
+});
+

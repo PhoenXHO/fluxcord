@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-10-11
+
+### Fixed
+
+- The post-handler redraw is queued behind the session's work instead of painted inline: a handler whose exit wakes a parked caller (`event.call`) lets that continuation navigate first, so chained calls paint only the screen they land on — the skipped-through screen never reaches the wire, and the queued redraw renders whatever the chain settled on, dropped as identical when it changed nothing.
+
 ## [0.2.2] - 2026-10-11
 
 ### Fixed
