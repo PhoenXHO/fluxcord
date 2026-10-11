@@ -66,6 +66,7 @@ interface MountArgs {
 	readonly ownerId?: string;
 	readonly rehydrateRef?: string;
 	readonly context?: unknown;
+	readonly data?: unknown;
 }
 
 export interface World {
@@ -96,6 +97,8 @@ function world(options: {
 	stateless?: boolean;
 	/** Adds a second screen with that id, so the landing tests can go() to it. */
 	extraScreen?: string;
+	/** Makes `first` a resolver over the bag, so the mount-seed tests can land by data. */
+	resolverFirst?: boolean;
 } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
@@ -121,7 +124,9 @@ function world(options: {
 					? { [options.extraScreen]: { view: () => view({}, text('all set')) } }
 					: {}),
 			},
-			first: 'main',
+			...(options.resolverFirst === true
+				? { first: (data: PanelData): string => (data.count > 5 ? 'done' : 'main') }
+				: { first: 'main' }),
 			// The flow-owned fresh bag: mount clones this per session.
 			initialData: { count: 3 },
 			ttlMs: 30 * MINUTE,
@@ -179,6 +184,7 @@ function world(options: {
 			ownerId: mountOptions.ownerId ?? OWNER_ID,
 			...(mountOptions.rehydrateRef !== undefined ? { rehydrateRef: mountOptions.rehydrateRef } : {}),
 			...(mountOptions.context !== undefined ? { context: mountOptions.context } : {}),
+			...(mountOptions.data !== undefined ? { data: mountOptions.data } : {}),
 		});
 	}
 
@@ -347,6 +353,51 @@ describe('mount - handle.go, the post-load landing', () => {
 		w.clock.advance(31 * MINUTE);
 
 		await expect(handle.go('done')).resolves.toBe(false);
+	});
+});
+
+describe('mount - the data seed', () => {
+	it('a seeded bag resolves first at birth: the birth payload is the landed screen', async () => {
+		const w = world({ extraScreen: 'done', resolverFirst: true });
+
+		await w.mount({ data: { count: 9 } });
+
+		expect(textBodies(w.sent[0].payload)).toContain('all set');
+	});
+
+	it('a seed under the threshold lands on the entry screen as before', async () => {
+		const w = world({ extraScreen: 'done', resolverFirst: true });
+
+		await w.mount({ data: { count: 1 } });
+
+		expect(textBodies(w.sent[0].payload)).toContain('count 1');
+	});
+
+	it('the seed is cloned per mount: two mounts never share bag state', async () => {
+		const w = world({ extraScreen: 'done', resolverFirst: true });
+		const seed = { count: 9 };
+
+		const a = await w.mount({ to: { channel: 'ch-1' }, data: seed });
+		await a.redraw((data) => {
+			data.count = 50;
+		});
+		const b = await w.mount({ to: { channel: 'ch-2' }, data: seed });
+
+		let seen = 0;
+		await b.redraw((data) => {
+			seen = data.count;
+		});
+		expect(seen).toBe(9);
+	});
+
+	it('a rehydratable mount keeps the restore callback above the seed', async () => {
+		const w = world({ rehydratable: true, extraScreen: 'done', resolverFirst: true });
+
+		const handle = await w.mount({ to: { channel: 'ch-1' }, rehydrateRef: 'good-ref', data: { count: 1 } });
+
+		// The restore callback won: { count: 77 } passes the threshold.
+		expect(textBodies(w.sent[0].payload)).toContain('all set');
+		expect(handle.sessionId).toBeDefined();
 	});
 });
 

@@ -58,13 +58,18 @@ async function mountLeaf(leaf: MountLeaf, interaction: ChatInputCommandInteracti
 	}
 	// The never-to-unknown cast of the leaf's flow: the same object, widened
 	// for mount's generic (the phantom __data channel makes them distinct
-	// to the checker). This file is the one place it happens. The bag comes
-	// from the flow's own initialData, and the invocation rides along as
-	// the mount context: the flow's onSessionStart hook receives it.
+	// to the checker). This file is the one place it happens. The bag is
+	// the leaf's data resolver's seed when authored (built per invocation,
+	// so the birth payload already carries the state the command read —
+	// the seed overrides initialData and first resolves on it), else the
+	// flow's own initialData. The invocation rides along as the mount
+	// context: the flow's onSessionStart hook receives it.
+	const data = leaf.data !== undefined ? await leaf.data(interaction) : undefined;
 	await host.mount(leaf.flow as Flow<unknown>, {
 		to: { reply: host.replySender(interaction, { ephemeral: leaf.ephemeral === true }) },
 		ownerId: interaction.user.id,
 		context: interaction,
+		...(data !== undefined ? { data } : {}),
 	});
 }
 

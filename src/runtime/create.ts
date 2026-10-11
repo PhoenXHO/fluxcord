@@ -215,7 +215,10 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		// The bag. A rebind of a rehydratable flow (rehydrateRef given) asks
 		// the flow's restore callback first: its data becomes the bag, so a
 		// rebind panel keeps its state, and a decline (undefined) falls back
-		// to the seed. Every other mount starts from the flow's own
+		// to the seed. An explicit mount data seed (the command layer's
+		// resolver built it per invocation) overrides initialData next, so
+		// the first payload already renders the state the host read before
+		// mounting. Every other mount starts from the flow's own
 		// initialData, cloned per mount. Two sessions must never share
 		// mutable bag state (an in-place push on a nested array would leak
 		// across panels), and a non-cloneable bag (functions, class
@@ -231,7 +234,9 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		// so the read casts back from the erased unknown.
 		const data = def.rehydrate !== undefined && mountOptions.rehydrateRef !== undefined
 			? ((await def.rehydrate(mountOptions.rehydrateRef)) as TData | undefined) ?? seeded()
-			: seeded();
+			: mountOptions.data !== undefined
+				? structuredClone(mountOptions.data) as TData
+				: seeded();
 		// The entry screen resolves once, on the seed: a resolver `first`
 		// picks the landing screen before any draw exists.
 		const first = entryScreen(def, data);

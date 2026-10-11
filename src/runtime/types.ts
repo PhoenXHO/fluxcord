@@ -61,6 +61,15 @@ export interface MountOptions {
 	 * flow types it at authoring time.
 	 */
 	readonly context?: unknown;
+	/**
+	 * Seeds the flow's bag before the first payload exists: overrides
+	 * `initialData`, and `first` resolves on it at birth, so an
+	 * async-read panel opens on the screen its data calls for with no
+	 * loading flash. Cloned per mount, like `initialData`. The command
+	 * layer fills it through a leaf's `data` resolver; hand it explicitly
+	 * only for programmatic mounts.
+	 */
+	readonly data?: unknown;
 }
 
 /**
