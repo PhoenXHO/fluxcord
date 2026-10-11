@@ -182,8 +182,20 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 			return;
 		}
 		// Raw-API payload handed to d.js verbatim: the builders exist to emit
-		// exactly this wire shape.
-		await interaction.showModal(payload as unknown as ModalComponentData);
+		// exactly this wire shape. A dead or late interaction (the token died
+		// past the response window, or an ack already closed it) is nothing to
+		// save: the panel is the user's real surface, and its next click is
+		// the retry. Quiet like the deleted-message edit.
+		try {
+			await interaction.showModal(payload as unknown as ModalComponentData);
+		} catch (error) {
+			const code = (error as { code?: unknown }).code;
+			if (code === 10062 || code === 40060) {
+				log.debug('showModal on a dead or already-answered interaction: dropped', error);
+				return;
+			}
+			throw error;
+		}
 		scope.modalOpen = true;
 	}
 
