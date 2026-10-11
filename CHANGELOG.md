@@ -6,9 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.2.3] - 2026-10-11
 
+### Added
+
+- `handle.go(screen)`, the post-load landing: an async-mounted panel can finish loading and land on the screen its data calls for. Serialized with clicks, history reset, nonce flipped, one redraw; throws on a screen the flow does not have, resolves false when the session is gone.
+- A mount data seed: `mount` accepts `data` (and a leaf's `mounts` accepts a `data` resolver over the invocation), overriding `initialData` before the first payload exists, so `first` resolves at birth and an async-read panel opens on the screen its data calls for with no loading flash.
+- A boot check for one flow constant registered under two module homes: the duplicate-flow-id guard cannot see it, because each module assembles a different full id from the same object and the token map would silently keep the last mapping.
+
 ### Fixed
 
-- The post-handler redraw is queued behind the session's work instead of painted inline: a handler whose exit wakes a parked caller (`event.call`) lets that continuation navigate first, so chained calls paint only the screen they land on — the skipped-through screen never reaches the wire, and the queued redraw renders whatever the chain settled on, dropped as identical when it changed nothing.
+- The post-handler redraw is queued behind the session's work instead of painted inline: a handler whose exit wakes a parked caller (`event.call`) lets that continuation navigate first, so chained calls paint only the screen they land on. The skipped-through screen never reaches the wire, and the queued redraw renders whatever the chain settled on, dropped as identical when it changed nothing.
 
 ## [0.2.2] - 2026-10-11
 
