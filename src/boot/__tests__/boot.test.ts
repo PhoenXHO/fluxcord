@@ -100,6 +100,13 @@ describe('buildFlowCatalog', () => {
 		expect(() => buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: twin }])).toThrow(/declared twice/);
 	});
 
+	it('one flow constant under two modules throws: the token map would silently keep the last', () => {
+		const shared = makeFlow();
+		expect(() =>
+			buildFlowCatalog([{ module: 'panel', flow: shared }, { module: 'other', flow: shared }]),
+		).toThrow(/registered under two homes/);
+	});
+
 	it('screen ids are per-flow: two flows of one module may reuse them', () => {
 		const evil = flow<PanelData>('twin', {
 			screens: { main: { view: () => view({}, text('m')) } },

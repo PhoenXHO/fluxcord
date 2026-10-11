@@ -48,9 +48,19 @@ export interface FlowCatalog {
  * @param registrations One entry per authored flow, harvested from the
  *   modules' `flow`s and `command`s.
  * @returns The catalog the runtime consumes; immutable from then on.
- * @throws When two flows land on the same full id.
+ * @throws When two flows land on the same full id, or when one flow
+ *   constant is registered under two modules: each module would assemble
+ *   a different full id from the same object (passing the duplicate-id
+ *   check), and the token map would silently keep the last mapping.
  */
 export function buildFlowCatalog(registrations: readonly FlowRegistration[]): FlowCatalog {
+	const seenFlows = new Set<object>();
+	for (const { module, flow } of registrations) {
+		if (seenFlows.has(flow)) {
+			throw new Error(`buildFlowCatalog: the same flow constant is registered under two homes (module '${module}' claims '${flow.id}', already registered)`);
+		}
+		seenFlows.add(flow);
+	}
 	const tokens: MountToken[] = registrations.map(({ module, flow, commandHint }) =>
 		Object.freeze({
 			flowId: `${module}/${flow.id}`,
