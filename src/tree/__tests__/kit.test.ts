@@ -22,7 +22,7 @@ describe('kitFor Back - draw', () => {
 		const node = kitFor({ history: [] }).Back({});
 		expect(node).toEqual({
 			kind: 'button',
-			label: 'Back',
+			label: '◀Back',
 			style: 'secondary',
 			disabled: true,
 			onClick: expect.any(Function),
