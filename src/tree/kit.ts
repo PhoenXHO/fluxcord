@@ -185,7 +185,7 @@ export function kitFor(session: Pick<ViewSession, 'history'>, options: { readonl
 			return button({
 				...(hasFlag ? {} : { secondary: true }),
 				...rest,
-				label: label ?? '◀Back',
+				label: label ?? '◀ Back',
 				disabled: session.history.length === 0 && !canExit,
 				onClick: run,
 			} as ButtonProps);
