@@ -32,7 +32,7 @@ import { defaultOnError } from '../pipeline/dispatch.js';
 import { createDefaultPolicyEngine, isPolicyPort } from '../pipeline/policy.js';
 import type { PrivilegeFacts } from '../pipeline/policy.js';
 import { ErrorSource } from '../pipeline/types.js';
-import type { ErrorHandler, PolicyPort } from '../pipeline/types.js';
+import type { ErrorHandler, PartingOptions, PolicyPort } from '../pipeline/types.js';
 import type { RehydrateStore } from '../state/types.js';
 import { createUiRuntime } from '../runtime/create.js';
 import type { MountHandle, MountOptions } from '../runtime/types.js';
@@ -92,6 +92,13 @@ export interface CreateBotOptions {
 	 * Default: nothing is gated.
 	 */
 	readonly policy?: PolicyPort | PrivilegeFacts;
+	/**
+	 * The host's global parting bundle: what a flow that declares no
+	 * `parting` of its own expires into (and what a dead click on its
+	 * panel renders), instead of the built-in screen. Flows with their
+	 * own parting keep it.
+	 */
+	readonly defaultParting?: PartingOptions;
 	/** Gateway intents for the built client. Default: `[Guilds]`. */
 	readonly intents?: readonly GatewayIntentBits[];
 	/**
@@ -162,6 +169,7 @@ export function createBot(options: CreateBotOptions): Bot {
 		policy: policyPort,
 		flows,
 		...(options.rehydrate !== undefined ? { rehydrate: options.rehydrate } : {}),
+		...(options.defaultParting !== undefined ? { defaultParting: options.defaultParting } : {}),
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 		...(options.now !== undefined ? { now: options.now } : {}),
 		...(options.sweeper !== undefined ? { sweeper: options.sweeper } : {}),

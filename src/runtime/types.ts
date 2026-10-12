@@ -10,7 +10,7 @@
 
 import type { V2MessagePayload } from '../render/v2.js';
 import type { MessageRef, RehydrateStore, Session } from '../state/types.js';
-import type { BridgePort, ErrorHandler, IncomingEvent, PolicyPort } from '../pipeline/types.js';
+import type { BridgePort, ErrorHandler, IncomingEvent, PartingOptions, PolicyPort } from '../pipeline/types.js';
 import type { FlowCatalog } from '../boot/build.js';
 import type { Flow } from '../flow/token.js';
 
@@ -72,6 +72,10 @@ export interface MountOptions {
 	readonly data?: unknown;
 }
 
+// The parting options ride the pipeline's vocabulary; the type import is
+// erased, so no platform-free boundary is crossed here.
+
+
 /**
  * What mount returns: identity for rehydration binding, redraw for
  * services that keep a panel updated over time, and go for the
@@ -111,6 +115,13 @@ export interface RuntimeOptions {
 	readonly flows: FlowCatalog;
 	/** Backs rehydration; omit and rehydratable flows fail loudly at mount. */
 	readonly rehydrate?: RehydrateStore;
+	/**
+	 * The host's global parting bundle: what a flow that declares no
+	 * `parting` of its own expires into (and what a dead click on its
+	 * panel renders), instead of the built-in screen. Flows with their
+	 * own parting keep it.
+	 */
+	readonly defaultParting?: PartingOptions;
 	/** Reports handler and death-path failures; omit and the shipped default fails loud. */
 	readonly onError?: ErrorHandler;
 	/** Injectable clock for tests; defaults to Date.now. */

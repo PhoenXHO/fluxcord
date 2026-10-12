@@ -16,7 +16,7 @@ import { actionHash } from '../../render/action-hash.js';
 import { encodeActionId } from '../../render/id-codec.js';
 import type { V2MessagePayload } from '../../render/v2.js';
 import { EventKind } from '../../pipeline/types.js';
-import type { IncomingEvent, PlatformPort, PolicyDecision, PolicyPort } from '../../pipeline/types.js';
+import type { IncomingEvent, PartingOptions, PlatformPort, PolicyDecision, PolicyPort } from '../../pipeline/types.js';
 import { EndReason, RemountPolicy } from '../../state/types.js';
 import type { MessageRef, RehydrateRow, RehydrateStore } from '../../state/types.js';
 import { button, row, text, view } from '../../tree/builders.js';
@@ -43,21 +43,26 @@ function textBodies(payload: V2MessagePayload): string[] {
 }
 
 /** The host-side bridge: edit/reply/modal recorded, no Discord. */
-function fakeBridge(): { platform: PlatformPort; edits: string[]; replies: string[] } {
+function fakeBridge(): { platform: PlatformPort; edits: string[]; editPayloads: V2MessagePayload[]; replies: string[]; partings: { ref: MessageRef; parting?: PartingOptions; hint?: string }[] } {
 	const edits: string[] = [];
+	const editPayloads: V2MessagePayload[] = [];
 	const replies: string[] = [];
+	const partings: { ref: MessageRef; parting?: PartingOptions; hint?: string }[] = [];
 	const platform: PlatformPort = {
 		replyToActor: vi.fn(async (body: string): Promise<void> => {
 			replies.push(body);
 		}),
 		redraw: vi.fn(async (): Promise<void> => undefined),
-		commitParting: vi.fn(async (): Promise<void> => undefined),
-		editMessage: vi.fn(async (ref: MessageRef): Promise<void> => {
+		commitParting: vi.fn(async (ref: MessageRef, parting?: PartingOptions, hint?: string): Promise<void> => {
+			partings.push({ ref, parting, hint });
+		}),
+		editMessage: vi.fn(async (ref: MessageRef, payload: V2MessagePayload): Promise<void> => {
 			edits.push(ref.messageId);
+			editPayloads.push(payload);
 		}),
 		showModal: vi.fn(async (): Promise<void> => undefined),
 	};
-	return { platform, edits, replies };
+	return { platform, edits, editPayloads, replies, partings };
 }
 
 /** What the world's mount helper accepts; the target arm defaults to the reply sender. */
@@ -74,7 +79,9 @@ export interface World {
 	readonly runtime: UiRuntime;
 	readonly platform: PlatformPort;
 	readonly edits: string[];
+	readonly editPayloads: V2MessagePayload[];
 	readonly replies: string[];
+	readonly partings: { ref: MessageRef; parting?: PartingOptions; hint?: string }[];
 	readonly rows: Map<string, RehydrateRow>;
 	readonly sent: { channelId: string; payload: V2MessagePayload }[];
 	readonly handler: ReturnType<typeof vi.fn>;
@@ -99,6 +106,10 @@ function world(options: {
 	extraScreen?: string;
 	/** Makes `first` a resolver over the bag, so the mount-seed tests can land by data. */
 	resolverFirst?: boolean;
+	/** A flow-authored parting bundle, to prove it outranks the runtime default. */
+	parting?: PartingOptions;
+	/** The host's global parting bundle, wired into the runtime. */
+	defaultParting?: PartingOptions;
 } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
@@ -127,6 +138,7 @@ function world(options: {
 			...(options.resolverFirst === true
 				? { first: (data: PanelData): string => (data.count > 5 ? 'done' : 'main') }
 				: { first: 'main' }),
+			...(options.parting !== undefined ? { parting: options.parting } : {}),
 			// The flow-owned fresh bag: mount clones this per session.
 			initialData: { count: 3 },
 			ttlMs: 30 * MINUTE,
@@ -137,7 +149,7 @@ function world(options: {
 				: {}),
 		}, options.meta));
 
-	const { platform, edits, replies } = fakeBridge();
+	const { platform, edits, editPayloads, replies, partings } = fakeBridge();
 	const rows = new Map<string, RehydrateRow>();
 	const rehydrateStore: RehydrateStore = {
 		put: async (row): Promise<void> => {
@@ -174,6 +186,7 @@ function world(options: {
 		policy,
 		flows: buildFlowCatalog([{ module: 'panel', flow: panelFlow }]),
 		...(options.noRehydrateStore === true ? {} : { rehydrate: rehydrateStore }),
+		...(options.defaultParting !== undefined ? { defaultParting: options.defaultParting } : {}),
 		now: () => clock.now,
 		sweeper: options.sweeper ?? false,
 	});
@@ -202,7 +215,7 @@ function world(options: {
 		await new Promise((resolve) => setImmediate(resolve));
 	}
 
-	return { clock, runtime, platform, edits, replies, rows, sent, handler, mount, click };
+	return { clock, runtime, platform, edits, editPayloads, replies, partings, rows, sent, handler, mount, click };
 }
 
 afterEach(() => {
@@ -353,6 +366,32 @@ describe('mount - handle.go, the post-load landing', () => {
 		w.clock.advance(31 * MINUTE);
 
 		await expect(handle.go('done')).resolves.toBe(false);
+	});
+});
+
+describe('the global parting default', () => {
+	it('a flow with no parting expires into the runtime default', async () => {
+		const w = world({ defaultParting: { note: 'the host wrote this' } });
+		const handle = await w.mount();
+		w.clock.advance(31 * MINUTE);
+
+		await w.click(handle.sessionId, handle.messageId);
+
+		const payload = w.editPayloads.at(-1);
+		expect(textBodies(payload!).join('\n')).toContain('the host wrote this');
+	});
+
+	it('a flow with its own parting keeps it over the runtime default', async () => {
+		const w = world({ parting: { note: 'the flow wrote this' }, defaultParting: { note: 'the host wrote this' } });
+		const handle = await w.mount();
+		w.clock.advance(31 * MINUTE);
+
+		await w.click(handle.sessionId, handle.messageId);
+
+		const payload = w.editPayloads.at(-1);
+		const body = textBodies(payload!).join('\n');
+		expect(body).toContain('the flow wrote this');
+		expect(body).not.toContain('the host wrote this');
 	});
 });
 

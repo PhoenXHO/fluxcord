@@ -21,6 +21,7 @@
 
 import { EndReason } from '../state/types.js';
 import type { RehydrateStore, Session } from '../state/types.js';
+import type { PartingOptions } from '../pipeline/types.js';
 import type { CommitPhase } from './commit.js';
 
 export interface OnEndOptions {
@@ -31,6 +32,13 @@ export interface OnEndOptions {
 	readonly onSessionEnd?: (session: Session<unknown>, reason: EndReason) => void;
 	/** Routes commit failures on death paths; the store hook cannot await. */
 	readonly onError?: (error: unknown, session: Session<unknown>, reason: EndReason) => void;
+	/**
+	 * The host's global parting bundle: what a flow that declares no
+	 * `parting` of its own expires into, instead of the built-in screen.
+	 * Flows with their own parting keep it; precedence is flow-authored,
+	 * then this, then the built-in.
+	 */
+	readonly defaultParting?: PartingOptions;
 }
 
 /** The store's onEnd hook shape (SessionStoreOptions.onEnd). */
@@ -59,9 +67,13 @@ export function createOnEnd(options: OnEndOptions): OnEnd {
 		// Expiry: rehydratable messages stay untouched for late-click revive.
 		if (session.rehydrate === undefined) {
 			// Parting copy belongs to the root flow: the root frame's token
-			// carries its parting bundle and command hint.
+			// carries its parting bundle and command hint. A flow that
+			// declares none expires into the host's defaultParting when the
+			// runtime has one, else the built-in screen (which still reads
+			// the command hint for its restart line).
 			const root = session.frames[0];
-			options.commit.commitParting(session.messageRef, root.token.definition.parting, root.token.commandHint).catch(fail);
+			const parting = root.token.definition.parting ?? options.defaultParting;
+			options.commit.commitParting(session.messageRef, parting, root.token.commandHint).catch(fail);
 		}
 	};
 }

@@ -75,6 +75,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		...(options.now !== undefined ? { now: options.now } : {}),
 		onEnd: createOnEnd({
 			commit,
+			...(options.defaultParting !== undefined ? { defaultParting: options.defaultParting } : {}),
 			// The flow's onSessionEnd hook, carried by the dying session's
 			// root frame token. Caught here: a throwing cleanup is logged, never
 			// allowed to break the death path it rides (store.end is sync).
@@ -179,6 +180,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		call: callEngine,
 		launch: launchEngine,
 		queue,
+		...(options.defaultParting !== undefined ? { defaultParting: options.defaultParting } : {}),
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 		...(options.now !== undefined ? { now: options.now } : {}),
 	});

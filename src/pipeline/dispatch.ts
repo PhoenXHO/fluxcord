@@ -57,6 +57,7 @@ import type {
 	IncomingEvent,
 	JobHandle,
 	LaunchEngine,
+	PartingOptions,
 	PlatformPort,
 	PolicyPort,
 	TryRevive,
@@ -138,6 +139,13 @@ export interface DispatchOptions {
 	 * ```
 	 */
 	readonly onError?: ErrorHandler;
+	/**
+	 * The host's global parting bundle: what a flow that declares no
+	 * `parting` of its own expires into on the dead-click path (the
+	 * onEnd expire path resolves the same fallback). Flows with their
+	 * own parting keep it.
+	 */
+	readonly defaultParting?: PartingOptions;
 	/** Injectable clock for honest expiry tests. */
 	readonly now?: () => number;
 	/**
@@ -300,7 +308,7 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 		}
 		await options.platform.commitParting(
 			{ channelId: incoming.channelId, messageId: incoming.messageId },
-			token?.definition.parting,
+			token?.definition.parting ?? options.defaultParting,
 			token?.commandHint,
 		);
 	}
