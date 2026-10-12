@@ -16,7 +16,6 @@
  * @module command/declare
  */
 
-import type { ChatInputCommandInteraction } from 'discord.js';
 import type { Flow } from '../flow/token.js';
 import type { Policy } from '../pipeline/types.js';
 
@@ -55,10 +54,11 @@ export interface MountSpec {
 	 * exists: the seed overrides `initialData`, and `first` resolves on
 	 * it at birth, so an async-read panel (a wizard that needs the
 	 * guild's settings row) opens on the screen its data calls for with
-	 * no loading flash. Receives the invocation; may be async. A throw
-	 * fails the command loudly, like any mount failure.
+	 * no loading flash. Receives the invocation as the opaque context
+	 * (the host types it at authoring time, like onSessionStart); may be
+	 * async. A throw fails the command loudly, like any mount failure.
 	 */
-	readonly data?: (interaction: ChatInputCommandInteraction) => unknown | Promise<unknown>;
+	data?(context: unknown): unknown | Promise<unknown>;
 }
 
 /** The erased leaf mounts() returns; readers treat the leaf generically. */
@@ -67,7 +67,7 @@ export interface MountLeaf {
 	readonly description?: string;
 	readonly ephemeral?: boolean;
 	readonly policy?: Policy;
-	readonly data?: (interaction: ChatInputCommandInteraction) => unknown | Promise<unknown>;
+	data?(context: unknown): unknown | Promise<unknown>;
 }
 
 /**
