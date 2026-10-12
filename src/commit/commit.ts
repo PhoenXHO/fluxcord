@@ -25,7 +25,7 @@ import { getPath } from '../flow/lens.js';
 import type { Screen } from '../flow/types.js';
 import { activeFrame } from '../state/types.js';
 import type { MessageRef, Session } from '../state/types.js';
-import type { PartingOptions, PlatformPort } from '../pipeline/types.js';
+import type { PartingInfo, PartingOptions, PlatformPort } from '../pipeline/types.js';
 import type { ComponentResult, ViewNode } from '../tree/types.js';
 import { kitFor } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
@@ -46,7 +46,7 @@ export interface CommitPhase {
 	 * the mounting command's invocation path: the fallback when the flow
 	 * declares no parting.command of its own.
 	 */
-	commitParting(messageRef: MessageRef, parting?: PartingOptions, commandHint?: string): Promise<void>;
+	commitParting(messageRef: MessageRef, parting?: PartingOptions, commandHint?: string, info?: PartingInfo): Promise<void>;
 }
 
 export interface CommitOptions {
@@ -140,10 +140,10 @@ export function createCommit(options: CommitOptions): CommitPhase {
 			lastSent.delete(session.messageRef.messageId);
 		},
 
-		async commitParting(messageRef: MessageRef, parting?: PartingOptions, commandHint?: string): Promise<void> {
+		async commitParting(messageRef: MessageRef, parting?: PartingOptions, commandHint?: string, info?: PartingInfo): Promise<void> {
 			if (done.has(messageRef.messageId)) return;
 			const tree = parting?.view !== undefined
-				? normalizeViewRoot(parting.view())
+				? normalizeViewRoot(parting.view(info))
 				: partingView(parting?.command ?? commandHint, parting?.note);
 			// Parting screens are dead ends: no session, no screen to name.
 			// 'parting' marks the namespace; a stray control click there finds

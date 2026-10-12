@@ -13,7 +13,7 @@
 
 import type { Flow } from '../flow/token.js';
 import type { V2MessagePayload, V2ModalPayload } from '../render/v2.js';
-import type { FlowFrame, MessageRef, Session } from '../state/types.js';
+import type { EndReason, FlowFrame, MessageRef, Session } from '../state/types.js';
 import type { ComponentResult } from '../tree/types.js';
 
 // used in docs
@@ -395,11 +395,13 @@ export interface PlatformPort {
 	/** Re-render the session's current screen and edit the message in place. */
 	redraw(session: Session<unknown>): Promise<void>;
 	/**
-	 * Edit a dead message into the parting screen (the flow's bundle or the framework default).
-	 * No-op for an already-parted message. The command hint is the mounting command's
-	 * invocation path: the fallback when the flow declares no parting.command of its own.
+	 * Edit a dead message into the parting screen (the flow's bundle, the
+	 * host's global default, or the framework default). No-op for an
+	 * already-parted message. The command hint is the mounting command's
+	 * invocation path: the fallback when the flow declares no parting.command
+	 * of its own. The info carries what the death knows, for view builders.
 	 */
-	commitParting(messageRef: MessageRef, parting?: PartingOptions, commandHint?: string): Promise<void>;
+	commitParting(messageRef: MessageRef, parting?: PartingOptions, commandHint?: string, info?: PartingInfo): Promise<void>;
 	/** The bridge's message-edit seam: the commit phase renders, the bridge delivers. */
 	editMessage(ref: MessageRef, payload: V2MessagePayload): Promise<void>;
 	/** The bridge's modal-open seam: the commit phase renders, the bridge opens. */
@@ -437,14 +439,29 @@ export interface ActionRecord<TData = unknown> {
 	readonly slot?: readonly string[];
 }
 
+/** What a parting screen knows about the death it renders. */
+export interface PartingInfo {
+	/** Why the panel died: `'close'` (a handler exit or crash) or `'expire'` (the TTL ran out). */
+	readonly reason: EndReason;
+	/** The dying flow's full id (`'<moduleId>/<name>'`), when known. */
+	readonly flowId?: string;
+	/** The mounting command's invocation path, when known (the built-in restart hint's source). */
+	readonly commandHint?: string;
+}
+
 /** The flow-authored death copy: command restart hint, extra note, or a whole custom screen. */
 export interface PartingOptions {
 	/** Command name without the slash (e.g. 'lotto'): renders "Run /lotto to start a new one." */
 	readonly command?: string;
 	/** Extra line under the default copy (e.g. why it expired). */
 	readonly note?: string;
-	/** Replaces the default parting screen entirely. No data: a builder; element roots fold engine-side. */
-	readonly view?: () => ComponentResult;
+	/**
+	 * Replaces the default parting screen entirely. No data: a builder;
+	 * element roots fold engine-side. Receives what the death knows (the
+	 * restart hint, the reason, the flow id); existing zero-argument
+	 * builders keep working.
+	 */
+	readonly view?: (info?: PartingInfo) => ComponentResult;
 }
 
 /**

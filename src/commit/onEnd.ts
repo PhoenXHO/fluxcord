@@ -73,7 +73,12 @@ export function createOnEnd(options: OnEndOptions): OnEnd {
 			// the command hint for its restart line).
 			const root = session.frames[0];
 			const parting = root.token.definition.parting ?? options.defaultParting;
-			options.commit.commitParting(session.messageRef, parting, root.token.commandHint).catch(fail);
+			options.commit.commitParting(
+				session.messageRef,
+				parting,
+				root.token.commandHint,
+				{ reason, flowId: session.flowId, commandHint: root.token.commandHint },
+			).catch(fail);
 		}
 	};
 }

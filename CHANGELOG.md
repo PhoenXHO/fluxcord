@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A host-level `defaultParting`: what a flow that declares no `parting` of its own expires into (and what a dead click on its panel renders), set once on the runtime or `createBot`. Parting view builders receive a `PartingInfo` (the restart hint, the death reason, the flow id); existing zero-argument builders keep working.
+
 ## [0.2.3] - 2026-10-11
 
 ### Added

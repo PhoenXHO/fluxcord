@@ -43,6 +43,7 @@ import { decodeActionId } from '../render/id-codec.js';
 import { isExpired } from '../state/store.js';
 import type { SessionStore } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
+import { EndReason } from '../state/types.js';
 import type { Session } from '../state/types.js';
 import { getPath, lensSession } from '../flow/lens.js';
 import type { Flow, MountToken } from '../flow/token.js';
@@ -310,6 +311,7 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 			{ channelId: incoming.channelId, messageId: incoming.messageId },
 			token?.definition.parting ?? options.defaultParting,
 			token?.commandHint,
+			{ reason: EndReason.Expire, flowId: token?.flowId, commandHint: token?.commandHint },
 		);
 	}
 
