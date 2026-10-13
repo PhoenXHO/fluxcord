@@ -181,6 +181,14 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 			log.warn('showModal on a modal-submit interaction: modal dropped');
 			return;
 		}
+		// A modal call IS the interaction's answer from the moment it
+		// starts, not from when the REST call resolves. Marking the scope
+		// synchronously keeps the end-of-dispatch ack and the ack-race
+		// timer off an interaction whose modal is still in flight: the
+		// alternative is a race where the ack consumes the interaction and
+		// the modal dies (the dead-click bug). Fire-and-forget callers
+		// stay safe too; the flag no longer depends on the await.
+		scope.modalOpen = true;
 		// Raw-API payload handed to d.js verbatim: the builders exist to emit
 		// exactly this wire shape. A dead or late interaction (the token died
 		// past the response window, or an ack already closed it) is nothing to
@@ -194,9 +202,11 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 				log.debug('showModal on a dead or already-answered interaction: dropped', error);
 				return;
 			}
+			// A real failure (network, payload): the interaction may still
+			// be answerable, so give the ack machinery its job back.
+			scope.modalOpen = false;
 			throw error;
 		}
-		scope.modalOpen = true;
 	}
 
 	/**

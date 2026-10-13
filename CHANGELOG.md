@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A host-level `defaultParting`: what a flow that declares no `parting` of its own expires into (and what a dead click on its panel renders), set once on the runtime or `createBot`. Parting view builders receive a `PartingInfo` (the restart hint, the death reason, the flow id); existing zero-argument builders keep working.
 
+### Fixed
+
+- A modal call no longer races the end-of-dispatch ack. The modal state marks synchronously when the call starts (not when the REST call resolves), so neither the success ack nor the ack-race timer can consume an interaction whose modal is still in flight. The old window showed up as fire-and-forget modal opens randomly dying: the ack won the wire race, and the click did nothing.
+
 ## [0.2.3] - 2026-10-11
 
 ### Added

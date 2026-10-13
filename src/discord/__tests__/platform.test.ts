@@ -153,6 +153,31 @@ describe('success ack', () => {
 		expect(button.deferUpdate).not.toHaveBeenCalled();
 	});
 
+	it('blocks the ack while a modal call is still in flight (fire-and-forget callers)', async () => {
+		const bridge = createUiBridge(fakeClient());
+		const button = fakeButton();
+		let releaseModal: (() => void) | undefined;
+		button.showModal = vi.fn(async () => {
+			await new Promise<void>((resolve) => {
+				releaseModal = resolve;
+			});
+		});
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			// Fire-and-forget on purpose: pre-fix, the end-of-dispatch ack
+			// raced this in-flight modal call and the modal died.
+			void bridge.platform.showModal({ title: 'Form', components: [] } as never);
+		});
+
+		// The modal REST call has not resolved, but the modal state is
+		// already marked: the ack must stay off the interaction.
+		expect(button.deferUpdate).not.toHaveBeenCalled();
+		releaseModal?.();
+		await vi.waitFor(() => {
+			if (button.showModal.mock.calls.length === 0) throw new Error('modal not settled');
+		});
+	});
+
 	it('still acks when the core itself fails', async () => {
 		const bridge = createUiBridge(fakeClient());
 		const button = fakeButton();
