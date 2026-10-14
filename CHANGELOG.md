@@ -9,10 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - A host-level `defaultParting`: what a flow that declares no `parting` of its own expires into (and what a dead click on its panel renders), set once on the runtime or `createBot`. Parting view builders receive a `PartingInfo` (the restart hint, the death reason, the flow id); existing zero-argument builders keep working.
+- `ViewSession.belowRoot`: whether the drawing flow is a call inside another flow's frame. Screens branch on call depth where Back is a cancel (below the root) versus a stray disabled button (at the root). Views now receive a read-only projection of the session facts, not the live session object.
 
 ### Fixed
 
 - A modal call no longer races the end-of-dispatch ack. The modal state marks synchronously when the call starts (not when the REST call resolves), so neither the success ack nor the ack-race timer can consume an interaction whose modal is still in flight. The old window showed up as fire-and-forget modal opens randomly dying: the ack won the wire race, and the click did nothing.
+- A dead rehydratable panel revives whenever the flow remounts with `coexist`, even though a live sibling session exists. The old "live successor wins" guard treated coexist siblings as successors; only `replace` flows supersede their older messages.
 
 ## [0.2.3] - 2026-10-11
 

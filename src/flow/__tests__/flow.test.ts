@@ -182,9 +182,12 @@ describe('the drawn session', () => {
 
 		const tree = viewOf(session);
 
-		// The live session went in, the same object reached the view...
-		expect(seen[0]).toBe(session);
-		// ...and the view drew from its read-only facts.
+		// The view receives the read-only session projection, not the live
+		// session object: the facts plus the call-depth fact.
+		const seenSession = seen[0] as ViewSession;
+		expect(seenSession).not.toBe(session);
+		expect(seenSession).toMatchObject({ ownerId: 'u1', screen: 'main', belowRoot: false });
+		// ...and the view drew from those read-only facts.
 		const drawn = tree.children.find((child) => child.kind === 'text');
 		expect(drawn).toMatchObject({ body: 'owner u1 on main' });
 	});
@@ -278,7 +281,7 @@ describe('subview', () => {
 
 	it('draws when the screen forwards its kit: helpers are plain calls', () => {
 		const helper = subview<LottoData>()((data) => view({}, text(`count: ${data.count}`)));
-		const stub: ViewSession = { ownerId: '', createdAt: 0, screen: 'main', history: [], lastActivityAt: 0, ttlMs: 0 };
+		const stub: ViewSession = { ownerId: '', createdAt: 0, screen: 'main', history: [], lastActivityAt: 0, ttlMs: 0, belowRoot: false };
 		const tree = helper({ count: 3, picker: { chosen: 'x' } }, kitFor(stub), stub);
 		expect(tree).toEqual(view({}, text('count: 3')));
 	});
@@ -433,6 +436,12 @@ function world(options: WorldOptions = {}): World {
 			},
 			exit: () => {},
 			crash: () => false,
+		},
+		// No fixture test launches; a use throws loudly instead of pretending.
+		launch: {
+			launch: (): void => {
+				throw new Error('no launch engine in this fixture');
+			},
 		},
 		...(options.omitErrorHandler !== true ? { onError: (report: ErrorReport): void => { errors.push(report); } } : {}),
 		now: () => clock.now,
@@ -661,6 +670,12 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 				},
 				exit: () => {},
 				crash: () => false,
+			},
+			// No fixture test launches; a use throws loudly instead of pretending.
+			launch: {
+				launch: (): void => {
+					throw new Error('no launch engine in this fixture');
+				},
 			},
 		});
 

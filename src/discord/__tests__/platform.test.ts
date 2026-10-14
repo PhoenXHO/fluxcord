@@ -157,11 +157,12 @@ describe('success ack', () => {
 		const bridge = createUiBridge(fakeClient());
 		const button = fakeButton();
 		let releaseModal: (() => void) | undefined;
-		button.showModal = vi.fn(async () => {
+		const modalCall = vi.fn(async () => {
 			await new Promise<void>((resolve) => {
 				releaseModal = resolve;
 			});
 		});
+		button.showModal = modalCall;
 
 		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
 			// Fire-and-forget on purpose: pre-fix, the end-of-dispatch ack
@@ -174,7 +175,7 @@ describe('success ack', () => {
 		expect(button.deferUpdate).not.toHaveBeenCalled();
 		releaseModal?.();
 		await vi.waitFor(() => {
-			if (button.showModal.mock.calls.length === 0) throw new Error('modal not settled');
+			if (modalCall.mock.calls.length === 0) throw new Error('modal not settled');
 		});
 	});
 

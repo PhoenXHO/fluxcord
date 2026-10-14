@@ -150,9 +150,13 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		if (row === undefined) return undefined;
 		const token = options.flows.byFlowId.get(row.flowId);
 		if (token === undefined) return undefined;
-		// The old message yields: a live successor of the same flow owned by
-		// the row's owner wins, and this click gets the parting screen.
-		if (store.findLive(row.flowId, row.ownerId) !== undefined) return undefined;
+		// The old message yields when a live successor of the same flow is
+		// owned by the row's owner. That is a replace-flow rule: a coexist
+		// flow's siblings are peers, not successors, so nothing about them
+		// blocks this revive.
+		if (token.definition.remount !== 'coexist' && store.findLive(row.flowId, row.ownerId) !== undefined) {
+			return undefined;
+		}
 		const data = await token.definition.rehydrate?.(row.ref);
 		if (data === undefined) return undefined;
 		return store.create({

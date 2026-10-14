@@ -712,21 +712,40 @@ describe('revive - dead clicks through the runtime', () => {
 		expect(w.edits).toEqual([handle.messageId]);
 	});
 
-	it('the old message yields: a live successor of the same flow wins', async () => {
-		// coexist, or the fresh mount's replace-close would freeze the old
-		// message and delete its row before the click ever arrives.
-		const w = world({ rehydratable: true, remount: RemountPolicy.Coexist });
+	it('the old message yields: a live successor of the same flow wins (replace flows)', async () => {
+		// The old session must already be dead (TTL) so the fresh mount's
+		// replace-close cannot delete its row before the click arrives.
+		const w = world({ rehydratable: true });
 		const old = await w.mount({ to: { channel: 'ch-1' }, rehydrateRef: 'lotto:1' });
 		w.clock.advance(31 * MINUTE);
 
-		// The owner mounted a fresh session; the old message is now superseded.
+		// The owner mounted a fresh session; for a replace flow the old
+		// message is superseded and its click takes the parting screen.
 		const fresh = await w.mount({ to: { channel: 'ch-2' }, rehydrateRef: 'lotto:2' });
 		w.edits.length = 0;
 
 		await w.click(old.sessionId, old.messageId);
 
 		expect(w.handler).not.toHaveBeenCalled();
-		expect(w.edits).toEqual([old.messageId]); // parting on the old message only
+		await expect(fresh.redraw()).resolves.toBe(true);
+	});
+
+	it('a coexist flow revives a dead panel even though a live sibling exists', async () => {
+		// Panels coexist: the siblings are peers, not successors, so a live
+		// newer panel says nothing about the old message's authority.
+		const w = world({ rehydratable: true, remount: RemountPolicy.Coexist });
+		const old = await w.mount({ to: { channel: 'ch-1' }, rehydrateRef: 'lotto:1' });
+		w.clock.advance(31 * MINUTE);
+
+		const fresh = await w.mount({ to: { channel: 'ch-2' }, rehydrateRef: 'lotto:2' });
+		w.edits.length = 0;
+
+		await w.click(old.sessionId, old.messageId);
+
+		// The dead panel revives and receives the click; no parting anywhere.
+		expect(w.handler).toHaveBeenCalledTimes(1);
+		expect(w.handler.mock.calls[0][0].session.data).toEqual({ count: 77 });
+		expect(w.edits).toEqual([old.messageId]);
 		await expect(fresh.redraw()).resolves.toBe(true);
 	});
 

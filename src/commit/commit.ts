@@ -71,10 +71,24 @@ export function viewOf(session: Session<unknown>): ViewNode {
 	// Views see the frame's own room in the bag: a called flow's screen
 	// lenses to its slot path, the root frame reads the whole bag.
 	const bag = frame.slot.length > 0 ? getPath(session.data, frame.slot) : session.data;
+	// The session projection views draw against: the read-only facts plus
+	// the call-depth fact (belowRoot), derived here where the frame stack
+	// is at hand. The full session object would satisfy the old shape
+	// structurally, but a projection keeps ViewSession's contract honest.
+	const viewSession = {
+		ownerId: session.ownerId,
+		createdAt: session.createdAt,
+		screen: session.screen,
+		history: session.history,
+		lastActivityAt: session.lastActivityAt,
+		ttlMs: session.ttlMs,
+		...(session.expiresAt !== undefined ? { expiresAt: session.expiresAt } : {}),
+		belowRoot: session.frames.length > 1,
+	};
 	// Views return the element union (TSX roots type flat), folded to a
 	// view node here, one place; validateTree polices the result below.
 	// Same for the composed wrap's result.
-	let tree = normalizeViewRoot(screen.view(bag, kitFor(session, { canExit: session.frames.length > 1 }), session));
+	let tree = normalizeViewRoot(screen.view(bag, kitFor(session, { canExit: session.frames.length > 1 }), viewSession));
 	const wrap = frame.token.definition.wrap as ((tree: ViewNode, session: Session<unknown>, kit: ReturnType<typeof kitFor>) => ComponentResult) | undefined;
 	if (wrap !== undefined) {
 		tree = normalizeViewRoot(wrap(tree, session, kitFor(session, { canExit: session.frames.length > 1 })));

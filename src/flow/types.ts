@@ -57,6 +57,13 @@ export interface ViewSession {
 	readonly lastActivityAt: number;
 	readonly ttlMs: number;
 	readonly expiresAt?: number;
+	/**
+	 * Whether the drawing flow sits below the root: false for a mounted
+	 * flow, true once it is a call inside another flow's frame. A screen
+	 * branches on this where Back is a cancel (below the root) versus a
+	 * stray disabled button (at the root).
+	 */
+	readonly belowRoot: boolean;
 }
 
 /**

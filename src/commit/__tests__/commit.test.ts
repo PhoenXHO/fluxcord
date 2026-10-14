@@ -173,6 +173,12 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		makeUi: createMakeUi({ exit: call.exit }),
 		call,
 		queue,
+		// No fixture test launches; a use throws loudly instead of pretending.
+		launch: {
+			launch: (): void => {
+				throw new Error('no launch engine in this fixture');
+			},
+		},
 		...(overrides.captureErrors === true ? { onError: (report: ErrorReport): void => { errors.push(report); } } : {}),
 		now: () => clock.now,
 	});

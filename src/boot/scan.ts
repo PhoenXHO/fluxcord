@@ -45,6 +45,7 @@ export function coverageScan(catalog: FlowCatalog): string[] {
 					history: [],
 					lastActivityAt: 0,
 					ttlMs: def.ttlMs,
+					belowRoot: false,
 				};
 				const tree = normalizeViewRoot(screen.view(structuredClone(def.initialData ?? {}) as never, kitFor(stub), stub));
 				const violation = validateTree(tree)[0];

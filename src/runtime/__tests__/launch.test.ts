@@ -14,7 +14,7 @@ import type { MountToken } from '../../flow/token.js';
 import type { CreateSessionInput, FlowFrame, Session } from '../../state/types.js';
 import { createSessionStore } from '../../state/store.js';
 import { createSessionQueue } from '../../pipeline/queue.js';
-import type { LaunchEngine } from '../../pipeline/types.js';
+import type { JobHandle, LaunchEngine } from '../../pipeline/types.js';
 import { createLaunch } from '../launch.js';
 
 interface Bag {
@@ -27,7 +27,8 @@ interface Harness {
 	store: ReturnType<typeof createSessionStore>;
 	session: Session<Bag>;
 	frame: FlowFrame;
-	launch: LaunchEngine['launch'];
+	/** Typed over the engine's erased seam so job mutates see the bag; the generic names the LENS (root bag by default, the slot bag for child frames). */
+	launch: <TData = Bag>(session: Session<unknown>, frame: FlowFrame, work: (job: JobHandle<TData>) => Promise<unknown>, options?: { readonly as?: string }) => void;
 	redraw: Mock;
 	errors: unknown[];
 	input: CreateSessionInput<Bag>;
@@ -70,7 +71,24 @@ function harness(options: { ttlMs?: number } = {}): Harness {
 		},
 	});
 	// The method detached is safe: the engine closes over its options, no this.
-	return { store, session, launch: engine.launch, redraw, errors, frame: session.frames[0], input, advance: (ms: number): void => { nowMs += ms; } };
+	// The wrapper keeps the bag typed across the erased engine seam.
+	return {
+		store,
+		session,
+		launch: <TData = Bag>(
+			session: Session<unknown>,
+			frame: FlowFrame,
+			work: (job: JobHandle<TData>) => Promise<unknown>,
+			options?: { readonly as?: string },
+		): void => {
+			engine.launch(session, frame, work as (job: JobHandle<unknown>) => Promise<unknown>, options);
+		},
+		redraw,
+		errors,
+		frame: session.frames[0],
+		input,
+		advance: (ms: number): void => { nowMs += ms; },
+	};
 }
 
 /** A hand-built child frame: enough frame for the membership checks, nothing more. */
@@ -139,7 +157,7 @@ describe('the launch engine', () => {
 		// The slot is seeded before the launch, exactly what event.call does
 		// for a real child frame (the lens contract: seed before entering).
 		h.session.data.child = {};
-		await h.launch(h.session, child, async (job) => {
+		await h.launch<{ count?: number }>(h.session, child, async (job) => {
 			job.mutate((data) => {
 				data.count = 7;
 			});
