@@ -25,7 +25,7 @@ import { actionHash } from '../render/action-hash.js';
 import type { StampLookup } from '../render/v2.js';
 import { NodeKind } from '../tree/vocab.js';
 import type { ActionHandler, ActionRecord } from '../pipeline/types.js';
-import type { ButtonNode, RowNode, SelectNode, ViewNode } from '../tree/types.js';
+import type { AccessoryNode, ButtonNode, RowNode, SectionNode, SelectNode, ViewNode } from '../tree/types.js';
 
 /** One draw's wiring: the click registry plus the renderer's stamps. */
 export interface MaterializedTree {
@@ -77,6 +77,19 @@ export function materializeTree(tree: ViewNode): MaterializedTree {
 		}
 	}
 
+	/** Stamps a section's accessory control: the one place a control lives outside a row. */
+	function stampSection(section: SectionNode): void {
+		const accessory = section.children.find((child): child is AccessoryNode => child.kind === NodeKind.accessory);
+		if (accessory === undefined) return;
+		for (const control of accessory.children) {
+			if (control.kind === NodeKind.button) {
+				stamp(control.onClick, control, control.label);
+			} else if (control.kind === NodeKind.link) {
+				// A link carries a url, not a handler: nothing to stamp.
+			}
+		}
+	}
+
 	for (const child of tree.children) {
 		if (child.kind === NodeKind.row) {
 			stampRow(child);
@@ -84,8 +97,12 @@ export function materializeTree(tree: ViewNode): MaterializedTree {
 			for (const grandchild of child.children) {
 				if (grandchild.kind === NodeKind.row) {
 					stampRow(grandchild);
+				} else if (grandchild.kind === NodeKind.section) {
+					stampSection(grandchild);
 				}
 			}
+		} else if (child.kind === NodeKind.section) {
+			stampSection(child);
 		}
 	}
 

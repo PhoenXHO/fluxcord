@@ -33,10 +33,12 @@ import type {
 	APILabelComponent,
 	APIMessageTopLevelComponent,
 	APIModalInteractionResponseCallbackComponent,
+	APISectionComponent,
 	APISelectMenuComponent,
 	APISelectMenuOption,
 	APISeparatorComponent,
 	APITextDisplayComponent,
+	APIThumbnailComponent,
 } from 'discord-api-types/v10';
 import { NodeKind, SeparatorSpacing } from '../tree/vocab.js';
 import type { SelectEntity } from '../tree/vocab.js';
@@ -51,14 +53,17 @@ import type {
 	CheckboxNode,
 	ContainerNode,
 	ControlNode,
+	AccessoryNode,
 	HrNode,
 	InputNode,
 	ModalNode,
 	RadioGroupNode,
 	RowNode,
+	SectionNode,
 	SelectNode,
 	SelectOption,
 	TextNode,
+	ThumbnailNode,
 	ViewNode,
 } from '../tree/types.js';
 import { encodeActionId } from './id-codec.js';
@@ -327,29 +332,79 @@ function renderContainer(node: ContainerNode, path: string, sessionId: string, s
 			switch (child.kind) {
 				case NodeKind.text: return renderText(child, childPath);
 				case NodeKind.row: return renderRow(child, childPath, sessionId, screenKey, stampOf);
+				case NodeKind.section: return renderSection(child, childPath, sessionId, screenKey, stampOf);
 				case NodeKind.hr: return renderSeparator(child);
-				default: throw new RenderError(childPath, `container child must be text, row or hr, got '${kindOf(child)}'`);
+				default: throw new RenderError(childPath, `container child must be text, row, section or hr, got '${kindOf(child)}'`);
 			}
 		}),
 	};
 }
 
-/** Renders one top-level view child: text, row or container. */
+/**
+ * Renders a section: the text children become the components array, the
+ * single accessory child is lifted into the platform's accessory slot
+ * (a thumbnail rendered as media, a button or link through the ordinary
+ * control path so its handler wiring lands like any button's).
+ */
+function renderSection(node: SectionNode, path: string, sessionId: string, screenKey: string, stampOf: StampLookup): APISectionComponent {
+	const texts = node.children.filter((child): child is TextNode => child.kind === NodeKind.text);
+	const accessoryNode = node.children.find((child): child is AccessoryNode => child.kind === NodeKind.accessory);
+	if (accessoryNode === undefined) {
+		// Validation rejects this shape at the draw site; the renderer stays
+		// honest rather than emitting a section the platform would reject.
+		throw new RenderError(path, 'section has no accessory block');
+	}
+	return {
+		type: ComponentType.Section,
+		components: texts.map((child, index) => renderText(child, `${path}/text[${index}]`)),
+		accessory: renderAccessory(accessoryNode, `${path}/accessory`, sessionId, screenKey, stampOf),
+	};
+}
+
+function renderAccessory(node: AccessoryNode, path: string, sessionId: string, screenKey: string, stampOf: StampLookup): APIThumbnailComponent | APIButtonComponent {
+	const child = node.children[0];
+	if (child === undefined) {
+		throw new RenderError(path, 'accessory block is empty');
+	}
+	const childPath = `${path}/${kindOf(child)}[0]`;
+	if (child.kind === NodeKind.thumbnail) {
+		return renderThumbnail(child, childPath);
+	}
+	return renderControl(child, childPath, sessionId, screenKey, stampOf) as APIButtonComponent;
+}
+
+function renderThumbnail(node: ThumbnailNode, path: string): APIThumbnailComponent {
+	if (!/^https?:\/\//.test(node.media)) {
+		throw new RenderError(path, `thumbnail media must be an http(s) URL, got '${node.media}'`);
+	}
+	return {
+		type: ComponentType.Thumbnail,
+		media: { url: node.media },
+		...(node.description !== undefined ? { description: node.description } : {}),
+		...(node.spoiler === true ? { spoiler: true } : {}),
+	};
+}
+
+/** Renders one top-level view child: text, row, container, section or hr. */
 function renderTopLevel(node: ViewNode['children'][number], path: string, sessionId: string, screenKey: string, stampOf: StampLookup): APIMessageTopLevelComponent {
 	switch (node.kind) {
 		case NodeKind.text: return renderText(node, path);
 		case NodeKind.row: return renderRow(node, path, sessionId, screenKey, stampOf);
 		case NodeKind.container: return renderContainer(node, path, sessionId, screenKey, stampOf);
+		case NodeKind.section: return renderSection(node, path, sessionId, screenKey, stampOf);
 		case NodeKind.hr: return renderSeparator(node);
 		default: throw new RenderError(path, `unknown view child kind '${kindOf(node)}'`);
 	}
 }
 
-/** Counts every component in the payload, including everything nested in rows and containers, because the platform's cap counts them all. */
-function countComponents(components: readonly { type: number; components?: readonly unknown[] }[]): number {
+/** Counts every component in the payload, including everything nested in rows, containers and section accessories, because the platform's cap counts them all. */
+function countComponents(components: readonly { type: number; components?: readonly unknown[]; accessory?: { readonly type: number } }[]): number {
 	let total = 0;
 	for (const component of components) {
 		total += 1;
+		if (component.accessory !== undefined) {
+			total += 1;
+		}
 		if (Array.isArray(component.components)) {
 			total += countComponents(component.components);
 		}

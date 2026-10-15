@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	accessory,
 	button,
 	checkbox,
 	checkboxGroup,
@@ -12,12 +13,14 @@ import {
 	optionSelect,
 	radioGroup,
 	row,
+	section,
 	text,
+	thumbnail,
 	view,
 } from '../builders.js';
 import { NodeKind } from '../vocab.js';
-import { validateTree } from '../validate.js';
-import type { ButtonNode, ContainerChild, ControlNode, InputNode, ModalChild, SelectNode, TreeRoot, ViewChild } from '../types.js';
+import { Rules, validateTree } from '../validate.js';
+import type { ButtonNode, ContainerChild, ControlNode, InputNode, ModalChild, SectionAccessory, SelectNode, TreeRoot, ViewChild } from '../types.js';
 
 /** Identity-bound fixture: the handler object itself is the binding. */
 const handler = (): void => {};
@@ -53,6 +56,61 @@ describe('validateTree - happy path', () => {
 
 	it('accepts a fully valid modal', () => {
 		expect(validateTree(modal({ title: 'T' }, note(), text('terms...')))).toEqual([]);
+	});
+
+	it('accepts a valid section in a view and in a container', () => {
+		const tree = view(
+			{},
+			section({}, text('one'), text('two'), accessory(thumbnail({ media: 'https://torn.com/a.png' }))),
+			container({}, section({}, text('case'), accessory(go()))),
+		);
+		expect(validateTree(tree)).toEqual([]);
+	});
+});
+
+describe('validateTree - section rules', () => {
+	it('a section with no text child violates sectionTextBounds', () => {
+		const tree = view({}, section({}, accessory(go())));
+		expect(rulesOf(tree)).toContain(Rules.sectionTextBounds);
+	});
+
+	it('a section with four texts violates sectionTextBounds', () => {
+		const tree = view({}, section({}, text('a'), text('b'), text('c'), text('d'), accessory(go())));
+		expect(rulesOf(tree)).toContain(Rules.sectionTextBounds);
+	});
+
+	it('a section with no accessory block violates sectionOneAccessory', () => {
+		const tree = view({}, section({}, text('only text')));
+		expect(rulesOf(tree)).toContain(Rules.sectionOneAccessory);
+	});
+
+	it('a second accessory block violates sectionOneAccessory', () => {
+		const tree = view(
+			{},
+			section({}, text('t'), accessory(go()), accessory(link({ url: 'https://torn.com', label: 'L' }))),
+		);
+		expect(rulesOf(tree)).toContain(Rules.sectionOneAccessory);
+	});
+
+	// The accessoryInsideSection rule guards future parents that might
+	// accept accessory children: today no parent outside a section does,
+	// so the parent kind-gates (rule 3 / rule for containers) always fire
+	// first and the rule is unreachable through a real tree.
+
+	it('an accessory block holding a select violates accessorySingleChild', () => {
+		// The types reject a select as an accessory; force is the boundary test.
+		const tree = view({}, section({}, text('t'), accessory(force<SectionAccessory>(pick()))));
+		expect(rulesOf(tree)).toContain(Rules.accessorySingleChild);
+	});
+
+	it('an accessory block holding two controls violates accessorySingleChild', () => {
+		const tree = view({}, section({}, text('t'), accessory(go(), go())));
+		expect(rulesOf(tree)).toContain(Rules.accessorySingleChild);
+	});
+
+	it('a thumbnail with a non-http media url violates thumbnailMediaUrl', () => {
+		const tree = view({}, section({}, text('t'), accessory(thumbnail({ media: 'ftp://x' }))));
+		expect(rulesOf(tree)).toContain(Rules.thumbnailMediaUrl);
 	});
 });
 

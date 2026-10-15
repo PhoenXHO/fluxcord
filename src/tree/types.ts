@@ -57,6 +57,41 @@ export interface ContainerNode {
 }
 
 /**
+ * Up to three text blocks beside exactly one accessory; maps to the
+ * platform's Section component. Legal in views and containers, never in
+ * modals. The children carry the composition flat: one to three text
+ * nodes plus exactly one accessory block, which the renderer lifts into
+ * the platform's accessory slot.
+ */
+export interface SectionNode {
+	readonly kind: NodeKind.section;
+	readonly children: readonly SectionChild[];
+}
+
+/**
+ * The section's accessory slot, authored as a tag: holds exactly one
+ * thumbnail, button, or link today. Legal only as a direct section
+ * child; the count relaxes the day the platform allows more.
+ */
+export interface AccessoryNode {
+	readonly kind: NodeKind.accessory;
+	readonly children: readonly SectionAccessory[];
+}
+
+/**
+ * A section accessory image: a rounded thumbnail riding the section's
+ * edge. Legal only inside an accessory block.
+ */
+export interface ThumbnailNode {
+	readonly kind: NodeKind.thumbnail;
+	/** The image URL. */
+	readonly media: string;
+	/** Alt text for screen readers. */
+	readonly description?: string;
+	readonly spoiler?: boolean;
+}
+
+/**
  * A horizontal separator: a divider line with vertical padding, or with
  * `divider: false`, padding alone. Maps to the platform's Separator
  * component; legal in views and containers, never in modals.
@@ -330,8 +365,10 @@ export interface RadioGroupNode {
 // compiler enforces these relationships, so illegal nesting is a compile error.
 
 export type ControlNode = ButtonNode | LinkNode | SelectNode;
-export type ViewChild = TextNode | RowNode | ContainerNode | HrNode;
-export type ContainerChild = TextNode | RowNode | HrNode;
+export type SectionAccessory = ThumbnailNode | ButtonNode | LinkNode;
+export type SectionChild = TextNode | AccessoryNode;
+export type ViewChild = TextNode | RowNode | ContainerNode | SectionNode | HrNode;
+export type ContainerChild = TextNode | RowNode | SectionNode | HrNode;
 export type ModalChild = InputNode | TextNode | SelectNode | CheckboxNode | CheckboxGroupNode | RadioGroupNode;
 export type TreeRoot = ViewNode | ModalNode;
 
@@ -344,6 +381,9 @@ export type TreeNode =
 	| TextNode
 	| RowNode
 	| ContainerNode
+	| SectionNode
+	| AccessoryNode
+	| ThumbnailNode
 	| HrNode
 	| ButtonNode
 	| LinkNode

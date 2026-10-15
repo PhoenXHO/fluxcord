@@ -19,6 +19,7 @@ import type {
 	ContainerChild,
 	ContainerNode,
 	ControlNode,
+	AccessoryNode,
 	HrNode,
 	InputNode,
 	LinkNode,
@@ -26,10 +27,14 @@ import type {
 	ModalNode,
 	RadioGroupNode,
 	RowNode,
+	SectionAccessory,
+	SectionChild,
+	SectionNode,
 	SelectNode,
 	SelectOption,
 	TextChild,
 	TextNode,
+	ThumbnailNode,
 	ViewChild,
 	ViewNode,
 } from './types.js';
@@ -52,6 +57,8 @@ export type TextProps = { readonly title?: string };
 export type RowProps = Omit<RowNode, 'kind' | 'children'>;
 export type ContainerProps = Omit<ContainerNode, 'kind' | 'children'>;
 export type HrProps = Omit<HrNode, 'kind'>;
+export type SectionProps = Omit<SectionNode, 'kind' | 'children'>;
+export type ThumbnailProps = Omit<ThumbnailNode, 'kind'>;
 /**
  * The button's style flags: the authoring spelling of its visual style.
  * At most one may be set and each takes no value; no flag means primary.
@@ -294,6 +301,28 @@ export function container(props: ContainerProps, ...children: readonly Container
  */
 export function hr(props: HrProps = {}): HrNode {
 	return deepFreeze({ kind: NodeKind.hr, ...props });
+}
+
+/**
+ * Up to three text blocks beside exactly one accessory; maps to the
+ * platform's Section component. The tag form carries the composition in
+ * the children: `<section><text/><accessory><thumbnail/></accessory></section>`.
+ */
+export function section(props: SectionProps = {}, ...children: readonly SectionChild[]): SectionNode {
+	return deepFreeze({ kind: NodeKind.section, ...props, children });
+}
+
+/**
+ * The section's accessory slot. Legal only as a direct section child;
+ * holds exactly one thumbnail, button, or link (validated).
+ */
+export function accessory(...children: readonly SectionAccessory[]): AccessoryNode {
+	return deepFreeze({ kind: NodeKind.accessory, children });
+}
+
+/** A section accessory image: a rounded thumbnail from a media URL. */
+export function thumbnail(props: ThumbnailProps): ThumbnailNode {
+	return deepFreeze({ kind: NodeKind.thumbnail, ...props });
 }
 
 // --- Control labels & style flags -------------------------------------------------

@@ -38,6 +38,7 @@
  */
 
 import {
+	accessory,
 	checkbox,
 	checkboxGroup,
 	code,
@@ -56,7 +57,9 @@ import {
 	optionSelect,
 	radioGroup,
 	row,
+	section,
 	text,
+	thumbnail,
 	view,
 	warning,
 } from './builders.js';
@@ -74,7 +77,9 @@ import type {
 	OptionSelectProps,
 	RadioGroupProps,
 	RowProps,
+	SectionProps,
 	TextProps,
+	ThumbnailProps,
 	ViewProps,
 } from './builders.js';
 import { SeparatorSpacing } from './vocab.js';
@@ -85,6 +90,7 @@ import type {
 	ContainerChild,
 	ContainerNode,
 	ControlNode,
+	AccessoryNode,
 	HrNode,
 	InputNode,
 	LinkNode,
@@ -92,10 +98,14 @@ import type {
 	ModalNode,
 	RadioGroupNode,
 	RowNode,
+	SectionAccessory,
+	SectionChild,
+	SectionNode,
 	SelectNode,
 	SelectOption,
 	TextChild,
 	TextNode,
+	ThumbnailNode,
 	TreeNode,
 	ViewChild,
 	ViewNode,
@@ -178,6 +188,9 @@ export function jsx(tag: 'checkbox-group', props: Omit<CheckboxGroupProps, 'opti
 export function jsx(tag: 'radio-group', props: Omit<RadioGroupProps, 'options'> & { readonly options?: readonly SelectOption[]; readonly children?: unknown } | null): RadioGroupNode;
 export function jsx(tag: 'option', props: OptionProps & { readonly children?: unknown } | null): SelectOption;
 export function jsx(tag: 'hr', props: HrTagProps | null): HrNode;
+export function jsx(tag: 'section', props: SectionProps & { readonly children?: unknown } | null): SectionNode;
+export function jsx(tag: 'accessory', props: { readonly children?: unknown } | null): AccessoryNode;
+export function jsx(tag: 'thumbnail', props: ThumbnailProps | null): ThumbnailNode;
 export function jsx(tag: 'error', props: { readonly children?: unknown } | null): TextNode;
 export function jsx(tag: 'warning', props: { readonly children?: unknown } | null): TextNode;
 export function jsx(tag: 'info', props: { readonly children?: unknown } | null): TextNode;
@@ -265,6 +278,15 @@ export function jsx(type: unknown, props: unknown): TreeNode | readonly TreeNode
 		}
 		case 'hr':
 			return hr(hrProps(node));
+		case 'section':
+			return section(node as SectionProps, ...children as readonly SectionChild[]);
+		case 'accessory':
+			return accessory(...children as readonly SectionAccessory[]);
+		case 'thumbnail':
+			if (children.length > 0) {
+				throw new Error('thumbnail takes no children; media is a prop');
+			}
+			return thumbnail(node as ThumbnailProps);
 		default:
 			throw new Error(`jsx: unknown tag '${String(type)}'`);
 	}
@@ -373,6 +395,9 @@ export namespace JSX {
 		info: { readonly children?: unknown };
 		row: RowProps & { readonly children?: unknown };
 		container: ContainerProps & { readonly children?: unknown };
+		section: SectionProps & { readonly children?: unknown };
+		accessory: { readonly children?: unknown };
+		thumbnail: ThumbnailProps;
 		link: LinkProps & { readonly children?: unknown };
 		modal: ModalProps & { readonly children?: unknown };
 		input: InputProps;

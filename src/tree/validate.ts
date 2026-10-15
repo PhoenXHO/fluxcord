@@ -16,6 +16,7 @@
 
 import { NodeKind, SeparatorSpacing } from './vocab.js';
 import type {
+	AccessoryNode,
 	ButtonNode,
 	CheckboxGroupNode,
 	CheckboxNode,
@@ -26,8 +27,10 @@ import type {
 	ModalNode,
 	RadioGroupNode,
 	RowNode,
+	SectionNode,
 	SelectNode,
 	SelectOption,
+	TextNode,
 	TreeNode,
 	TreeRoot,
 	ViewNode,
@@ -49,7 +52,7 @@ export interface Violation {
  * this file reads `Rules.viewNeedsChild` instead of a magic number.
  * Every value is explicit, so nothing renumbers when a rule is added.
  */
-enum Rules {
+export enum Rules {
 	/** The tree's root must be a view or a modal. */
 	rootKind = 1,
 	/** A view needs at least one child. */
@@ -122,6 +125,16 @@ enum Rules {
 	radioGroupBounds = 35,
 	/** `values` belongs to a static options list, not an entity select. */
 	selectValuesStaticOnly = 36,
+	/** A section carries 1-3 text children. */
+	sectionTextBounds = 37,
+	/** A section takes exactly one accessory block. */
+	sectionOneAccessory = 38,
+	/** The accessory tag is only legal as a direct section child. */
+	accessoryInsideSection = 39,
+	/** The accessory block holds exactly one thumbnail, button or link. */
+	accessorySingleChild = 40,
+	/** A thumbnail carries an http(s) media URL. */
+	thumbnailMediaUrl = 41,
 }
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set(Object.values(NodeKind));
@@ -163,12 +176,40 @@ export function validateTree(root: TreeRoot): Violation[] {
 /**
  * Dispatches each node to its kind's checks; unknown kinds are reported.
  */
-function validateNode(node: TreeNode, path: string, violations: Violation[], inModal = false): void {
+function validateNode(node: TreeNode, path: string, violations: Violation[], inModal = false, parentKind?: NodeKind): void {
 	switch (node.kind) {
 		case NodeKind.view: validateView(node, path, violations); break;
 		case NodeKind.text: break; // no value rules of its own; text caps are renderer limits
 		case NodeKind.row: validateRow(node, path, violations); break;
 		case NodeKind.container: validateContainer(node, path, violations); break;
+		case NodeKind.section: validateSection(node, path, violations); break;
+		case NodeKind.accessory:
+			// The accessory block is a section-only grouping: anywhere else
+			// it has no meaning and no wire representation.
+			if (parentKind !== NodeKind.section) {
+				violations.push({
+					path,
+					rule: Rules.accessoryInsideSection,
+					message: 'the accessory tag is only legal as a direct section child',
+				});
+			}
+			break;
+		case NodeKind.thumbnail:
+			if (parentKind !== NodeKind.accessory) {
+				violations.push({
+					path,
+					rule: Rules.accessorySingleChild,
+					message: 'a thumbnail is only legal inside an accessory block',
+				});
+			}
+			if (!/^https?:\/\//.test(node.media)) {
+				violations.push({
+					path,
+					rule: Rules.thumbnailMediaUrl,
+					message: `thumbnail media must be an http(s) URL, got '${node.media}'`,
+				});
+			}
+			break;
 		case NodeKind.button: validateButton(node, path, violations); break;
 		case NodeKind.link: validateLink(node, path, violations); break;
 		case NodeKind.select: validateSelect(node, path, violations, inModal); break;
@@ -204,16 +245,65 @@ function validateView(node: ViewNode, path: string, violations: Violation[]): vo
 		if (!KNOWN_KINDS.has(child.kind)) {
 			// Unknown kind: report it and move on.
 			violations.push({ path: childPath, rule: Rules.unknownNodeKind, message: `unknown node kind '${kindOf(child)}'` });
-		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.container && child.kind !== NodeKind.hr) {
+		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.container && child.kind !== NodeKind.section && child.kind !== NodeKind.hr) {
 			violations.push({
 				path: childPath,
 				rule: Rules.viewChildKind,
-				message: `view child must be text, row, container or hr, got '${kindOf(child)}'`,
+				message: `view child must be text, row, container, section or hr, got '${kindOf(child)}'`,
 			});
 		} else {
-			validateNode(child, childPath, violations);
+			validateNode(child, childPath, violations, false, NodeKind.view);
 		}
 	});
+}
+
+/**
+ * A section carries one to three text children plus exactly one
+ * accessory block, whose single child is a thumbnail, button, or link.
+ * The platform's Section component is the whole contract: no other
+ * composition exists on the wire.
+ */
+function validateSection(node: SectionNode, path: string, violations: Violation[]): void {
+	const texts = node.children.filter((child): child is TextNode => child.kind === NodeKind.text);
+	const accessories = node.children.filter((child): child is AccessoryNode => child.kind === NodeKind.accessory);
+	if (texts.length < 1 || texts.length > 3) {
+		violations.push({
+			path,
+			rule: Rules.sectionTextBounds,
+			message: `section takes 1-3 text children, got ${texts.length}`,
+		});
+	}
+	if (accessories.length !== 1) {
+		violations.push({
+			path,
+			rule: Rules.sectionOneAccessory,
+			message: `section takes exactly one accessory block, got ${accessories.length}`,
+		});
+	}
+	node.children.forEach((child, index) => {
+		const childPath = `${path}/${kindOf(child)}[${index}]`;
+		if (child.kind === NodeKind.accessory) {
+			validateAccessory(child, childPath, violations);
+		}
+	});
+}
+
+/**
+ * The accessory block holds exactly one thumbnail, button, or link:
+ * the platform's accessory union, selects excluded. The child recurses
+ * for its own value checks (a thumbnail's URL rule lives there).
+ */
+function validateAccessory(node: AccessoryNode, path: string, violations: Violation[]): void {
+	const child = node.children[0];
+	if (node.children.length !== 1 || child === undefined || (child.kind !== NodeKind.thumbnail && child.kind !== NodeKind.button && child.kind !== NodeKind.link)) {
+		violations.push({
+			path,
+			rule: Rules.accessorySingleChild,
+			message: 'the accessory block holds exactly one thumbnail, button or link',
+		});
+		return;
+	}
+	validateNode(child, `${path}/${kindOf(child)}[0]`, violations, false, NodeKind.accessory);
 }
 
 /**
@@ -236,14 +326,14 @@ function validateContainer(node: ContainerNode, path: string, violations: Violat
 		const childPath = `${path}/${kindOf(child)}[${index}]`;
 		if (!KNOWN_KINDS.has(child.kind)) {
 			violations.push({ path: childPath, rule: Rules.unknownNodeKind, message: `unknown node kind '${kindOf(child)}'` });
-		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.hr) {
+		} else if (child.kind !== NodeKind.text && child.kind !== NodeKind.row && child.kind !== NodeKind.section && child.kind !== NodeKind.hr) {
 			violations.push({
 				path: childPath,
 				rule: Rules.containerChildKind,
-				message: `container child must be text, row or hr, got '${kindOf(child)}'`,
+				message: `container child must be text, row, section or hr, got '${kindOf(child)}'`,
 			});
 		} else {
-			validateNode(child, childPath, violations);
+			validateNode(child, childPath, violations, false, NodeKind.container);
 		}
 	});
 }

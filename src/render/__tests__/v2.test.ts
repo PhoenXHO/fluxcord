@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { button, checkbox, checkboxGroup, container, entitySelect, hr, input, link, modal, optionSelect, radioGroup, row, text, view } from '../../tree/builders.js';
+import { accessory, button, checkbox, checkboxGroup, container, entitySelect, hr, input, link, modal, optionSelect, radioGroup, row, section, text, thumbnail, view } from '../../tree/builders.js';
 import { actionHash } from '../action-hash.js';
 import { renderV2Message, renderV2Modal, RenderError } from '../v2.js';
 import type { V2MessagePayload, V2ModalPayload } from '../v2.js';
@@ -284,6 +284,34 @@ describe('renderV2Message - container', () => {
 				{ type: 10, content: 'panel' },
 				{ type: 1, components: [{ type: 2, style: 1, label: 'Go', custom_id: CUSTOM_ID }] },
 			],
+		}]);
+	});
+
+	it('renders a section with its texts and accessory slot', () => {
+		const payload = render(view(
+			{},
+			section(
+				{},
+				text({ title: 'Case' }, 'BUG-0007'),
+				accessory(thumbnail({ media: 'https://torn.com/a.png', description: 'logo' })),
+			),
+		));
+		expect(payload.components).toEqual([{
+			type: 9,
+			components: [{ type: 10, content: '**Case**\nBUG-0007' }],
+			accessory: { type: 11, media: { url: 'https://torn.com/a.png' }, description: 'logo' },
+		}]);
+	});
+
+	it('renders a button accessory through the control path, handler wiring included', () => {
+		const payload = render(view(
+			{},
+			section({}, text('text'), accessory(button({ onClick: go, label: 'Go' }))),
+		));
+		expect(payload.components).toEqual([{
+			type: 9,
+			components: [{ type: 10, content: 'text' }],
+			accessory: { type: 2, style: 1, label: 'Go', custom_id: CUSTOM_ID },
 		}]);
 	});
 
