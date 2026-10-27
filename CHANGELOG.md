@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-27
+
+### Added
+
+- Command arguments: a leaf (a bare mount or a subcommand) declares the slash command options its invoker types with the `arg` helpers (`arg.string`, `integer`, `number`, `boolean`, `user`, `channel`, `role`) in `mounts(flow, { args })`. They are called args because `option` is already the select's `<option>` tag. The leaf's `data` resolver receives the parsed values as a second parameter, typed from the list: optional unless `{ required: true }`, narrowed to literals by `choices`, and user, channel and role values as ids. The first parameter is unchanged, so existing resolvers keep working.
+- Discord's rules for arguments are checked when the command is declared, with the leaf's invocation path in the message: lowercase names of 1 to 32 characters, no duplicates, descriptions of 1 to 100 characters, at most 25 arguments, required ones first, choices only on strings and numbers and not alongside a min or max.
+
 ## [0.2.4] - 2026-10-27
 
 ### Added
