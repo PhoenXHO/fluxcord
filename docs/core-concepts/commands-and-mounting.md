@@ -79,6 +79,32 @@ The `subcommands` record is keyed by subcommand name, and each leaf must supply 
 
 At registration, Discord receives the group as a single command with declared subcommands, routing any incoming invocation by subcommand name directly to the owning leaf. From there the mount proceeds as usual; each leaf's flow initializes from its own `initialData`, ensuring the panel behaves predictably no matter which door opened it.
 
+## Arguments
+
+A command often needs to know what the user is asking about before any panel exists. A lookup command is the clearest case: `/whois member:@someone` should open on that person, not on an empty search box. Discord calls these slash command options; fluxcord calls them args, because `option` is already the tag you put inside a select. A leaf declares them with the `arg` helpers and reads them in its `data` resolver:
+
+```tsx
+import { arg, command, mounts } from 'fluxcord';
+
+export const whoisCommand = command('whois', 'Look up a member', {
+    mount: mounts(whoisFlow, {
+        args: [
+            arg.user('member', 'Who to look up'),
+            arg.integer('torn_id', 'Or a Torn id', { min: 1 }),
+        ],
+        data: (interaction, args) => ({ shown: args.member ?? null, tornId: args.torn_id ?? null }),
+    }),
+});
+```
+
+Each helper takes the name the command line shows, a description, and the extras that apply to that kind of value. The kinds are `string`, `integer`, `number`, `boolean`, `user`, `channel` and `role`. Numbers take `min` and `max`, strings take `minLength` and `maxLength`, and strings and numbers can take `choices`, a fixed list the user picks from. A bare choice such as `'verified'` is its own label; `{ name: 'Not linked', value: 'pending' }` separates the two.
+
+Arguments are optional unless you pass `{ required: true }`, and the resolver's second parameter is typed from the list. Here `args.member` is `string | undefined`, while an argument declared `required: true` loses the `undefined`, and a `choices` list narrows the value to its literals. User, channel and role arguments arrive as ids. The first parameter is still the invocation, so a resolver that ignores arguments does not change.
+
+Discord's own rules are checked when the module loads, so a bad declaration fails at boot with the command's name in the message instead of at registration. Names are 1 to 32 lowercase letters, numbers, `-` or `_`, descriptions are 1 to 100 characters, a leaf takes at most 25 arguments, required arguments come first, and an argument with `choices` takes no `min` or `max`.
+
+On a grouped command, arguments belong to the subcommand that declares them, because that is where Discord attaches them. Two subcommands can take different arguments, and a subcommand with none registers none. Autocomplete is not part of the helpers yet.
+
 ## The permission knob
 
 The `staff` command carries `memberPermissions` using constants imported from discord.js, since this gate delegates enforcement straight to Discord. That value maps directly onto the command's default member permissions. Discord doesn't list the command in the picker for anyone lacking `ManageMessages` and rejects any invocations that manage to slip through.
