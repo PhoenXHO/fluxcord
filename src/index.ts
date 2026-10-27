@@ -17,6 +17,7 @@ export * from './flow/token.js'; // flow, Flow, FlowMeta
 export * from './flow/screen.js'; // screen, subview
 export * from './flow/types.js'; // Screen, FlowOptions, FlowDefinition
 export * from './pipeline/action.js'; // action
+export * from './command/args.js'; // arg, ArgValues, validateArgs
 export * from './command/declare.js'; // command, mounts, Command
 export * from './command/harvest.js'; // moduleFlowRegistrations, FlowSourceModule
 export * from './flow/expiry.js'; // expiryEpoch, Expiry
