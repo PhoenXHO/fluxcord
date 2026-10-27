@@ -444,6 +444,23 @@ export function renderV2Message(view: ViewNode, sessionId: string, screenKey: st
 	return { flags: MessageFlags.IsComponentsV2, components };
 }
 
+/**
+ * Renders a view that carries no controls straight to its message body,
+ * with no session behind it: the shape of a DM or a one-off channel post
+ * that nobody can click. `renderV2Message` asks for a session id, a screen
+ * key and a stamp lookup because a clickable control needs all three; a
+ * static view needs none of them.
+ *
+ * @param view The view to render. Buttons and selects are rejected.
+ * @returns The message body: the V2 flag plus the component tree.
+ * @throws `RenderError` when the view holds a button or a select, or when any platform limit breaks.
+ */
+export function renderStatic(view: ViewNode): V2MessagePayload {
+	return renderV2Message(view, '', '', () => {
+		throw new RenderError('view', 'renderStatic takes a view without buttons or selects: nothing is listening for the click');
+	});
+}
+
 /** The REST body for a modal interaction response: the modal's own id, its title, and its components. */
 export interface V2ModalPayload {
 	readonly custom_id: string;

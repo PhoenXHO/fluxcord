@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { accessory, button, checkbox, checkboxGroup, container, entitySelect, hr, input, link, modal, optionSelect, radioGroup, row, section, text, thumbnail, view } from '../../tree/builders.js';
 import { actionHash } from '../action-hash.js';
-import { renderV2Message, renderV2Modal, RenderError } from '../v2.js';
+import { renderStatic, renderV2Message, renderV2Modal, RenderError } from '../v2.js';
 import type { V2MessagePayload, V2ModalPayload } from '../v2.js';
 import { materializeTree } from '../../commit/frame.js';
 import type { ButtonNode, ControlNode, InputNode, ModalNode, ViewNode } from '../../tree/types.js';
@@ -31,6 +31,18 @@ describe('renderV2Message - message envelope', () => {
 			{ type: 10, content: 'a' },
 			{ type: 1, components: [{ type: 2, style: 1, label: 'Go', custom_id: CUSTOM_ID }] },
 		]);
+	});
+});
+
+describe('renderStatic', () => {
+	it('renders a control-less view without a session', () => {
+		const payload = renderStatic(view({ title: 'Hi' }, container({}, text('a'), row({}, link({ url: 'https://example.com', label: 'Open' })))));
+		expect(payload.flags).toBe(32768);
+		expect(payload.components[0]).toEqual({ type: 10, content: '# Hi' });
+	});
+
+	it('rejects a view with a button', () => {
+		expect(() => renderStatic(view({}, row({}, button({ onClick: go, label: 'Go' }))))).toThrow(RenderError);
 	});
 });
 

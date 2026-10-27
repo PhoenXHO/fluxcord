@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A host-level `defaultParting`: what a flow that declares no `parting` of its own expires into (and what a dead click on its panel renders), set once on the runtime or `createBot`. Parting view builders receive a `PartingInfo` (the restart hint, the death reason, the flow id); existing zero-argument builders keep working.
 - `ViewSession.belowRoot`: whether the drawing flow is a call inside another flow's frame. Screens branch on call depth where Back is a cancel (below the root) versus a stray disabled button (at the root). Views now receive a read-only projection of the session facts, not the live session object.
 - `section`, `accessory`, and `thumbnail` nodes: the platform's Section component. A section carries one to three `<text>` blocks plus exactly one `<accessory>` block, whose single child is a `<thumbnail>` (media URL, alt text, spoiler) or a button or link with full handler wiring. Legal in views and containers, never in modals; the composition is validated at the draw site and the 40-component budget counts the accessory.
+- `renderStatic(view)`: renders a view with no controls straight to its message body, with no session, screen key or stamp lookup behind it. The shape for a DM or a one-off post that nobody can click; a view holding a button or a select throws a `RenderError`.
 
 ### Fixed
 
