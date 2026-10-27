@@ -18,16 +18,20 @@
 
 import type { Flow } from '../flow/token.js';
 import type { Policy } from '../pipeline/types.js';
+import { validateArgs } from './args.js';
+import type { AnyArg, ArgValues } from './args.js';
 
 /** Command and subcommand names must be Discord-valid bare names. */
 const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 /**
- * What one mount point knows beyond the flow itself: just the picker
- * description. The data bag is the flow's own initialData, and session
- * lifecycle lives on the flow's meta hooks; a command is pure declaration.
+ * What one mount point knows beyond the flow itself: the picker
+ * description, whether it opens ephemeral, its door gate, the arguments
+ * the invoker types, and the resolver that seeds the flow's bag. The data
+ * bag defaults to the flow's own initialData, and session lifecycle lives
+ * on the flow's meta hooks; a command is pure declaration.
  */
-export interface MountSpec {
+export interface MountSpec<TArgs extends readonly AnyArg[] = readonly []> {
 	/**
 	 * What the subcommand shows in the command picker. Required on
 	 * subcommand leaves; a bare leaf may carry its own, which overrides
@@ -50,15 +54,23 @@ export interface MountSpec {
 	 */
 	readonly policy?: Policy;
 	/**
+	 * The arguments the invoker types after the command, declared with the
+	 * `arg` helpers in the order the command line shows them (required ones
+	 * first). Their values reach `data` as its second parameter, typed from
+	 * this list.
+	 */
+	readonly args?: TArgs;
+	/**
 	 * Builds the flow's bag for this invocation, before the first payload
 	 * exists: the seed overrides `initialData`, and `first` resolves on
 	 * it at birth, so an async-read panel (a wizard that needs the
 	 * guild's settings row) opens on the screen its data calls for with
 	 * no loading flash. Receives the invocation as the opaque context
-	 * (the host types it at authoring time, like onSessionStart); may be
-	 * async. A throw fails the command loudly, like any mount failure.
+	 * (the host types it at authoring time, like onSessionStart) and the
+	 * parsed arguments; may be async. A throw fails the command loudly,
+	 * like any mount failure.
 	 */
-	data?(context: unknown): unknown | Promise<unknown>;
+	data?(context: unknown, args: ArgValues<TArgs>): unknown | Promise<unknown>;
 }
 
 /** The erased leaf mounts() returns; readers treat the leaf generically. */
@@ -67,7 +79,8 @@ export interface MountLeaf {
 	readonly description?: string;
 	readonly ephemeral?: boolean;
 	readonly policy?: Policy;
-	data?(context: unknown): unknown | Promise<unknown>;
+	readonly args?: readonly AnyArg[];
+	data?(context: unknown, args: Record<string, unknown>): unknown | Promise<unknown>;
 }
 
 /**
@@ -75,18 +88,21 @@ export interface MountLeaf {
  * exists for descriptions: subcommand leaves need one, a bare leaf can
  * override with one.
  */
-export function mounts<TData>(
+export function mounts<TData, const TArgs extends readonly AnyArg[] = readonly []>(
 	flow: Flow<TData>,
-	spec: MountSpec = {},
+	spec: MountSpec<TArgs> = {},
 ): MountLeaf {
 	// The flow is widened to the erased leaf shape here: the same
-	// object, retyped for readers that treat leaves generically.
+	// object, retyped for readers that treat leaves generically. The
+	// resolver's typed second parameter widens the same way: the binding
+	// builds the values from the very list that typed them.
 	return Object.freeze({
 		flow,
 		...(spec.description !== undefined ? { description: spec.description } : {}),
 		...(spec.ephemeral !== undefined ? { ephemeral: spec.ephemeral } : {}),
 		...(spec.policy !== undefined ? { policy: spec.policy } : {}),
-		...(spec.data !== undefined ? { data: spec.data } : {}),
+		...(spec.args !== undefined ? { args: spec.args } : {}),
+		...(spec.data !== undefined ? { data: spec.data as MountLeaf['data'] } : {}),
 	});
 }
 
@@ -142,6 +158,9 @@ export function command(name: string, description: string, spec: CommandSpec): C
 				throw new Error(`command '${name}': subcommand '${key}' requires a description`);
 			}
 		}
+	}
+	for (const { leaf, commandHint } of commandLeaves({ name, description, spec })) {
+		if (leaf.args !== undefined) validateArgs(commandHint, leaf.args);
 	}
 	return Object.freeze({ name, description, spec: Object.freeze(spec) });
 }
