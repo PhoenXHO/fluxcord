@@ -57,6 +57,7 @@ import type {
 	HrNode,
 	InputNode,
 	ModalNode,
+	ComponentResult,
 	RadioGroupNode,
 	RowNode,
 	SectionNode,
@@ -66,6 +67,7 @@ import type {
 	ThumbnailNode,
 	ViewNode,
 } from '../tree/types.js';
+import { normalizeViewRoot } from '../tree/normalize.js';
 import { encodeActionId } from './id-codec.js';
 
 // --- Errors & payload shapes -----------------------------------------------------
@@ -451,12 +453,13 @@ export function renderV2Message(view: ViewNode, sessionId: string, screenKey: st
  * key and a stamp lookup because a clickable control needs all three; a
  * static view needs none of them.
  *
- * @param view The view to render. Buttons and selects are rejected.
+ * @param view The view to render: a `view()` node or a TSX `<view>`, the same
+ *   shapes a screen may return. Buttons and selects are rejected.
  * @returns The message body: the V2 flag plus the component tree.
  * @throws `RenderError` when the view holds a button or a select, or when any platform limit breaks.
  */
-export function renderStatic(view: ViewNode): V2MessagePayload {
-	return renderV2Message(view, '', '', () => {
+export function renderStatic(view: ComponentResult): V2MessagePayload {
+	return renderV2Message(normalizeViewRoot(view), '', '', () => {
 		throw new RenderError('view', 'renderStatic takes a view without buttons or selects: nothing is listening for the click');
 	});
 }
