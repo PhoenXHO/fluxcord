@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `renderStatic` takes a TSX `<view>` (or any root a screen may return), not only a `view()` node, so a message with no controls (a DM, a one-off post) is written the same way as a screen. It folds the root with the same `normalizeViewRoot` screens use; a `view()` node still works as before.
+
 ## [0.2.5] - 2026-10-27
 
 ### Added
