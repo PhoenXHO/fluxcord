@@ -74,6 +74,29 @@ Because the nearest policy wins, a control's gate replaces its flow's gate for t
 
 Evaluation happens per click against fresh facts, and the staff picker serves as the demo. The roles screen writes the picks to the module's store, and an already-open ticket desk enforces the new roles on its very next click. A Discord message renders once for everyone, so a gate never hides a control; the button looks the same to a non-staff member, and the denial happens on click.
 
+## Answering a clicker who does not own the panel
+
+A panel opened for everyone, such as the campfire anyone may feed, is owned by the member who mounted it, yet its buttons open to every member with `policy.allow()`. A handler on such a panel often needs to answer the person who clicked, and the shared message is the wrong place for that answer. Two verbs on the toolkit speak to the clicker alone.
+
+```tsx
+const addLog = action<CampfireData>()(async e => {
+    e.mutate(d => { d.logs += 1; });
+    await e.ui.reply(
+        <view>
+            <text>You added a log. Thanks for keeping the fire going.</text>
+        </view>,
+    );
+});
+
+const seeKeepers = action<CampfireData>()(async e => {
+    await e.ui.open(keepersFlow, { data: { fire: e.session.data.fire } });
+});
+```
+
+`ui.reply` sends an ephemeral message with a static view. The view takes no buttons or selects, because nothing would listen for the click, and it throws a `RenderError` before anything is sent. `ui.open` mounts a flow as an ephemeral panel owned by the clicker, so `policy.owner()` inside that flow means them and not the member who started the shared panel. The new flow must be listed in its module's manifest flows, and it cannot rehydrate. Neither verb touches the shared message: the handler's own `mutate` still redraws it, and the clicker's answer arrives separately.
+
+Both ride the click's own interaction. An unanswered click is answered by the reply itself, and a click the framework already acknowledged (a slow handler, a parked call) takes a follow-up instead. A host with a custom bridge supplies `sendToActor` and `actorSender`; without them the verbs throw an error that says so.
+
 ## What gates do not do
 
 The `PolicyRequest` carries identity and location but not the interaction's values, so per-target rules belong inside the handler where the values live. App-state conditions are host facts too: you can compute them into privilege names, or wait for the requirement registry. Both escape hatches exist without new vocabulary.

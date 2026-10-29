@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `ui.reply(view)`: answers whoever clicked with an ephemeral message only they see, so a shared panel can confirm one member's action, or tell them why it did not go through, without touching what everyone else sees. The view takes no buttons or selects and throws a `RenderError` before anything is sent. A handler may still mutate the panel in the same click.
+- `ui.open(flow, { data })`: mounts a flow as an ephemeral panel owned by the clicker, beside the current panel, which stays as it is. The shape for a paginated list or a form that one member opens from a public panel. The flow must be in its module's manifest flows and cannot rehydrate (an ephemeral message dies at Discord's interaction wall).
+- Bridge seams behind the two verbs: `PlatformPort.sendToActor(payload)` and `PlatformPort.actorSender()`, both optional like `ack`. The shipped Discord bridge implements them: a reply when the click is unanswered, a follow-up when it was already acked, with later edits of the message routed through the interaction's webhook. The host's `ephemeralAsPublic` switch keeps both public for dev. A bridge without them makes the verbs throw a clear error.
+
 ### Changed
 
 - `renderStatic` takes a TSX `<view>` (or any root a screen may return), not only a `view()` node, so a message with no controls (a DM, a one-off post) is written the same way as a screen. It folds the root with the same `normalizeViewRoot` screens use; a `view()` node still works as before.
