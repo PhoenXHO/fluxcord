@@ -13,6 +13,7 @@
 
 import type { Flow } from '../flow/token.js';
 import type { V2MessagePayload, V2ModalPayload } from '../render/v2.js';
+import type { InteractionSender } from '../runtime/types.js';
 import type { EndReason, FlowFrame, MessageRef, Session } from '../state/types.js';
 import type { ComponentResult } from '../tree/types.js';
 
@@ -99,6 +100,24 @@ export interface UiToolkit<TKeys extends string = string> {
 	 * element union (TSX roots are flat); folded to a modal node at the seam.
 	 */
 	showModal(modal: ComponentResult): Promise<void>;
+	/**
+	 * Answer the clicker privately, whoever they are: an ephemeral message
+	 * only they see, with a static view. The shared panel is untouched, and
+	 * a handler may still mutate it in the same click. The view takes no
+	 * buttons or selects (nothing listens for them; use `open` for
+	 * something interactive) and throws a RenderError before anything is
+	 * sent. Resolves once Discord has the message.
+	 */
+	reply(view: ComponentResult): Promise<void>;
+	/**
+	 * Open a separate panel for the clicker: the flow mounts as an ephemeral
+	 * message owned by them (not by the panel's owner), beside the current
+	 * panel, which stays as it is. `data` seeds the new flow's bag. The flow
+	 * must be listed in its module's manifest flows, and it cannot rehydrate
+	 * (an ephemeral message dies at Discord's interaction wall). Throws when
+	 * the host's bridge cannot reply to the click.
+	 */
+	open<TChild, TExit>(flow: Flow<TChild, TExit>, options?: { readonly data?: TChild }): Promise<void>;
 }
 
 /**
@@ -392,6 +411,21 @@ export interface PlatformPort {
 	 * for observability.
 	 */
 	replyToActor(text: string): Promise<void>;
+	/**
+	 * Get a rendered message to the actor of the current interaction,
+	 * ephemeral like `replyToActor` (what `ui.reply` rides). Dropped quietly
+	 * outside a dispatch window or when the interaction already expired.
+	 * Optional: bridges that cannot reply per click omit it, and
+	 * `ui.reply` throws.
+	 */
+	sendToActor?(payload: V2MessagePayload): Promise<void>;
+	/**
+	 * A sender that replies to the current interaction with an ephemeral
+	 * message and reports where it landed, so a flow can mount on it (what
+	 * `ui.open` rides). `undefined` outside a dispatch window. Optional:
+	 * bridges that cannot reply per click omit it, and `ui.open` throws.
+	 */
+	actorSender?(): InteractionSender | undefined;
 	/** Re-render the session's current screen and edit the message in place. */
 	redraw(session: Session<unknown>): Promise<void>;
 	/**
@@ -422,7 +456,7 @@ export interface PlatformPort {
  * (`redraw`, `commitParting`); the runtime composes the full `PlatformPort`
  * from both.
  */
-export type BridgePort = Pick<PlatformPort, 'replyToActor' | 'editMessage' | 'showModal' | 'ack'>;
+export type BridgePort = Pick<PlatformPort, 'replyToActor' | 'sendToActor' | 'actorSender' | 'editMessage' | 'showModal' | 'ack'>;
 
 /** One clickable in an action map: its handler plus the control's label text for diagnostics. */
 export interface ActionRecord<TData = unknown> {

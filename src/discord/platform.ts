@@ -82,6 +82,12 @@ export const EPHEMERAL_CEILING_MS = INTERACTION_WALL_MS - 60_000;
 /** Live lines kept before the oldest is evicted (bound, not exact). */
 const EPHEMERAL_LINE_CAP = 500;
 
+/** One ephemeral message's door: when its interaction began, and how to edit it. */
+interface EphemeralLine {
+	readonly startedAt: number;
+	readonly edit: (payload: V2MessagePayload) => Promise<unknown>;
+}
+
 const SILENT: BridgeLogger = Object.freeze({
 	debug: () => undefined,
 	warn: () => undefined,
@@ -142,7 +148,18 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 	 * Insertion order keeps the oldest evictable; the cap bounds memory,
 	 * not lifetime.
 	 */
-	const lines = new Map<string, ChatInputCommandInteraction>();
+	const lines = new Map<string, EphemeralLine>();
+
+	/** Registers a live line; past the cap the oldest is dropped (bound, not exact). */
+	function rememberLine(messageId: string, line: EphemeralLine): void {
+		lines.set(messageId, line);
+		if (lines.size > EPHEMERAL_LINE_CAP) {
+			const oldest = lines.keys().next();
+			if (oldest.done !== true) {
+				lines.delete(oldest.value);
+			}
+		}
+	}
 
 	async function replyToActor(text: string): Promise<void> {
 		const interaction = scopes.getStore()?.interaction;
@@ -166,6 +183,72 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 			// rather than throw: the pipeline cannot act on a lost denial.
 			log.debug('replyToActor failed (interaction likely expired)', err);
 		}
+	}
+
+	/** The payload as an ephemeral message body, unless the host's dev switch keeps it public. */
+	const actorBody = (payload: V2MessagePayload): V2MessagePayload =>
+		options.ephemeralAsPublic === true ? payload : { ...payload, flags: payload.flags | MessageFlags.Ephemeral };
+
+	async function sendToActor(payload: V2MessagePayload): Promise<void> {
+		const interaction = scopes.getStore()?.interaction;
+		if (interaction === undefined) {
+			log.warn('sendToActor outside a dispatch window, message dropped');
+			return;
+		}
+		try {
+			const body = actorBody(payload) as unknown as InteractionReplyOptions;
+			if (interaction.replied || interaction.deferred) {
+				await interaction.followUp(body);
+			} else {
+				await interaction.reply(body);
+			}
+		} catch (err) {
+			// Same stance as replyToActor: an expired interaction cannot take
+			// the message, and nothing upstream can act on the loss.
+			log.debug('sendToActor failed (interaction likely expired)', err);
+		}
+	}
+
+	/**
+	 * A sender that answers the click in flight with a fresh ephemeral
+	 * message, for a flow to mount on. An unanswered click is answered by the
+	 * reply itself; an already-acked one (the ack race, a parked call)
+	 * takes a follow-up. Either way the message joins the ephemeral lines,
+	 * so the flow's later edits reach it through this interaction's webhook.
+	 */
+	function actorSender(): InteractionSender | undefined {
+		const interaction = scopes.getStore()?.interaction;
+		if (interaction === undefined) return undefined;
+		const ephemeral = options.ephemeralAsPublic !== true;
+		return {
+			...(ephemeral ? { ceilingMs: EPHEMERAL_CEILING_MS } : {}),
+			async send(payload: V2MessagePayload): Promise<MessageRef> {
+				const body = actorBody(payload);
+				if (!interaction.replied && !interaction.deferred) {
+					const replyOptions = { ...body, withResponse: true } as unknown as InteractionReplyOptions & { withResponse: true };
+					const response = await interaction.reply(replyOptions);
+					const message = response.resource?.message;
+					if (message === undefined || message === null) {
+						throw new Error('bridge actorSender: reply returned no message resource');
+					}
+					if (ephemeral) {
+						rememberLine(message.id, {
+							startedAt: interaction.createdTimestamp,
+							edit: (next) => interaction.editReply(next as unknown as MessageEditOptions),
+						});
+					}
+					return { channelId: message.channelId, messageId: message.id };
+				}
+				const message = await interaction.followUp(body as unknown as InteractionReplyOptions);
+				if (ephemeral) {
+					rememberLine(message.id, {
+						startedAt: interaction.createdTimestamp,
+						edit: (next) => interaction.editReply({ ...next, message: message.id } as unknown as MessageEditOptions),
+					});
+				}
+				return { channelId: message.channelId, messageId: message.id };
+			},
+		};
 	}
 
 	async function showModal(payload: V2ModalPayload): Promise<void> {
@@ -240,12 +323,12 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 		// edit through the command interaction's webhook while it lives.
 		const line = lines.get(ref.messageId);
 		if (line !== undefined) {
-			if (Date.now() - line.createdTimestamp > INTERACTION_WALL_MS) {
+			if (Date.now() - line.startedAt > INTERACTION_WALL_MS) {
 				lines.delete(ref.messageId);
 				throw new Error(`bridge editMessage: ephemeral line '${ref.messageId}' is past the interaction wall`);
 			}
 			try {
-				await line.editReply(payload as unknown as MessageEditOptions);
+				await line.edit(payload);
 			} catch (error) {
 				if (isUnknownMessage(error)) {
 					log.debug(`bridge editMessage: ephemeral line '${ref.messageId}' was already deleted`);
@@ -300,14 +383,10 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 					if (message === undefined || message === null) {
 						throw new Error('bridge replySender: ephemeral reply returned no message resource');
 					}
-					lines.set(message.id, interaction);
-					if (lines.size > EPHEMERAL_LINE_CAP) {
-						// Bound, not exact: drop the oldest line past the cap.
-						const oldest = lines.keys().next();
-						if (oldest.done !== true) {
-							lines.delete(oldest.value);
-						}
-					}
+					rememberLine(message.id, {
+						startedAt: interaction.createdTimestamp,
+						edit: (next) => interaction.editReply(next as unknown as MessageEditOptions),
+					});
 					return { channelId: message.channelId, messageId: message.id };
 				},
 			};
@@ -357,5 +436,5 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 		});
 	}
 
-	return { platform: { replyToActor, showModal, ack, editMessage }, sendToChannel, replySender, dispatch };
+	return { platform: { replyToActor, sendToActor, actorSender, showModal, ack, editMessage }, sendToChannel, replySender, dispatch };
 }

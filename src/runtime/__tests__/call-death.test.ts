@@ -109,6 +109,8 @@ function deathWorld(): {
 			back: () => undefined,
 			exit: () => undefined,
 			showModal: () => Promise.resolve(),
+			reply: () => Promise.resolve(),
+			open: () => Promise.resolve(),
 		},
 		task: async <T>(fn: () => Promise<T>): Promise<T> => fn(),
 		mutate: (fn: (data: unknown) => void): void => {

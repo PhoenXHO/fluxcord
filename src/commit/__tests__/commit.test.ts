@@ -170,7 +170,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		platform,
 		reviveIndex: catalog.byFlowId,
 		tryRevive: async (): Promise<Session<unknown> | undefined> => undefined,
-		makeUi: createMakeUi({ exit: call.exit }),
+		makeUi: createMakeUi({ exit: call.exit, open: async () => undefined }),
 		call,
 		queue,
 		// No fixture test launches; a use throws loudly instead of pretending.

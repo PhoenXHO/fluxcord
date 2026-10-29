@@ -416,3 +416,130 @@ describe('ephemeral lines', () => {
 		expect(channel.messages.fetch).toHaveBeenCalledWith('mE0');
 	});
 });
+
+describe('binding - sendToActor', () => {
+	const PAYLOAD = { flags: MessageFlags.IsComponentsV2, components: [] } as never;
+
+	it('replies with the payload, ephemeral, to the interaction in flight', async () => {
+		const bridge = createUiBridge(fakeClient());
+		// d.js flips `replied` on a real interaction; the fake mirrors it.
+		const button = fakeButton({
+			reply: vi.fn(async function (this: Record<string, unknown>) {
+				this.replied = true;
+			}),
+		});
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			await bridge.platform.sendToActor?.(PAYLOAD);
+		});
+
+		expect(button.reply).toHaveBeenCalledWith({
+			flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+			components: [],
+		});
+		// The reply answered the click: the end-of-dispatch ack stays off.
+		expect(button.deferUpdate).not.toHaveBeenCalled();
+	});
+
+	it('falls back to followUp when the click was already acked', async () => {
+		const bridge = createUiBridge(fakeClient());
+		const button = fakeButton({ deferred: true });
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			await bridge.platform.sendToActor?.(PAYLOAD);
+		});
+
+		expect(button.reply).not.toHaveBeenCalled();
+		expect(button.followUp).toHaveBeenCalledWith({
+			flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+			components: [],
+		});
+	});
+
+	it('keeps the message public when the host asks for public copy (dev)', async () => {
+		const bridge = createUiBridge(fakeClient(), { ephemeralAsPublic: true });
+		const button = fakeButton();
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			await bridge.platform.sendToActor?.(PAYLOAD);
+		});
+
+		expect(button.reply).toHaveBeenCalledWith({ flags: MessageFlags.IsComponentsV2, components: [] });
+	});
+
+	it('drops the payload (no crash) outside a dispatch window', async () => {
+		const bridge = createUiBridge(fakeClient());
+		await expect(bridge.platform.sendToActor?.(PAYLOAD)).resolves.toBeUndefined();
+	});
+});
+
+describe('binding - actorSender', () => {
+	const PAYLOAD = { flags: MessageFlags.IsComponentsV2, components: [] } as never;
+
+	it('is undefined outside a dispatch window', () => {
+		const bridge = createUiBridge(fakeClient());
+		expect(bridge.platform.actorSender?.()).toBeUndefined();
+	});
+
+	it('sends an ephemeral reply on an unanswered click, reports the ceiling and registers the line', async () => {
+		const bridge = createUiBridge(fakeClient());
+		const editReply = vi.fn(async () => undefined);
+		const button = fakeButton({
+			createdTimestamp: Date.now(),
+			reply: vi.fn(async () => ({ resource: { message: { id: 'eph1', channelId: 'cE' } } })),
+			editReply,
+		});
+		let ref: unknown;
+		let ceiling: number | undefined;
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			const sender = bridge.platform.actorSender?.();
+			ceiling = sender?.ceilingMs;
+			ref = await sender?.send(PAYLOAD);
+		});
+
+		expect(ref).toEqual({ channelId: 'cE', messageId: 'eph1' });
+		expect(ceiling).toBe(EPHEMERAL_CEILING_MS);
+		const options = (button.reply as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(options).toMatchObject({ withResponse: true, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+
+		// Later edits of that message ride the line, not the channel.
+		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'eph1' }, PAYLOAD);
+		expect(editReply).toHaveBeenCalledWith(PAYLOAD);
+	});
+
+	it('follows up on an already-acked click and edits that follow-up by id', async () => {
+		const bridge = createUiBridge(fakeClient());
+		const editReply = vi.fn(async () => undefined);
+		const button = fakeButton({
+			deferred: true,
+			createdTimestamp: Date.now(),
+			followUp: vi.fn(async () => ({ id: 'eph2', channelId: 'cE' })),
+			editReply,
+		});
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			const ref = await bridge.platform.actorSender?.()?.send(PAYLOAD);
+			expect(ref).toEqual({ channelId: 'cE', messageId: 'eph2' });
+		});
+
+		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'eph2' }, PAYLOAD);
+		expect(editReply).toHaveBeenCalledWith({ ...(PAYLOAD as object), message: 'eph2' });
+	});
+
+	it('has no ceiling and no line when the host asks for public copy (dev)', async () => {
+		const bridge = createUiBridge(fakeClient(), { ephemeralAsPublic: true });
+		const button = fakeButton({
+			reply: vi.fn(async () => ({ resource: { message: { id: 'pub1', channelId: 'cE' } } })),
+		});
+
+		await bridge.dispatch(button as unknown as UiComponentInteraction, async () => {
+			const sender = bridge.platform.actorSender?.();
+			expect(sender?.ceilingMs).toBeUndefined();
+			await sender?.send(PAYLOAD);
+		});
+
+		const options = (button.reply as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(options.flags).toBe(MessageFlags.IsComponentsV2);
+	});
+});

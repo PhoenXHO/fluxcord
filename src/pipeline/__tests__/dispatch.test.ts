@@ -137,6 +137,8 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 				store.close(session.id);
 			},
 			showModal: () => Promise.resolve(),
+			reply: () => Promise.resolve(),
+			open: () => Promise.resolve(),
 		},
 		task: <T>(fn: () => Promise<T>): Promise<T> => fn(),
 		mutate: (fn: (data: unknown) => void): void => {

@@ -29,7 +29,8 @@
 
 import { encodeActionId } from '../render/id-codec.js';
 import type { ActionAddress } from '../render/id-codec.js';
-import { renderV2Modal } from '../render/v2.js';
+import { renderStatic, renderV2Modal } from '../render/v2.js';
+import type { Flow } from '../flow/token.js';
 import { generateId } from '../state/store.js';
 import { activeFrame } from '../state/types.js';
 import type { FlowFrame, Session } from '../state/types.js';
@@ -44,13 +45,19 @@ export interface MakeUiOptions {
 	 * closes the session (the store's onEnd wiring does the farewell).
 	 */
 	readonly exit: (session: Session<unknown>, value: unknown, final?: ComponentResult) => void;
+	/**
+	 * What `ui.open` does: mount the flow on the clicker's ephemeral reply,
+	 * owned by them. The runtime supplies it (it owns mount); the toolkit
+	 * only forwards the clicker and the seed.
+	 */
+	readonly open: (flow: Flow<unknown, unknown>, actorId: string, data: unknown) => Promise<void>;
 }
 
-/** Builds the event-bound toolkit: ui effects plus the task/mutate hooks. */
-export type MakeUi = (session: Session<unknown>, address: ActionAddress, platform: PlatformPort) => EventTools;
+/** Builds the event-bound toolkit: ui effects plus the task/mutate hooks. `actorId` is the clicker the verbs speak to. */
+export type MakeUi = (session: Session<unknown>, address: ActionAddress, platform: PlatformPort, actorId: string) => EventTools;
 
 export function createMakeUi(options: MakeUiOptions): MakeUi {
-	return (session, address, platform) => {
+	return (session, address, platform, actorId) => {
 		// Sealing. Every verb looks the top frame up when it runs and
 		// touches nothing else on the stack, so a parent's pages stay out
 		// of reach for a child handler and the other way around. The
@@ -123,6 +130,18 @@ export function createMakeUi(options: MakeUiOptions): MakeUi {
 				frame.modalHandler = opener?.handler;
 				frame.modalPolicy = opener?.policy;
 				return platform.showModal(payload);
+			},
+			async reply(view: ComponentResult): Promise<void> {
+				// Rendering first: a view with controls rejects here, before
+				// anything reaches the clicker.
+				const payload = renderStatic(view);
+				if (platform.sendToActor === undefined) {
+					throw new Error('ui.reply: this host cannot reply to the clicker (the bridge has no sendToActor)');
+				}
+				await platform.sendToActor(payload);
+			},
+			open<TChild, TExit>(flow: Flow<TChild, TExit>, openOptions?: { readonly data?: TChild }): Promise<void> {
+				return options.open(flow as Flow<unknown, unknown>, actorId, openOptions?.data);
 			},
 		};
 

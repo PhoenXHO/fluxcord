@@ -51,7 +51,7 @@ function onScreen(
 		token: TOKEN,
 	});
 	activeFrame(session).history = [...history];
-	const { ui } = createMakeUi({ exit: () => {} })(session, ADDRESS, platform);
+	const { ui } = createMakeUi({ exit: () => {}, open: async () => undefined })(session, ADDRESS, platform, 'u1');
 	return { session, ui };
 }
 
@@ -146,7 +146,7 @@ describe('the backstop (stringly targets)', () => {
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace', token: TOKEN,
 		});
-		const { ui } = createMakeUi({ exit: () => {} })(session, ADDRESS, PLATFORM);
+		const { ui } = createMakeUi({ exit: () => {}, open: async () => undefined })(session, ADDRESS, PLATFORM, 'u1');
 		expect(() => ui.go('nope')).toThrow(/targets no screen of flow/);
 	});
 
@@ -157,7 +157,7 @@ describe('the backstop (stringly targets)', () => {
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: {}, screen: 'menu', ttlMs: DEFAULT_TTL_MS, remount: 'replace', token: TOKEN,
 		});
-		const { ui } = createMakeUi({ exit: () => {} })(session, ADDRESS, PLATFORM);
+		const { ui } = createMakeUi({ exit: () => {}, open: async () => undefined })(session, ADDRESS, PLATFORM, 'u1');
 		expect(() => ui.push('nope')).toThrow(/targets no screen of flow/);
 	});
 });
@@ -182,7 +182,8 @@ describe('ui.exit - the injected seam', () => {
 			exit: (s, value, final) => {
 				exits.push({ session: s, value, final });
 			},
-		})(session, ADDRESS, PLATFORM);
+			open: async () => undefined,
+		})(session, ADDRESS, PLATFORM, 'u1');
 		return { session, ui, exits };
 	}
 

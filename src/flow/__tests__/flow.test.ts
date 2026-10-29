@@ -429,7 +429,7 @@ function world(options: WorldOptions = {}): World {
 		platform,
 		reviveIndex: catalog.byFlowId,
 		tryRevive: vi.fn(async () => undefined),
-		makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit }),
+		makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit, open: async () => undefined }),
 		call: {
 			call: async () => {
 				throw new Error('no call engine in test');
@@ -663,7 +663,7 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			platform,
 			reviveIndex: catalog.byFlowId,
 			tryRevive: vi.fn(async () => undefined),
-			makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit }),
+			makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit, open: async () => undefined }),
 			call: {
 				call: async () => {
 					throw new Error('no call engine in test');

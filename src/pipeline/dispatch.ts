@@ -119,7 +119,7 @@ export interface DispatchOptions {
 	 * task/mutate hooks. The commit phase's createMakeUi is the real one;
 	 * tests inject a stand-in.
 	 */
-	readonly makeUi: (session: Session<unknown>, address: ActionAddress, platform: PlatformPort) => EventTools;
+	readonly makeUi: (session: Session<unknown>, address: ActionAddress, platform: PlatformPort, actorId: string) => EventTools;
 	/** The call engine: `event.call`'s machinery, shared with `ui.exit` and the crash path. */
 	readonly call: CallEngine;
 	/** The launch engine: `event.launch`'s machinery for detached tracked work. */
@@ -421,7 +421,7 @@ export function createDispatch(options: DispatchOptions): Dispatch {
 			// reach this line and leave the window alone.
 			options.store.touch(session.id);
 
-			const tools = options.makeUi(session, address, options.platform);
+			const tools = options.makeUi(session, address, options.platform, incoming.actorId);
 			// Lensing follows ownership, not the screen: the draw phase tags
 			// every control with the bag path its handler lenses to. The tag
 			// rides the record; a record without one (modal handlers, and

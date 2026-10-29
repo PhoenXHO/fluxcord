@@ -99,7 +99,19 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	// The call engine needs store, queue and commit; the toolkit needs the
 	// engine's exit seam. Order is fixed by those edges.
 	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken, ack: options.platform.ack });
-	const makeUi = createMakeUi({ exit: callEngine.exit });
+	const makeUi = createMakeUi({
+		exit: callEngine.exit,
+		// ui.open: the flow mounts on the clicker's own ephemeral reply, owned
+		// by them. `mount` is a hoisted declaration below, so the closure
+		// resolves it at click time.
+		open: async (flow, actorId, data) => {
+			const sender = options.platform.actorSender?.();
+			if (sender === undefined) {
+				throw new Error('ui.open: this host cannot open an ephemeral panel for the clicker (the bridge has no actorSender, or the click is outside a dispatch)');
+			}
+			await mount(flow, { to: { reply: sender }, ownerId: actorId, ...(data !== undefined ? { data } : {}) });
+		},
+	});
 	// The host supplies the bridge (editMessage, replyToActor, showModal);
 	// the commit phase owns redraw and the parting edit. Compose them once;
 	// dispatch, mount and the toolkit all see this one port.
