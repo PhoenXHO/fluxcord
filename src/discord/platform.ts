@@ -39,8 +39,8 @@
  * `interaction.editReply` while it lives. The line's sender reports
  * `ceilingMs` (wall minus a parting margin) so the runtime can end the
  * session before the wall and the parting edit still lands. After the
- * wall the line throws a typed error and is evicted; the panel simply
- * fades client-side. The host's `ephemeralAsPublic` option flips ephemeral
+ * wall an edit through the line ends quietly (a debug log) and the line
+ * is evicted; the panel simply fades client-side. The host's `ephemeralAsPublic` option flips ephemeral
  * mounts fully public instead (no line, no ceiling), same dev-observability
  * switch as actor copy.
  *
@@ -323,9 +323,13 @@ export function createUiBridge(client: Client, options: BridgeOptions = {}): UiB
 		// edit through the command interaction's webhook while it lives.
 		const line = lines.get(ref.messageId);
 		if (line !== undefined) {
+			// Past the wall the message is out of reach for good, like a deleted
+			// one: nothing is left to save. A host that slept through the
+			// expiry sweep lands here on wake, so the edit ends quietly.
 			if (Date.now() - line.startedAt > INTERACTION_WALL_MS) {
+				log.debug(`bridge editMessage: ephemeral line '${ref.messageId}' is past the interaction wall`);
 				lines.delete(ref.messageId);
-				throw new Error(`bridge editMessage: ephemeral line '${ref.messageId}' is past the interaction wall`);
+				return;
 			}
 			try {
 				await line.edit(payload);

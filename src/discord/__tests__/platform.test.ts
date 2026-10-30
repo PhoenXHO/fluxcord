@@ -360,7 +360,7 @@ describe('ephemeral lines', () => {
 		expect(channel.messages.fetch).not.toHaveBeenCalled();
 	});
 
-	it('a line past the wall throws typed and evicts (late edits fall back to the channel)', async () => {
+	it('a line past the wall ends quietly and evicts (late edits fall back to the channel)', async () => {
 		const interaction = fakeCommandInteraction({ createdTimestamp: Date.now() - INTERACTION_WALL_MS - 5_000 });
 		const channel = {
 			isSendable: (): boolean => true,
@@ -369,8 +369,9 @@ describe('ephemeral lines', () => {
 		const bridge = createUiBridge(fakeClient({ cE: channel }));
 		await bridge.replySender(interaction, { ephemeral: true }).send({ flags: 0, components: [] } as never);
 
-		await expect(bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, {} as never))
-			.rejects.toThrow('past the interaction wall');
+		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, {} as never);
+		expect(interaction.editReply).not.toHaveBeenCalled();
+		expect(channel.messages.fetch).not.toHaveBeenCalled();
 
 		// Evicted: the next edit takes the ordinary channel path.
 		await bridge.platform.editMessage({ channelId: 'cE', messageId: 'mE0' }, {} as never);
