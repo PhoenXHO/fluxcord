@@ -136,7 +136,10 @@ async function evaluate(gate: Policy, request: PolicyRequest, facts: PrivilegeFa
 		}
 		case 'all': {
 			for (const sub of gate.of) {
-				if (!(await evaluate(sub, request, facts)).allowed) return settle(false, gate);
+				const result = await evaluate(sub, request, facts);
+				// The gate's own copy wins; without one, the member that said no
+				// speaks, so a gate of several conditions explains the one that failed.
+				if (!result.allowed) return gate.denyMessage !== undefined ? denied(gate) : result;
 			}
 			return settle(true, gate);
 		}

@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- A `policy.all` with no deny copy of its own reports the first member that said no, instead of the generic denial, so a gate of several conditions explains which one failed. The gate's own copy still wins when it has one, and a member with no copy still gives the generic denial. `policy.any` is unchanged: when every member fails there is no single reason to report.
 - `renderStatic` takes a TSX `<view>` (or any root a screen may return), not only a `view()` node, so a message with no controls (a DM, a one-off post) is written the same way as a screen. It folds the root with the same `normalizeViewRoot` screens use; a `view()` node still works as before.
 
 ## [0.2.5] - 2026-10-27

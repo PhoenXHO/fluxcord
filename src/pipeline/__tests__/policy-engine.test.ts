@@ -90,6 +90,27 @@ describe('the default policy engine', () => {
 		await expect(open.authorize(request({ actionPolicy: staff }))).resolves.toEqual({ allowed: true });
 	});
 
+	it('an all without copy of its own reports the first member that said no, in order', async () => {
+		const engine = createDefaultPolicyEngine({ privileges: async () => ['mod'] });
+		const gate = policy.all(
+			policy.privilege('mod', { deny: 'Not staff.' }),
+			policy.privilege('running', { deny: 'Nothing is running.' }),
+			policy.privilege('owner-ish', { deny: 'Owners only.' }),
+		);
+		await expect(engine.authorize(request({ actionPolicy: gate }))).resolves.toEqual({ allowed: false, denyMessage: 'Nothing is running.' });
+		// Nested: the message travels up through an inner all.
+		const nested = policy.all(policy.all(policy.privilege('running', { deny: 'Nothing is running.' })));
+		await expect(engine.authorize(request({ actionPolicy: nested }))).resolves.toEqual({ allowed: false, denyMessage: 'Nothing is running.' });
+	});
+
+	it('an all with copy of its own keeps it over a member\'s, and a member without copy leaves the generic denial', async () => {
+		const engine = createDefaultPolicyEngine({ privileges: async () => [] });
+		const own = policy.all([policy.privilege('x', { deny: 'Member copy.' })], { deny: 'Gate copy.' });
+		await expect(engine.authorize(request({ actionPolicy: own }))).resolves.toEqual({ allowed: false, denyMessage: 'Gate copy.' });
+		const bare = policy.all(policy.privilege('x'));
+		await expect(engine.authorize(request({ actionPolicy: bare }))).resolves.toEqual({ allowed: false });
+	});
+
 	it('nearest policy wins: actionPolicy replaces flowPolicy, flowPolicy applies alone', async () => {
 		const engine = createDefaultPolicyEngine({ privileges: async () => [] });
 		// The flow is gated, the control opted open.
