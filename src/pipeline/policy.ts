@@ -35,6 +35,23 @@ export interface PolicyOptions {
 	readonly deny?: string;
 }
 
+/** The two ways to build a combinator: sub-policies as arguments, or as an array with options. */
+interface Combinator {
+	(...of: Policy[]): Policy;
+	(of: readonly Policy[], options?: PolicyOptions): Policy;
+}
+
+function combinator(kind: 'any' | 'all'): Combinator {
+	return (...args: [readonly Policy[], PolicyOptions?] | Policy[]): Policy => {
+		const [first, second] = args;
+		if (Array.isArray(first)) {
+			const options = second as PolicyOptions | undefined;
+			return { kind, of: first as readonly Policy[], ...(options?.deny !== undefined ? { denyMessage: options.deny } : {}) };
+		}
+		return { kind, of: args as Policy[] };
+	};
+}
+
 /**
  * The policy vocabulary. Every value is inert data; nothing here asks a
  * question. See {@link Policy} for the shape.
@@ -48,14 +65,16 @@ export const policy = {
 	privilege(name: string, options?: PolicyOptions): Policy {
 		return { kind: 'privilege', name, ...(options?.deny !== undefined ? { denyMessage: options.deny } : {}) };
 	},
-	/** Passes when at least one sub-policy passes. */
-	any(...of: Policy[]): Policy {
-		return { kind: 'any', of };
-	},
-	/** Passes only when every sub-policy passes. */
-	all(...of: Policy[]): Policy {
-		return { kind: 'all', of };
-	},
+	/**
+	 * Passes when at least one sub-policy passes. Takes the sub-policies as
+	 * arguments, or as an array followed by options when the gate carries its
+	 * own deny copy: `any([a, b], { deny: 'Staff only.' })`.
+	 */
+	any: combinator('any'),
+	/**
+	 * Passes only when every sub-policy passes. Same two forms as `any`.
+	 */
+	all: combinator('all'),
 	/** Never passes. */
 	deny(options?: PolicyOptions): Policy {
 		return { kind: 'deny', ...(options?.deny !== undefined ? { denyMessage: options.deny } : {}) };

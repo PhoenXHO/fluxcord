@@ -76,6 +76,20 @@ describe('the default policy engine', () => {
 		await expect(engine.authorize(request({ actorId: 'u2', actionPolicy: gate }))).resolves.toEqual({ allowed: false });
 	});
 
+	it('any and all take their own deny copy through the array form, and the plain form is unchanged', async () => {
+		const engine = createDefaultPolicyEngine({ privileges: async () => [] });
+		const staff = policy.any([policy.privilege('admin'), policy.privilege('mod')], { deny: 'Staff only.' });
+		await expect(engine.authorize(request({ actionPolicy: staff }))).resolves.toEqual({ allowed: false, denyMessage: 'Staff only.' });
+		const both = policy.all([policy.privilege('admin'), policy.owner()], { deny: 'Admin owners only.' });
+		await expect(engine.authorize(request({ actionPolicy: both }))).resolves.toEqual({ allowed: false, denyMessage: 'Admin owners only.' });
+		// The argument-list form still builds the same data, with no copy.
+		expect(policy.any(policy.allow(), policy.deny())).toEqual({ kind: 'any', of: [{ kind: 'allow' }, { kind: 'deny' }] });
+		expect(policy.any([policy.allow()])).toEqual({ kind: 'any', of: [{ kind: 'allow' }] });
+		// A combinator that passes carries no copy into the decision.
+		const open = createDefaultPolicyEngine({ privileges: async () => ['mod'] });
+		await expect(open.authorize(request({ actionPolicy: staff }))).resolves.toEqual({ allowed: true });
+	});
+
 	it('nearest policy wins: actionPolicy replaces flowPolicy, flowPolicy applies alone', async () => {
 		const engine = createDefaultPolicyEngine({ privileges: async () => [] });
 		// The flow is gated, the control opted open.
