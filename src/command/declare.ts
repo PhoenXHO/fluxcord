@@ -18,6 +18,7 @@
 
 import type { Flow } from '../flow/token.js';
 import type { Policy } from '../pipeline/types.js';
+import type { MountHandle } from '../runtime/types.js';
 import { validateArgs } from './args.js';
 import type { AnyArg, ArgValues } from './args.js';
 
@@ -31,7 +32,7 @@ const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  * bag defaults to the flow's own initialData, and session lifecycle lives
  * on the flow's meta hooks; a command is pure declaration.
  */
-export interface MountSpec<TArgs extends readonly AnyArg[] = readonly []> {
+export interface MountSpec<TArgs extends readonly AnyArg[] = readonly [], TData = unknown> {
 	/**
 	 * What the subcommand shows in the command picker. Required on
 	 * subcommand leaves; a bare leaf may carry its own, which overrides
@@ -70,7 +71,25 @@ export interface MountSpec<TArgs extends readonly AnyArg[] = readonly []> {
 	 * parsed arguments; may be async. A throw fails the command loudly,
 	 * like any mount failure.
 	 */
-	data?(context: unknown, args: ArgValues<TArgs>): unknown | Promise<unknown>;
+	data?(context: unknown, args: ArgValues<TArgs>): TData | Promise<TData>;
+	/**
+	 * The rehydrate ref for a flow that declares a `rehydrate` callback,
+	 * read from the bag `data` built: the panel then outlives its session
+	 * like any other persistent mount. Needs `data`; a public mount only.
+	 */
+	rehydrateRef?(data: TData): string;
+	/**
+	 * Runs once the panel is posted, with the bag and the mount's handle
+	 * (its `messageId` among them): the place to remember the message.
+	 * A throw goes on to the host; the panel stays posted. Needs `data`.
+	 */
+	onMounted?(data: TData, handle: MountHandle<TData>): unknown;
+	/**
+	 * Runs when the panel could not be posted, with the bag and the error:
+	 * the place to undo what `data` wrote. The error is thrown again after
+	 * it, so the host still hears of it. Needs `data`.
+	 */
+	onMountFailed?(data: TData, error: unknown): unknown;
 }
 
 /** The erased leaf mounts() returns; readers treat the leaf generically. */
@@ -80,7 +99,10 @@ export interface MountLeaf {
 	readonly ephemeral?: boolean;
 	readonly policy?: Policy;
 	readonly args?: readonly AnyArg[];
-	data?(context: unknown, args: Record<string, unknown>): unknown | Promise<unknown>;
+	data?(context: unknown, args: Record<string, unknown>): unknown;
+	rehydrateRef?(data: unknown): string;
+	onMounted?(data: unknown, handle: MountHandle): unknown;
+	onMountFailed?(data: unknown, error: unknown): unknown;
 }
 
 /**
@@ -90,7 +112,7 @@ export interface MountLeaf {
  */
 export function mounts<TData, const TArgs extends readonly AnyArg[] = readonly []>(
 	flow: Flow<TData>,
-	spec: MountSpec<TArgs> = {},
+	spec: MountSpec<TArgs, TData> = {},
 ): MountLeaf {
 	// The flow is widened to the erased leaf shape here: the same
 	// object, retyped for readers that treat leaves generically. The
@@ -103,6 +125,9 @@ export function mounts<TData, const TArgs extends readonly AnyArg[] = readonly [
 		...(spec.policy !== undefined ? { policy: spec.policy } : {}),
 		...(spec.args !== undefined ? { args: spec.args } : {}),
 		...(spec.data !== undefined ? { data: spec.data as MountLeaf['data'] } : {}),
+		...(spec.rehydrateRef !== undefined ? { rehydrateRef: spec.rehydrateRef as MountLeaf['rehydrateRef'] } : {}),
+		...(spec.onMounted !== undefined ? { onMounted: spec.onMounted as MountLeaf['onMounted'] } : {}),
+		...(spec.onMountFailed !== undefined ? { onMountFailed: spec.onMountFailed as MountLeaf['onMountFailed'] } : {}),
 	});
 }
 
@@ -161,8 +186,24 @@ export function command(name: string, description: string, spec: CommandSpec): C
 	}
 	for (const { leaf, commandHint } of commandLeaves({ name, description, spec })) {
 		if (leaf.args !== undefined) validateArgs(commandHint, leaf.args);
+		validateMountHooks(commandHint, leaf);
 	}
 	return Object.freeze({ name, description, spec: Object.freeze(spec) });
+}
+
+/**
+ * The persistence fields read the bag the `data` resolver builds, so they
+ * need one; and an ephemeral panel dies at the platform wall, so it has
+ * nothing to rehydrate.
+ */
+function validateMountHooks(commandHint: string, leaf: MountLeaf): void {
+	const hooks = (['rehydrateRef', 'onMounted', 'onMountFailed'] as const).filter((key) => leaf[key] !== undefined);
+	if (hooks.length > 0 && leaf.data === undefined) {
+		throw new Error(`command '${commandHint}': ${hooks.join(', ')} read the bag the data resolver builds; declare data`);
+	}
+	if (leaf.rehydrateRef !== undefined && leaf.ephemeral === true) {
+		throw new Error(`command '${commandHint}': an ephemeral panel cannot rehydrate; drop rehydrateRef or ephemeral`);
+	}
 }
 
 /** One harvested leaf: the mount point plus its invocation path ('sync', 'lotto start'). */

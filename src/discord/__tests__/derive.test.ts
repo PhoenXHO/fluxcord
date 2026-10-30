@@ -143,3 +143,82 @@ describe('the command door', () => {
 		expect(mount).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('persistent command mounts', () => {
+	interface PollBag { pollId: string }
+	const poll = flow<PollBag>('poll', {
+		screens: { main: screen<PollBag>()(() => view({}, text('poll'))) },
+		first: 'main',
+		initialData: { pollId: '' },
+	});
+	const interaction = {
+		user: { id: 'u1' },
+		guildId: 'g1',
+		channelId: 'c1',
+		reply: vi.fn(async () => undefined),
+		options: { getSubcommand: (): string => 'main' },
+	} as unknown as ChatInputCommandInteraction;
+
+	/** Host stubs: a mount that posts (or fails with the given error). */
+	function hostMounting(failure?: Error): ReturnType<typeof vi.fn> {
+		const handle = { sessionId: 's1', messageId: 'm1' };
+		const mount = vi.fn(async () => {
+			if (failure !== undefined) throw failure;
+			return handle;
+		});
+		setUiHost({
+			mount: mount as unknown as UiHost['mount'],
+			replySender: vi.fn(() => ({ send: vi.fn() })) as unknown as UiHost['replySender'],
+		});
+		return mount;
+	}
+
+	it('takes the rehydrate ref from the bag, then hands the bag and the handle to onMounted', async () => {
+		const mount = hostMounting();
+		const onMounted = vi.fn();
+		const onMountFailed = vi.fn();
+		const cmd = command('poll', 'Start a poll', {
+			mount: mounts(poll, {
+				data: () => ({ pollId: 'p1' }),
+				rehydrateRef: (bag) => `poll:${bag.pollId}`,
+				onMounted,
+				onMountFailed,
+			}),
+		});
+
+		await deriveCommand(cmd).execute(interaction);
+
+		expect(mount).toHaveBeenCalledWith(poll, expect.objectContaining({ rehydrateRef: 'poll:p1', data: { pollId: 'p1' } }));
+		expect(onMounted).toHaveBeenCalledWith({ pollId: 'p1' }, { sessionId: 's1', messageId: 'm1' });
+		expect(onMountFailed).not.toHaveBeenCalled();
+	});
+
+	it('runs onMountFailed when the post fails, then throws the error on', async () => {
+		const failure = new Error('Missing Access');
+		hostMounting(failure);
+		const onMounted = vi.fn();
+		const onMountFailed = vi.fn();
+		const cmd = command('poll', 'Start a poll', {
+			mount: mounts(poll, { data: () => ({ pollId: 'p1' }), onMounted, onMountFailed }),
+		});
+
+		await expect(deriveCommand(cmd).execute(interaction)).rejects.toBe(failure);
+
+		expect(onMountFailed).toHaveBeenCalledWith({ pollId: 'p1' }, failure);
+		expect(onMounted).not.toHaveBeenCalled();
+	});
+
+	it('rejects the hooks on a leaf with no data resolver', () => {
+		expect(() => command('poll', 'Start a poll', {
+			mount: mounts(poll, { onMounted: vi.fn() }),
+		})).toThrow("command 'poll': onMounted read the bag the data resolver builds; declare data");
+	});
+
+	it('rejects a rehydrate ref on an ephemeral leaf', () => {
+		expect(() => command('poll', 'Start a poll', {
+			subcommands: {
+				start: mounts(poll, { description: 'Start', ephemeral: true, data: () => ({ pollId: 'p1' }), rehydrateRef: (bag) => bag.pollId }),
+			},
+		})).toThrow("command 'poll start': an ephemeral panel cannot rehydrate");
+	});
+});

@@ -22,6 +22,13 @@ const dummy = flow('dummy', {
 	first: 'main',
 });
 
+/** A flow with a bag, for the resolver that seeds one. */
+const seeded = flow<{ seeded: boolean }>('seeded', {
+	screens: { main: screen<{ seeded: boolean }>()(() => view({}, text('seeded'))) },
+	first: 'main',
+	initialData: { seeded: false },
+});
+
 interface JsonOption {
 	name: string;
 	type: number;
@@ -247,7 +254,7 @@ describe('deriveCommand - argument values', () => {
 		const seen: Record<string, unknown>[] = [];
 		const { mount } = host();
 		const cmd = command('whois', 'Look someone up', {
-			mount: mounts(dummy, {
+			mount: mounts(seeded, {
 				args: [arg.user('member', 'Who'), arg.integer('torn_id', 'Id')],
 				data: (_context, args) => {
 					seen.push({ ...args });
@@ -259,7 +266,7 @@ describe('deriveCommand - argument values', () => {
 		await deriveCommand(cmd).execute(invoked({ member: '123' }));
 
 		expect(seen).toEqual([{ member: '123' }]);
-		expect(mount).toHaveBeenCalledWith(dummy, expect.objectContaining({ data: { seeded: true } }));
+		expect(mount).toHaveBeenCalledWith(seeded, expect.objectContaining({ data: { seeded: true } }));
 	});
 
 	it('the resolver still gets the invocation as its first parameter', async () => {

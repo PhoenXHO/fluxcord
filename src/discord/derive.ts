@@ -33,6 +33,7 @@ import type { AnyArg, ArgChoice } from '../command/args.js';
 import type { Command, MountLeaf } from '../command/declare.js';
 import type { Flow } from '../flow/token.js';
 import { DEFAULT_DENY_MESSAGE } from '../pipeline/dispatch.js';
+import type { MountHandle } from '../runtime/types.js';
 import { uiHost } from './ui-host.js';
 
 /**
@@ -218,12 +219,23 @@ async function mountLeaf(leaf: MountLeaf, interaction: ChatInputCommandInteracti
 	// invoker typed. The invocation rides along as the mount context: the
 	// flow's onSessionStart hook receives it.
 	const data = leaf.data !== undefined ? await leaf.data(interaction, readArgs(interaction, leaf.args)) : undefined;
-	await host.mount(leaf.flow as Flow<unknown>, {
-		to: { reply: host.replySender(interaction, { ephemeral: leaf.ephemeral === true }) },
-		ownerId: interaction.user.id,
-		context: interaction,
-		...(data !== undefined ? { data } : {}),
-	});
+	// A persistent panel takes its rehydrate ref from the bag; the hooks
+	// hear how the post went. A failed post runs the undo hook, then the
+	// error goes on to the host as before.
+	let handle: MountHandle;
+	try {
+		handle = await host.mount(leaf.flow as Flow<unknown>, {
+			to: { reply: host.replySender(interaction, { ephemeral: leaf.ephemeral === true }) },
+			ownerId: interaction.user.id,
+			context: interaction,
+			...(data !== undefined ? { data } : {}),
+			...(leaf.rehydrateRef !== undefined ? { rehydrateRef: leaf.rehydrateRef(data) } : {}),
+		});
+	} catch (error) {
+		if (leaf.onMountFailed !== undefined) await leaf.onMountFailed(data, error);
+		throw error;
+	}
+	if (leaf.onMounted !== undefined) await leaf.onMounted(data, handle);
 }
 
 /**
