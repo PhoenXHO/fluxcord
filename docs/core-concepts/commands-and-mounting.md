@@ -139,6 +139,24 @@ In the staff example, the `tickets` subcommand specifies `ephemeral: true`. Stan
 
 Visibility settings are defined at the mount leaf rather than inside the flow definition. Because the flow itself remains agnostic about privacy settings, the same flow can be mounted publicly in one context and ephemerally in another. Note that ephemeral messages operate under platform-level interaction response limits, as detailed in [Sessions and expiry](sessions-and-expiry.md).
 
+## Persistent panels from a command
+
+A command can open a panel that outlives its session, the way `bot.mount` does for a flow with a `rehydrate` callback (see [Persistence](persistence.md)). The leaf reads the rehydrate ref from the bag its `data` resolver built, and two hooks hear how the post went:
+
+```tsx
+export const pollCommand = command('poll', 'Start a poll in this channel', {
+    mount: mounts(pollFlow, {
+        args: [arg.string('question', 'What to ask', { required: true })],
+        data: async (interaction, args) => ({ poll: await createPoll(args.question) }),
+        rehydrateRef: (bag) => `poll:${bag.poll.id}`,
+        onMounted: (bag, handle) => savePollMessage(bag.poll.id, handle.messageId),
+        onMountFailed: (bag) => deletePoll(bag.poll.id),
+    }),
+});
+```
+
+`onMounted` runs once the panel is posted, with the bag and the mount's handle, so it is the place to remember the message. If it throws, the error goes to the host and the panel stays posted. `onMountFailed` runs when the panel could not be posted, so it is the place to undo what `data` wrote; the error is thrown again after it. All three fields read the bag, so `command()` rejects them on a leaf without a `data` resolver, and it rejects `rehydrateRef` on an ephemeral leaf, because an ephemeral panel ends at the interaction limit.
+
 ## Dev-only tools
 
 Command specifications also support a `devOnly` flag to designate development utilities. The default host keeps these commands out of the public registration. When `createBot` is given a `devGuildId` (or the `DISCORD_DEV_GUILD_ID` environment variable is set), dev-only commands register only in that guild. Without a dev guild, they are dropped. A custom host reads the `devOnly` fact inside its `registerCommands` callback (see [Hosting and commands](../getting-started/hosting-and-commands.md) for details).
