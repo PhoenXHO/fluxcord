@@ -103,7 +103,29 @@ Arguments are optional unless you pass `{ required: true }`, and the resolver's 
 
 Discord's own rules are checked when the module loads, so a bad declaration fails at boot with the command's name in the message instead of at registration. Names are 1 to 32 lowercase letters, numbers, `-` or `_`, descriptions are 1 to 100 characters, a leaf takes at most 25 arguments, required arguments come first, and an argument with `choices` takes no `min` or `max`.
 
-On a grouped command, arguments belong to the subcommand that declares them, because that is where Discord attaches them. Two subcommands can take different arguments, and a subcommand with none registers none. Autocomplete is not part of the helpers yet.
+On a grouped command, arguments belong to the subcommand that declares them, because that is where Discord attaches them. Two subcommands can take different arguments, and a subcommand with none registers none.
+
+### Suggestions as the invoker types
+
+A fixed `choices` list suits a handful of values. When the list is long or changes, a string, integer or number argument takes an `autocomplete` handler instead, and Discord asks it for suggestions on every keystroke.
+
+```tsx
+export const whoisCommand = command('whois', 'Look up a member', {
+    mount: mounts(whoisFlow, {
+        args: [
+            arg.string('name', 'Start typing a name', {
+                autocomplete: async (typed, context) =>
+                    (await findMembers(context.guildId, typed)).map(member => ({ name: member.display, value: member.id })),
+            }),
+        ],
+        data: (interaction, args) => ({ shown: args.name ?? null }),
+    }),
+});
+```
+
+The handler receives the text typed so far and a context with the server, channel and user, plus `values`: the other options the invoker has already filled in, so one argument's suggestions can depend on another's. It returns up to 25 choices, each a label and a value; extra choices are dropped and a label is cut at 100 characters. The value of the choice the invoker picks reaches the leaf's `data` resolver as the argument's value, exactly as a fixed choice does. Autocomplete cannot be combined with `choices`, and `command()` rejects the pair when it loads.
+
+Two things to keep in mind. The invoker may send text that was never suggested, so the resolver or the flow still validates what it receives. And suggestions are answered before the leaf's gate is evaluated, the way Discord's own suggestion box works, so a handler should not return anything the invoker may not see. If a handler throws, the invoker sees an empty list and the error goes to the host's logger.
 
 ## The permission knob
 
