@@ -9,6 +9,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { Client } from 'discord.js';
+import { arg } from '../../command/args.js';
 import { command, mounts } from '../../command/declare.js';
 import { screen } from '../../flow/screen.js';
 import { flow } from '../../flow/token.js';
@@ -110,6 +111,39 @@ describe('createBot - the registration seam', () => {
 		await flush();
 		expect(set).toHaveBeenCalledTimes(1);
 		expect(set.mock.calls[0][0]).toHaveLength(1);
+	});
+});
+
+describe('createBot - autocomplete', () => {
+	it('routes an autocomplete interaction to the command whose argument asked for it', async () => {
+		const set = vi.fn(async (_bodies: unknown, _guild?: string) => []);
+		const { client } = fakeReadyClient(set);
+		const picker = command('pick', 'Pick something', {
+			mount: mounts(aboutFlow, { args: [arg.string('thing', 'A thing', { autocomplete: (typed) => [{ name: typed, value: typed }] })] }),
+		});
+		createBot({ modules: [{ name: 'pick', commands: [picker] }], token: 't', client, sweeper: false });
+		await flush();
+
+		const listener = vi.mocked(client.on).mock.calls.find(([event]) => event === 'interactionCreate')?.[1] as (i: unknown) => Promise<void>;
+		const respond = vi.fn(async (): Promise<void> => undefined);
+		await listener({
+			isAutocomplete: (): boolean => true,
+			isChatInputCommand: (): boolean => false,
+			isMessageComponent: (): boolean => false,
+			isModalSubmit: (): boolean => false,
+			commandName: 'pick',
+			user: { id: 'u1' },
+			guildId: 'g1',
+			channelId: 'c1',
+			respond,
+			options: {
+				getFocused: () => ({ name: 'thing', value: 'abc' }),
+				getSubcommand: () => null,
+				data: [{ name: 'thing', value: 'abc', focused: true }],
+			},
+		});
+
+		expect(respond).toHaveBeenCalledWith([{ name: 'abc', value: 'abc' }]);
 	});
 });
 

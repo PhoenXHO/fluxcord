@@ -32,6 +32,25 @@ export interface ArgChoice<V extends string | number = string | number> {
 	readonly value: V;
 }
 
+/** What an autocomplete handler can see besides the text typed into its own argument. */
+export interface AutocompleteContext {
+	/** The server the invoker is typing in; null in a DM. */
+	readonly guildId: string | null;
+	readonly userId: string;
+	readonly channelId: string | null;
+	/** The other options already typed, by argument name. */
+	readonly values: Readonly<Record<string, string | number | boolean>>;
+}
+
+/**
+ * Suggests choices for what the invoker has typed so far. Discord shows at
+ * most 25, so extra choices are dropped and labels are cut to 100
+ * characters. The value of a choice reaches the leaf's data resolver as the
+ * argument's value, like a fixed choice does.
+ */
+export type ArgAutocomplete<V extends string | number = string | number> =
+	(typed: string, context: AutocompleteContext) => readonly ArgChoice<V>[] | Promise<readonly ArgChoice<V>[]>;
+
 /**
  * A declared argument. The name is a literal type so the values object can
  * be keyed by it; `required` is a literal so required arguments lose their
@@ -43,6 +62,7 @@ export interface ArgDef<N extends string = string, V = unknown, R extends boolea
 	readonly description: string;
 	readonly required: R;
 	readonly choices?: readonly ArgChoice[];
+	readonly autocomplete?: ArgAutocomplete;
 	readonly min?: number;
 	readonly max?: number;
 	readonly minLength?: number;
@@ -72,6 +92,12 @@ interface CommonExtras<R extends boolean> {
 export interface StringArgExtras<R extends boolean, C extends string> extends CommonExtras<R> {
 	/** A fixed list the invoker picks from. A bare string is its own label. */
 	readonly choices?: readonly (C | ArgChoice<C>)[];
+	/**
+	 * Suggestions computed as the invoker types, for a list too long or too
+	 * live to fix in advance. Cannot be combined with `choices`. The invoker
+	 * may still send text that was not suggested, so the leaf validates it.
+	 */
+	readonly autocomplete?: ArgAutocomplete<string>;
 	readonly minLength?: number;
 	readonly maxLength?: number;
 }
@@ -79,6 +105,8 @@ export interface StringArgExtras<R extends boolean, C extends string> extends Co
 export interface NumberArgExtras<R extends boolean, C extends number> extends CommonExtras<R> {
 	/** A fixed list the invoker picks from. A bare number is its own label. */
 	readonly choices?: readonly (C | ArgChoice<C>)[];
+	/** Suggestions computed as the invoker types. Cannot be combined with `choices`. */
+	readonly autocomplete?: ArgAutocomplete<number>;
 	readonly min?: number;
 	readonly max?: number;
 }
@@ -96,6 +124,7 @@ function make<N extends string, V, R extends boolean>(
 	extras: {
 		required?: R;
 		choices?: readonly (string | number | ArgChoice)[];
+		autocomplete?: ArgAutocomplete;
 		min?: number;
 		max?: number;
 		minLength?: number;
@@ -109,6 +138,7 @@ function make<N extends string, V, R extends boolean>(
 		description,
 		required: (extras.required ?? false) as R,
 		...(choices !== undefined ? { choices } : {}),
+		...(extras.autocomplete !== undefined ? { autocomplete: extras.autocomplete } : {}),
 		...(extras.min !== undefined ? { min: extras.min } : {}),
 		...(extras.max !== undefined ? { max: extras.max } : {}),
 		...(extras.minLength !== undefined ? { minLength: extras.minLength } : {}),
@@ -203,6 +233,9 @@ export function validateArgs(owner: string, args: readonly AnyArg[]): void {
 		}
 
 		const numeric = def.kind === 'integer' || def.kind === 'number';
+		if (def.autocomplete !== undefined && def.choices !== undefined) {
+			fail(`${label} has choices, which cannot be combined with autocomplete`);
+		}
 		if (def.choices !== undefined) {
 			if (def.kind !== 'string' && !numeric) fail(`${label} is a ${def.kind}, which cannot have choices`);
 			if (def.choices.length === 0 || def.choices.length > MAX_CHOICES) fail(`${label} needs 1 to ${MAX_CHOICES} choices`);

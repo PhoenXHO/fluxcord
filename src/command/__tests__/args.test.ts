@@ -125,3 +125,28 @@ describe('command() argument checks', () => {
 		expect(declare({ args: [arg.string('s', 'S', { choices })] })).toThrow(/1 to 25 choices/);
 	});
 });
+
+describe('autocomplete arguments', () => {
+	const suggest = (): { name: string; value: string }[] => [{ name: 'Xanax', value: '206' }];
+	const declare = (args: ReturnType<typeof arg.string>[]): (() => unknown) =>
+		() => command('tool', 'A tool', { mount: mounts(dummy, { args }) });
+
+	it('keep the handler on the declared argument', () => {
+		const item = arg.string('item', 'An item', { autocomplete: suggest });
+		expect(item.autocomplete).toBe(suggest);
+		expect(arg.string('plain', 'Plain').autocomplete).toBeUndefined();
+	});
+
+	it('work on strings, integers and numbers', () => {
+		expect(arg.integer('days', 'Days', { autocomplete: () => [{ name: 'One', value: 1 }] }).autocomplete).toBeDefined();
+		expect(arg.number('rate', 'Rate', { autocomplete: () => [{ name: 'Half', value: 0.5 }] }).autocomplete).toBeDefined();
+	});
+
+	it('are accepted on a leaf alongside ordinary arguments', () => {
+		expect(declare([arg.string('item', 'An item', { autocomplete: suggest, required: true })])).not.toThrow();
+	});
+
+	it('cannot be combined with fixed choices, which Discord forbids', () => {
+		expect(declare([arg.string('item', 'An item', { autocomplete: suggest, choices: ['a'] })])).toThrow(/choices, which cannot be combined with autocomplete/);
+	});
+});

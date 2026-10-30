@@ -19,6 +19,7 @@
 
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import type {
+	AutocompleteInteraction,
 	ChatInputCommandInteraction,
 	SlashCommandBooleanOption,
 	SlashCommandChannelOption,
@@ -28,7 +29,7 @@ import type {
 	SlashCommandStringOption,
 	SlashCommandUserOption,
 } from 'discord.js';
-import type { AnyArg } from '../command/args.js';
+import type { AnyArg, ArgChoice } from '../command/args.js';
 import type { Command, MountLeaf } from '../command/declare.js';
 import type { Flow } from '../flow/token.js';
 import { DEFAULT_DENY_MESSAGE } from '../pipeline/dispatch.js';
@@ -48,6 +49,12 @@ export interface DerivedCommand {
 	readonly requiresDiscordPermissions?: bigint;
 	/** Mounts the flow behind the (sub)command onto the invocation's reply. */
 	readonly execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
+	/**
+	 * Answers an autocomplete interaction with the focused argument's
+	 * suggestions. Present only when some leaf declared an autocomplete
+	 * argument; the host routes autocomplete interactions to it.
+	 */
+	readonly autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
 }
 
 /**
@@ -75,6 +82,7 @@ function applyArgs(target: ArgTarget, args: readonly AnyArg[] | undefined): void
 					if (def.minLength !== undefined) option.setMinLength(def.minLength);
 					if (def.maxLength !== undefined) option.setMaxLength(def.maxLength);
 					if (def.choices !== undefined) option.addChoices(...def.choices.map((c) => ({ name: c.name, value: String(c.value) })));
+					if (def.autocomplete !== undefined) option.setAutocomplete(true);
 					return option;
 				});
 				break;
@@ -84,6 +92,7 @@ function applyArgs(target: ArgTarget, args: readonly AnyArg[] | undefined): void
 					if (def.min !== undefined) option.setMinValue(def.min);
 					if (def.max !== undefined) option.setMaxValue(def.max);
 					if (def.choices !== undefined) option.addChoices(...def.choices.map((c) => ({ name: c.name, value: Number(c.value) })));
+					if (def.autocomplete !== undefined) option.setAutocomplete(true);
 					return option;
 				});
 				break;
@@ -93,6 +102,7 @@ function applyArgs(target: ArgTarget, args: readonly AnyArg[] | undefined): void
 					if (def.min !== undefined) option.setMinValue(def.min);
 					if (def.max !== undefined) option.setMaxValue(def.max);
 					if (def.choices !== undefined) option.addChoices(...def.choices.map((c) => ({ name: c.name, value: Number(c.value) })));
+					if (def.autocomplete !== undefined) option.setAutocomplete(true);
 					return option;
 				});
 				break;
@@ -125,6 +135,61 @@ function readArgs(interaction: ChatInputCommandInteraction, args: readonly AnyAr
 	}
 	return values;
 }
+
+/** Discord shows at most this many suggestions, and cuts a label at this many characters. */
+const SUGGESTIONS_MAX = 25;
+const SUGGESTION_LABEL_MAX = 100;
+
+/** The options already typed, minus the focused one, read out from under the subcommand level. */
+function typedValues(interaction: AutocompleteInteraction): Record<string, string | number | boolean> {
+	const subcommand = interaction.options.getSubcommand(false);
+	const entries = subcommand === null
+		? interaction.options.data
+		: interaction.options.data.find((option) => option.name === subcommand)?.options ?? [];
+	const values: Record<string, string | number | boolean> = {};
+	for (const entry of entries) {
+		if (entry.focused === true || entry.value === undefined || entry.value === null) continue;
+		values[entry.name] = entry.value;
+	}
+	return values;
+}
+
+/**
+ * Answers one autocomplete interaction from the leaf's handler for the
+ * focused argument. An argument without a handler, or a handler that throws,
+ * answers with nothing; a throw is then rethrown so the host can log it.
+ * Runs before the leaf's door, like the platform's own suggestion box: it
+ * only suggests, and the gate still stands when the command is run.
+ */
+async function answerAutocomplete(leaf: MountLeaf | undefined, interaction: AutocompleteInteraction): Promise<void> {
+	const focused = interaction.options.getFocused(true);
+	const def = leaf?.args?.find((candidate) => candidate.name === focused.name);
+	const suggest = def?.autocomplete;
+	if (def === undefined || suggest === undefined) {
+		await interaction.respond([]);
+		return;
+	}
+	let choices: readonly ArgChoice[];
+	try {
+		choices = await suggest(String(focused.value), {
+			guildId: interaction.guildId,
+			userId: interaction.user.id,
+			channelId: interaction.channelId,
+			values: typedValues(interaction),
+		});
+	} catch (error) {
+		await interaction.respond([]).catch(() => undefined);
+		throw error;
+	}
+	const numeric = def.kind !== 'string';
+	await interaction.respond(choices.slice(0, SUGGESTIONS_MAX).map((choice) => ({
+		name: choice.name.slice(0, SUGGESTION_LABEL_MAX),
+		value: numeric ? Number(choice.value) : String(choice.value),
+	})));
+}
+
+/** Whether any argument of the leaf takes suggestions. */
+const suggests = (leaf: MountLeaf): boolean => (leaf.args ?? []).some((def) => def.autocomplete !== undefined);
 
 /** Mounts one leaf's flow onto the interaction's reply. */
 async function mountLeaf(leaf: MountLeaf, interaction: ChatInputCommandInteraction): Promise<void> {
@@ -195,6 +260,7 @@ export function deriveCommand(command: Command): DerivedCommand {
 			async execute(interaction: ChatInputCommandInteraction): Promise<void> {
 				await mountLeaf(leaf, interaction);
 			},
+			...(suggests(leaf) ? { autocomplete: (interaction: AutocompleteInteraction): Promise<void> => answerAutocomplete(leaf, interaction) } : {}),
 		};
 	}
 
@@ -217,5 +283,11 @@ export function deriveCommand(command: Command): DerivedCommand {
 			const leaf = leaves[interaction.options.getSubcommand()];
 			await mountLeaf(leaf, interaction);
 		},
+		...(Object.values(leaves).some(suggests)
+			? {
+				autocomplete: (interaction: AutocompleteInteraction): Promise<void> =>
+					answerAutocomplete(leaves[interaction.options.getSubcommand()], interaction),
+			}
+			: {}),
 	};
 }

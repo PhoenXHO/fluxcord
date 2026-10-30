@@ -6,7 +6,7 @@
  * @module discord/__tests__/derive-args
  */
 
-import type { ChatInputCommandInteraction } from 'discord.js';
+import type { AutocompleteInteraction, ChatInputCommandInteraction } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import { arg } from '../../command/args.js';
 import { command, mounts } from '../../command/declare.js';
@@ -89,6 +89,130 @@ describe('deriveCommand - arguments on the builder', () => {
 	it('a leaf with no arguments registers none', () => {
 		const cmd = command('plain', 'Plain', { mount: mounts(dummy) });
 		expect(deriveCommand(cmd).data.toJSON().options ?? []).toEqual([]);
+	});
+});
+
+describe('deriveCommand - autocomplete', () => {
+	const suggest = vi.fn((typed: string) => [{ name: `Match ${typed}`, value: typed }]);
+
+	/** A fake autocomplete interaction: the focused option, the others already typed, and a recorded respond. */
+	function typing(
+		focused: { name: string; value: string },
+		others: Record<string, string | number> = {},
+		subcommand?: string,
+	): { interaction: AutocompleteInteraction; respond: ReturnType<typeof vi.fn> } {
+		const respond = vi.fn(async (): Promise<void> => undefined);
+		const flat = [
+			{ name: focused.name, value: focused.value, focused: true },
+			...Object.entries(others).map(([name, value]) => ({ name, value })),
+		];
+		const interaction = {
+			user: { id: 'u1' },
+			guildId: 'g1',
+			channelId: 'c1',
+			respond,
+			options: {
+				getFocused: (): { name: string; value: string } => focused,
+				getSubcommand: (): string | null => subcommand ?? null,
+				data: subcommand === undefined ? flat : [{ name: subcommand, options: flat }],
+			},
+		} as unknown as AutocompleteInteraction;
+		return { interaction, respond };
+	}
+
+	it('registers an autocomplete argument as such', () => {
+		const cmd = command('lotto', 'Lotto', {
+			mount: mounts(dummy, { args: [arg.string('item', 'An item', { autocomplete: suggest }), arg.string('note', 'A note')] }),
+		});
+		const options = deriveCommand(cmd).data.toJSON().options as (JsonOption & { autocomplete?: boolean })[];
+		expect(options.find((o) => o.name === 'item')?.autocomplete).toBe(true);
+		expect(options.find((o) => o.name === 'note')?.autocomplete).toBeUndefined();
+	});
+
+	it('a command with no autocomplete argument has no autocomplete handler', () => {
+		const cmd = command('plain', 'Plain', { mount: mounts(dummy, { args: [arg.string('note', 'A note')] }) });
+		expect(deriveCommand(cmd).autocomplete).toBeUndefined();
+	});
+
+	it('answers with the handler\'s choices for what was typed', async () => {
+		suggest.mockClear();
+		const cmd = command('lotto', 'Lotto', { mount: mounts(dummy, { args: [arg.string('item', 'An item', { autocomplete: suggest })] }) });
+		const { interaction, respond } = typing({ name: 'item', value: 'xan' });
+
+		await deriveCommand(cmd).autocomplete!(interaction);
+
+		expect(suggest).toHaveBeenCalledWith('xan', expect.objectContaining({ guildId: 'g1', userId: 'u1', channelId: 'c1' }));
+		expect(respond).toHaveBeenCalledWith([{ name: 'Match xan', value: 'xan' }]);
+	});
+
+	it('hands the handler the other options already typed, not the focused one', async () => {
+		const seen: unknown[] = [];
+		const cmd = command('lotto', 'Lotto', {
+			mount: mounts(dummy, {
+				args: [
+					arg.string('item', 'An item', { autocomplete: (_typed, context) => { seen.push(context.values); return []; } }),
+					arg.integer('amount', 'How many'),
+				],
+			}),
+		});
+		const { interaction } = typing({ name: 'item', value: 'x' }, { amount: 3 });
+
+		await deriveCommand(cmd).autocomplete!(interaction);
+
+		expect(seen).toEqual([{ amount: 3 }]);
+	});
+
+	it('routes a subcommand to its own leaf and focused argument', async () => {
+		const other = vi.fn(() => [{ name: 'Wrong', value: 'wrong' }]);
+		const cmd = command('lotto', 'Lotto', {
+			subcommands: {
+				start: { ...mounts(dummy, { args: [arg.string('item', 'An item', { autocomplete: suggest })] }), description: 'Start' },
+				join: { ...mounts(dummy, { args: [arg.string('item', 'An item', { autocomplete: other })] }), description: 'Join' },
+			},
+		});
+		const { interaction, respond } = typing({ name: 'item', value: 'b' }, {}, 'start');
+
+		await deriveCommand(cmd).autocomplete!(interaction);
+
+		expect(respond).toHaveBeenCalledWith([{ name: 'Match b', value: 'b' }]);
+		expect(other).not.toHaveBeenCalled();
+	});
+
+	it('answers with nothing for an argument that has no handler', async () => {
+		const cmd = command('lotto', 'Lotto', {
+			mount: mounts(dummy, { args: [arg.string('item', 'An item', { autocomplete: suggest }), arg.string('note', 'A note')] }),
+		});
+		const { interaction, respond } = typing({ name: 'note', value: 'hi' });
+
+		await deriveCommand(cmd).autocomplete!(interaction);
+
+		expect(respond).toHaveBeenCalledWith([]);
+	});
+
+	it('keeps 25 choices, trims long labels, and awaits an async handler', async () => {
+		const many = Array.from({ length: 30 }, (_, i) => ({ name: 'n'.repeat(150) + i, value: `v${i}` }));
+		const cmd = command('lotto', 'Lotto', {
+			mount: mounts(dummy, { args: [arg.string('item', 'An item', { autocomplete: async () => many })] }),
+		});
+		const { interaction, respond } = typing({ name: 'item', value: '' });
+
+		await deriveCommand(cmd).autocomplete!(interaction);
+
+		const [answered] = respond.mock.calls[0] as [{ name: string; value: string }[]];
+		expect(answered).toHaveLength(25);
+		expect(answered[0].name).toHaveLength(100);
+		expect(answered[0].value).toBe('v0');
+	});
+
+	it('answers with nothing and rethrows when the handler fails, so the host can log it', async () => {
+		const boom = new Error('lookup failed');
+		const cmd = command('lotto', 'Lotto', {
+			mount: mounts(dummy, { args: [arg.string('item', 'An item', { autocomplete: () => { throw boom; } })] }),
+		});
+		const { interaction, respond } = typing({ name: 'item', value: 'x' });
+
+		await expect(deriveCommand(cmd).autocomplete!(interaction)).rejects.toBe(boom);
+		expect(respond).toHaveBeenCalledWith([]);
 	});
 });
 
