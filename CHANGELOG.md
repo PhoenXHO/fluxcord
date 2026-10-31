@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-31
+
 ### Added
 
 - Persistent panels from a command: `mounts(flow, { rehydrateRef, onMounted, onMountFailed })`. `rehydrateRef(bag)` reads the rehydrate ref from the bag the leaf's `data` resolver built, so a flow with a `rehydrate` callback can be a command's public reply and outlive its session. `onMounted(bag, handle)` runs once the panel is posted (the handle carries its `messageId`); a throw there goes to the host and the panel stays. `onMountFailed(bag, error)` runs when the post fails, to undo what `data` wrote, and the error is thrown again after it. `command()` rejects the three on a leaf without `data`, and `rehydrateRef` on an ephemeral leaf.
@@ -14,7 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `ui.reply(view)`: answers whoever clicked with an ephemeral message only they see, so a shared panel can confirm one member's action, or tell them why it did not go through, without touching what everyone else sees. The view takes no buttons or selects and throws a `RenderError` before anything is sent. A handler may still mutate the panel in the same click.
 - `ui.open(flow, { data })`: mounts a flow as an ephemeral panel owned by the clicker, beside the current panel, which stays as it is. The shape for a paginated list or a form that one member opens from a public panel. The flow must be in its module's manifest flows and cannot rehydrate (an ephemeral message dies at Discord's interaction wall).
 - Bridge seams behind the two verbs: `PlatformPort.sendToActor(payload)` and `PlatformPort.actorSender()`, both optional like `ack`. The shipped Discord bridge implements them: a reply when the click is unanswered, a follow-up when it was already acked, with later edits of the message routed through the interaction's webhook. The host's `ephemeralAsPublic` switch keeps both public for dev. A bridge without them makes the verbs throw a clear error.
-
 - `createBot` host seams for an app that needs more than the defaults. `intercept(interaction, next)` wraps every interaction before routing: `next()` runs the shipped routing (command execute, autocomplete, component and modal dispatch) and a host that never calls it drops the interaction, so authorization, stale filtering, logging and failure copy have one home; a throw lands in the error unit like any listener failure. `wrapBridge(port)` decorates the bridge port the runtime talks through. `flows` hands in a prebuilt catalog, used as is, so a host that also needs the catalog elsewhere builds it once. `onReady(client)` runs awaited on ready, before commands register; a rejection goes to `onError` and registration still runs. `Bot.stop()` stops the sweeper, then closes the client.
 
 ### Changed
