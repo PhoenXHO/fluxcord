@@ -82,7 +82,7 @@ void bot.start();
 
 This function starts the bot and logs it in. The `void` type annotation is intentional because we're not awaiting the promise; if the login fails, Node's unhandled-rejection handling stops the process and prints the reason, which is the right outcome for a boot script. The moment the login succeeds, fluxcord posts your derived commands to Discord and starts listening for interactions; nothing else is needed.
 
-`createBot` takes more seams than the one field shown here: a custom permission engine and a `registerCommands` callback that replaces the built-in registration. The JSDoc on `createBot` covers both, and the [API Reference](../reference/README.md) collects the guide-level notes.
+`createBot` takes more seams than the one field shown here: a custom permission engine, a `registerCommands` callback that replaces the built-in registration, an `intercept` function that wraps every interaction before fluxcord routes it (call `next()` to let it through, skip it to drop the interaction), an `onReady` hook that runs before commands register, a `wrapBridge` decorator for the port the runtime replies through, and a prebuilt `flows` catalog. The bot it returns has a `stop` that stops the sweeper and closes the client. The JSDoc on `createBot` covers each, and the [API Reference](../reference/README.md) collects the guide-level notes.
 
 ## Seeing it live
 
