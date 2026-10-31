@@ -25,6 +25,7 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import type { Interaction } from 'discord.js';
 import { buildFlowCatalog } from '../boot/build.js';
+import type { FlowCatalog } from '../boot/build.js';
 import { moduleFlowRegistrations } from '../command/harvest.js';
 import type { FlowSourceModule } from '../command/harvest.js';
 import type { Flow } from '../flow/token.js';
@@ -32,7 +33,7 @@ import { defaultOnError } from '../pipeline/dispatch.js';
 import { createDefaultPolicyEngine, isPolicyPort } from '../pipeline/policy.js';
 import type { PrivilegeFacts } from '../pipeline/policy.js';
 import { ErrorSource } from '../pipeline/types.js';
-import type { ErrorHandler, PartingOptions, PolicyPort } from '../pipeline/types.js';
+import type { BridgePort, ErrorHandler, PartingOptions, PolicyPort } from '../pipeline/types.js';
 import type { RehydrateStore } from '../state/types.js';
 import { createUiRuntime } from '../runtime/create.js';
 import type { MountHandle, MountOptions } from '../runtime/types.js';
@@ -86,6 +87,33 @@ export interface CreateBotOptions {
 	 */
 	readonly registerCommands?: (client: Client<true>, commands: readonly CommandRegistration[]) => Promise<void>;
 	/**
+	 * Wraps every interaction before fluxcord routes it. `next` runs the
+	 * shipped routing (command execute, autocomplete, component and modal
+	 * dispatch); a host that never calls it drops the interaction. This is
+	 * the seam for anything that must run around a command: authorization,
+	 * stale filtering, logging, failure copy, ids fluxcord does not own. A
+	 * throw lands in the same error unit as any listener failure. Omit and
+	 * every interaction goes straight to `next`.
+	 */
+	readonly intercept?: (interaction: Interaction, next: () => Promise<void>) => Promise<void>;
+	/**
+	 * Decorates the bridge the runtime talks through: receives the shipped
+	 * port and returns the one the runtime uses (swap `replyToActor` for a
+	 * styled reply, say). Omit to use the shipped port as is.
+	 */
+	readonly wrapBridge?: (port: BridgePort) => BridgePort;
+	/**
+	 * A prebuilt flow catalog, used as is. `modules` then only supply
+	 * commands; their flows are not harvested again. Omit and the catalog is
+	 * built from the modules.
+	 */
+	readonly flows?: FlowCatalog;
+	/**
+	 * Runs once the client is ready, awaited before commands register. A
+	 * rejection goes to `onError` and boot carries on to registration.
+	 */
+	readonly onReady?: (client: Client<true>) => Promise<void>;
+	/**
 	 * The permission layer. Pass the facts object (`{ privileges }`) and
 	 * the shipped engine evaluates the authored policy vocabulary against
 	 * it; pass your own `PolicyPort` and the engine is out entirely.
@@ -120,10 +148,12 @@ export interface CreateBotOptions {
 	readonly sweeper?: boolean;
 }
 
-/** What createBot hands back: the login button and the two live seams. */
+/** What createBot hands back: the login and logout buttons and the two live seams. */
 export interface Bot {
 	/** Logs in; command registration, dispatch and the sweeper are already wired. */
 	readonly start: () => Promise<void>;
+	/** Stops the sweeper, then closes the client (parting edits need the connection, so that order). */
+	readonly stop: () => Promise<void>;
 	/** The raw client, for listeners fluxcord does not cover. */
 	readonly client: Client;
 	/** Opens a flow session programmatically (push panels, service surfaces). @see {@link UiRuntime.mount}. */
@@ -161,10 +191,10 @@ export function createBot(options: CreateBotOptions): Bot {
 		...(options.logger !== undefined ? { logger: options.logger } : {}),
 		...(options.ephemeralAsPublic !== undefined ? { ephemeralAsPublic: options.ephemeralAsPublic } : {}),
 	});
-	const flows = buildFlowCatalog(options.modules.flatMap(moduleFlowRegistrations));
+	const flows = options.flows ?? buildFlowCatalog(options.modules.flatMap(moduleFlowRegistrations));
 	const policyPort = normalizePolicy(options.policy);
 	const runtime = createUiRuntime({
-		platform: bridge.platform,
+		platform: options.wrapBridge !== undefined ? options.wrapBridge(bridge.platform) : bridge.platform,
 		sendToChannel: bridge.sendToChannel,
 		policy: policyPort,
 		flows,
@@ -202,7 +232,32 @@ export function createBot(options: CreateBotOptions): Bot {
 	);
 	const commands = registrations.map((entry) => entry.command);
 
+	// A failure with no dispatch core around it (a listener rejection, a
+	// failed ready hook) lands in the same error unit the runtime uses, with
+	// the same containment: a custom unit that throws falls back to the
+	// shipped one instead of escaping into the client's listener.
+	const reportFailure = (error: unknown): void => {
+		const report = {
+			error,
+			source: ErrorSource.Framework,
+			reply: (): Promise<void> => Promise.resolve(),
+		};
+		try {
+			(options.onError ?? defaultOnError)(report);
+		} catch (unitError) {
+			console.error('[fluxcord] onError unit threw:', unitError);
+			defaultOnError(report);
+		}
+	};
+
 	const register = async (ready: Client<true>): Promise<void> => {
+		if (options.onReady !== undefined) {
+			try {
+				await options.onReady(ready);
+			} catch (error) {
+				reportFailure(error);
+			}
+		}
 		if (options.registerCommands !== undefined) {
 			await options.registerCommands(ready, registrations);
 			return;
@@ -246,24 +301,12 @@ export function createBot(options: CreateBotOptions): Bot {
 		}
 	};
 
-	// A listener rejection has no dispatch core around it (a failed mount
-	// send, say), so it lands in the same error unit the runtime uses —
-	// with the same containment: a custom unit that throws falls back to
-	// the shipped one instead of escaping into the client's listener.
-	const runInteraction = (interaction: Interaction): Promise<void> =>
-		onInteraction(interaction).catch((error) => {
-			const report = {
-				error,
-				source: ErrorSource.Framework,
-				reply: (): Promise<void> => Promise.resolve(),
-			};
-			try {
-				(options.onError ?? defaultOnError)(report);
-			} catch (unitError) {
-				console.error('[fluxcord] onError unit threw:', unitError);
-				defaultOnError(report);
-			}
-		});
+	// The host's intercept, when present, wraps the shipped routing; a
+	// rejection from either (a failed mount send, say) is reported.
+	const runInteraction = (interaction: Interaction): Promise<void> => {
+		const next = (): Promise<void> => onInteraction(interaction);
+		return (options.intercept !== undefined ? options.intercept(interaction, next) : next()).catch(reportFailure);
+	};
 
 	client.on(Events.InteractionCreate, (interaction) => {
 		void runInteraction(interaction);
@@ -280,6 +323,10 @@ export function createBot(options: CreateBotOptions): Bot {
 
 	return {
 		start: (): Promise<void> => client.login(token).then(() => undefined),
+		stop: async (): Promise<void> => {
+			runtime.stopSweeper();
+			await client.destroy();
+		},
 		client,
 		mount: runtime.mount,
 	};

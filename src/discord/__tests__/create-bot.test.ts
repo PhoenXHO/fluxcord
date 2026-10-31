@@ -14,6 +14,7 @@ import { command, mounts } from '../../command/declare.js';
 import { screen } from '../../flow/screen.js';
 import { flow } from '../../flow/token.js';
 import { text, view } from '../../tree/builders.js';
+import { buildFlowCatalog } from '../../boot/build.js';
 import { createBot } from '../create-bot.js';
 import type { CommandRegistration } from '../create-bot.js';
 
@@ -21,16 +22,19 @@ import type { CommandRegistration } from '../create-bot.js';
 function fakeReadyClient(set: (bodies: unknown, guild?: string) => Promise<unknown>): {
 	client: Client;
 	login: (token: string) => Promise<void>;
+	destroy: () => Promise<void>;
 } {
 	const login = vi.fn(async (_token: string) => undefined);
+	const destroy = vi.fn(async () => undefined);
 	const client = {
 		isReady: (): boolean => true,
 		on: vi.fn(),
 		once: vi.fn(),
 		login,
+		destroy,
 		application: { commands: { set } },
 	} as unknown as Client;
-	return { client, login };
+	return { client, login, destroy };
 }
 
 /**
@@ -144,6 +148,157 @@ describe('createBot - autocomplete', () => {
 		});
 
 		expect(respond).toHaveBeenCalledWith([{ name: 'abc', value: 'abc' }]);
+	});
+});
+
+describe('createBot - the host seams', () => {
+	/** An autocomplete interaction for `/pick`, with the reply recorded. */
+	const pickInteraction = (respond: () => Promise<void>): unknown => ({
+		isAutocomplete: (): boolean => true,
+		isChatInputCommand: (): boolean => false,
+		isMessageComponent: (): boolean => false,
+		isModalSubmit: (): boolean => false,
+		commandName: 'pick',
+		user: { id: 'u1' },
+		guildId: 'g1',
+		channelId: 'c1',
+		respond,
+		options: {
+			getFocused: () => ({ name: 'thing', value: 'abc' }),
+			getSubcommand: () => null,
+			data: [{ name: 'thing', value: 'abc', focused: true }],
+		},
+	});
+	const picker = command('pick', 'Pick something', {
+		mount: mounts(aboutFlow, { args: [arg.string('thing', 'A thing', { autocomplete: (typed) => [{ name: typed, value: typed }] })] }),
+	});
+	const listenerOf = (client: Client): ((i: unknown) => Promise<void>) =>
+		vi.mocked(client.on).mock.calls.find(([event]) => event === 'interactionCreate')?.[1] as (i: unknown) => Promise<void>;
+
+	it('intercept wraps the routing: next runs it, and not calling next drops the interaction', async () => {
+		const { client } = fakeReadyClient(async () => []);
+		let letThrough = true;
+		const seen = vi.fn();
+		createBot({
+			modules: [{ name: 'pick', commands: [picker] }],
+			token: 't',
+			client,
+			sweeper: false,
+			intercept: async (interaction, next) => {
+				seen(interaction);
+				if (letThrough) await next();
+			},
+		});
+		await flush();
+		const respond = vi.fn(async (): Promise<void> => undefined);
+
+		await listenerOf(client)(pickInteraction(respond));
+		expect(seen).toHaveBeenCalledTimes(1);
+		expect(respond).toHaveBeenCalledTimes(1);
+
+		letThrough = false;
+		await listenerOf(client)(pickInteraction(respond));
+		expect(seen).toHaveBeenCalledTimes(2);
+		expect(respond).toHaveBeenCalledTimes(1);
+	});
+
+	it('a throw inside intercept reaches onError as a framework failure', async () => {
+		const { client } = fakeReadyClient(async () => []);
+		const onError = vi.fn();
+		createBot({
+			modules: [{ name: 'pick', commands: [picker] }],
+			token: 't',
+			client,
+			sweeper: false,
+			onError,
+			intercept: async () => {
+				throw new Error('gate broke');
+			},
+		});
+		await flush();
+		await listenerOf(client)(pickInteraction(async () => undefined));
+		await flush();
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(onError.mock.calls[0][0].error).toEqual(new Error('gate broke'));
+	});
+
+	it('wrapBridge receives the shipped port and its result is what the runtime talks through', async () => {
+		const wrapBridge = vi.fn((port) => port);
+		createBot({
+			modules: [{ name: 'about', commands: [aboutCommand] }],
+			token: 't',
+			client: fakeReadyClient(async () => []).client,
+			sweeper: false,
+			wrapBridge,
+		});
+		expect(wrapBridge).toHaveBeenCalledTimes(1);
+		expect(typeof wrapBridge.mock.calls[0][0].replyToActor).toBe('function');
+	});
+
+	it('a prebuilt flow catalog is used as is: the modules are not harvested again', () => {
+		// The flow is both listed and mounted, which the harvest rejects; a
+		// prebuilt catalog means the harvest never runs.
+		const flows = buildFlowCatalog([{ module: 'about', flow: aboutFlow }]);
+		expect(() =>
+			createBot({
+				modules: [{ name: 'about', flows: [aboutFlow], commands: [aboutCommand] }],
+				token: 't',
+				client: fakeReadyClient(async () => []).client,
+				sweeper: false,
+				flows,
+			}),
+		).not.toThrow();
+	});
+
+	it('onReady runs and settles before commands register', async () => {
+		const order: string[] = [];
+		const registerCommands = vi.fn(async () => {
+			order.push('register');
+		});
+		createBot({
+			modules: [{ name: 'about', commands: [aboutCommand] }],
+			token: 't',
+			client: fakeReadyClient(async () => []).client,
+			sweeper: false,
+			onReady: async () => {
+				await flush();
+				order.push('ready');
+			},
+			registerCommands,
+		});
+		await flush();
+		await flush();
+		expect(order).toEqual(['ready', 'register']);
+	});
+
+	it('an onReady rejection goes to onError and registration still runs', async () => {
+		const onError = vi.fn();
+		const registerCommands = vi.fn(async () => undefined);
+		createBot({
+			modules: [{ name: 'about', commands: [aboutCommand] }],
+			token: 't',
+			client: fakeReadyClient(async () => []).client,
+			sweeper: false,
+			onError,
+			onReady: async () => {
+				throw new Error('init failed');
+			},
+			registerCommands,
+		});
+		await flush();
+		expect(onError).toHaveBeenCalledTimes(1);
+		expect(registerCommands).toHaveBeenCalledTimes(1);
+	});
+
+	it('stop closes the client', async () => {
+		const { client, destroy } = fakeReadyClient(async () => []);
+		const bot = createBot({
+			modules: [{ name: 'about', commands: [aboutCommand] }],
+			token: 't',
+			client,
+		});
+		await bot.stop();
+		expect(destroy).toHaveBeenCalledTimes(1);
 	});
 });
 
