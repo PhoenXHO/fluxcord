@@ -90,7 +90,7 @@ describe('the flow registry', () => {
 
 	it('knows nothing about an object flow() did not make', () => {
 		const declared = makeFlow('real');
-		const forged = { flowMark: true, id: 'real', definition: declared.definition } as unknown as Flow<PanelData>;
+		const forged = { id: 'real', definition: declared.definition } as unknown as Flow<PanelData>;
 
 		expect(tokenOf(forged)).toBeUndefined();
 		expect(tokenById('missing')).toBeUndefined();
@@ -105,7 +105,7 @@ describe('the flow registry', () => {
 	});
 
 	it('a command cannot mount something flow() did not make', () => {
-		const forged = { flowMark: true, id: 'forged', definition: makeFlow('real').definition } as unknown as Flow<PanelData>;
+		const forged = { id: 'forged', definition: makeFlow('real').definition } as unknown as Flow<PanelData>;
 
 		expect(() => command('forged', 'Forged', { mount: mounts(forged) })).toThrow(/not a flow made by flow\(\)/);
 	});

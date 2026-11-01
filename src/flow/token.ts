@@ -83,6 +83,8 @@ export interface FlowMeta<TData = unknown> {
 	onSessionEnd?(end: SessionEnd): void;
 }
 
+const flowBrand: unique symbol = Symbol('fluxcord.flow');
+
 /**
  * A flow as authored: its name plus its definition. Modules export these
  * as constants; a `command`'s leaf mounts one, or the host mounts it
@@ -95,8 +97,8 @@ export interface FlowMeta<TData = unknown> {
  * annotates its constant with the pair.
  */
 export interface Flow<TData = never, TExit = void> {
-	/** Marks the object as made by `flow()`; a literal that fakes it is still refused, since the runtime only mounts flows it registered. */
-	readonly flowMark: true;
+	/** Private brand: the symbol is not exported, so only `flow()` can produce a value of this type. The runtime also refuses any object it did not register. */
+	readonly [flowBrand]: true;
 	/** The flow's name: the only id the author writes, and the id on its buttons and rehydrate rows. Unique across the app. */
 	readonly id: string;
 	/** The built definition: `screens`, `initialData`, ttl and the rest. */
@@ -157,7 +159,7 @@ export function flow<TData = void, const TScreens extends string = string>(
 	}
 	const frozenMeta = meta !== undefined ? Object.freeze({ ...meta }) : undefined;
 	const declared: Flow<TData> = Object.freeze({
-		flowMark: true as const,
+		[flowBrand]: true as const,
 		id,
 		definition,
 		...(frozenMeta !== undefined ? { meta: frozenMeta } : {}),
