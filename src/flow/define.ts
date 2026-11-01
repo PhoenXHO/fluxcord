@@ -46,7 +46,8 @@ function assertId(kind: string, id: string): void {
  *
  * @param options Screens, `first`, `initialData`, and the optional pieces.
  * @returns The frozen definition a flow carries.
- * @throws On an invalid screen id, an invalid `ttlMs`, or a `static` flow
+ * @throws On an invalid screen id, an invalid `ttlMs` or `rehydrateTtlMs`
+ *   (or `rehydrateTtlMs` without `rehydrate`), or a `static` flow
  *   that also declares `ttlMs`, `remount` or `rehydrate`.
  */
 export function defineFlow<TData = void, const TScreens extends string = string>(
@@ -79,6 +80,16 @@ export function defineFlow<TData = void, const TScreens extends string = string>
 		throw new Error(`defineFlow: ttlMs must be a positive number of milliseconds, or Infinity to never expire (got ${String(ttlMs)})`);
 	}
 
+	const { rehydrateTtlMs } = options;
+	if (rehydrateTtlMs !== undefined) {
+		if (options.rehydrate === undefined) {
+			throw new Error('defineFlow: rehydrateTtlMs is the retention of rehydrate rows, so the flow must declare rehydrate');
+		}
+		if (Number.isNaN(rehydrateTtlMs) || rehydrateTtlMs <= 0) {
+			throw new Error(`defineFlow: rehydrateTtlMs must be a positive number of milliseconds, or Infinity to keep rows until the session closes (got ${String(rehydrateTtlMs)})`);
+		}
+	}
+
 	const isStatic = options.static === true;
 	if (isStatic) {
 		// A static mount keeps no session, so every option about a session's
@@ -102,6 +113,7 @@ export function defineFlow<TData = void, const TScreens extends string = string>
 		...(options.parting !== undefined ? { parting: options.parting } : {}),
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 		...(options.rehydrate !== undefined ? { rehydrate: options.rehydrate } : {}),
+		...(rehydrateTtlMs !== undefined ? { rehydrateTtlMs } : {}),
 		static: isStatic,
 	};
 	return Object.freeze(definition);

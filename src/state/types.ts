@@ -54,6 +54,9 @@ export type RemountPolicy = (typeof RemountPolicy)[keyof typeof RemountPolicy];
 /** The default sliding TTL: 30 minutes. A flow overrides it per definition with its own `ttlMs`. */
 export const DEFAULT_TTL_MS = 30 * 60 * 1000;
 
+/** The default rehydrate retention: 7 days. A rehydratable flow overrides it with `rehydrateTtlMs`, or `Infinity` to keep its rows until its session closes. */
+export const DEFAULT_REHYDRATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Why a session ended: `'close'` is a deliberate end, `'expire'` is the TTL running out. The commit-phase wiring decides what each reason does to the message. */
 export const EndReason = {
 	Close: 'close',
@@ -262,16 +265,27 @@ export interface RehydrateRow {
  * The persistence interface for rehydration, and the only place the
  * framework meets a database. It is an interface on purpose: the host app
  * injects whatever storage it likes, and no framework code beyond these
- * three methods knows or cares how rows are kept.
+ * methods knows or cares how rows are kept.
  *
  * Rows are written at mount, deleted at close, and deliberately survive
  * TTL death, so a click that arrives after the session is gone can still
- * rebuild from domain truth. When no implementation is injected, the
- * feature is simply inactive: no rows are written, and late clicks bounce
- * as unknown.
+ * rebuild from domain truth. They do not survive forever: a row unused
+ * for its flow's `rehydrateTtlMs` (7 days unless the flow says otherwise)
+ * is purged, and a row whose message Discord reports gone is deleted.
+ * When no implementation is injected, the feature is simply inactive: no
+ * rows are written, and late clicks bounce as unknown.
+ *
+ * `touch` and `purge` are what make retention work. Both are optional:
+ * a store without `purge` keeps every row (a flow that sets a finite
+ * `rehydrateTtlMs` on such a store fails at boot), and a store without
+ * `touch` ages rows from the time they were written.
  */
 export interface RehydrateStore {
 	put(row: RehydrateRow): Promise<void>;
 	get(messageId: string): Promise<RehydrateRow | undefined>;
 	delete(messageId: string): Promise<void>;
+	/** Marks the row as in use now: called when its session dies by expiry and when a late click revives it. */
+	touch?(messageId: string): Promise<void>;
+	/** Deletes the flow's rows last used before `olderThan`; resolves with how many it deleted. */
+	purge?(flowId: string, olderThan: Date): Promise<number>;
 }

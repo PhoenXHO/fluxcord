@@ -10,6 +10,7 @@
  *   close, plain         -> freeze the final screen; delete the rehydrate row
  *   expire, no rehydrate -> parting edit (once; the done-set dedupes)
  *   expire, rehydrate    -> untouched; the row survives for late-click revive
+ *                           and is touched, so its retention clock starts
  * ```
  *
  * The store's hook is synchronous, so the async commit work is
@@ -64,8 +65,11 @@ export function createOnEnd(options: OnEndOptions): OnEnd {
 			options.rehydrate?.delete(session.messageRef.messageId).catch(fail);
 			return;
 		}
-		// Expiry: rehydratable messages stay untouched for late-click revive.
-		if (session.rehydrate === undefined) {
+		// Expiry: rehydratable messages stay untouched for late-click revive,
+		// and the row's retention clock restarts from this death.
+		if (session.rehydrate !== undefined) {
+			options.rehydrate?.touch?.(session.messageRef.messageId).catch(fail);
+		} else {
 			// Parting copy belongs to the root flow: the root frame's token
 			// carries its parting bundle and command hint. A flow that
 			// declares none expires into the host's defaultParting when the

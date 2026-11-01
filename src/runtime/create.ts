@@ -31,9 +31,9 @@ import { createCall } from './call.js';
 import { createLaunch } from './launch.js';
 import { renderV2Message } from '../render/v2.js';
 import { createSessionStore, generateId, isExpired } from '../state/store.js';
-import { activeFrame } from '../state/types.js';
+import { activeFrame, DEFAULT_REHYDRATE_TTL_MS } from '../state/types.js';
 import type { MessageRef, RehydrateRow, Session } from '../state/types.js';
-import type { IncomingEvent, PlatformPort } from '../pipeline/types.js';
+import type { BridgePort, IncomingEvent, PlatformPort } from '../pipeline/types.js';
 import type { V2MessagePayload } from '../render/v2.js';
 import type { MountHandle, MountOptions, MountTarget, RuntimeOptions, UiRuntime } from './types.js';
 import { defaultOnError } from '../pipeline/dispatch.js';
@@ -41,6 +41,9 @@ import { ErrorSource } from '../pipeline/types.js';
 
 /** Default sweeper cadence: 15 seconds. */
 export const DEFAULT_SWEEP_INTERVAL_MS = 15_000;
+
+/** How often old rehydrate rows are purged: hourly. */
+export const PURGE_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
  * Assembles the runtime: store, queue, commit phase, dispatch, mount and
@@ -70,7 +73,30 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			// The error unit itself failed; nothing is left to tell.
 		}
 	};
-	const commit = createCommit({ platform: options.platform });
+	// The bridge as the rest of the runtime sees it. With a rehydrate store,
+	// an edit that fails because Discord says the message or its channel is
+	// gone (10008, 10003) also deletes that message's row: nothing can ever
+	// click it again, so the row would only sit there. The failure still
+	// reaches the caller unchanged.
+	const bridge: BridgePort = options.rehydrate === undefined
+		? options.platform
+		: {
+			...options.platform,
+			editMessage: async (ref, payload): Promise<void> => {
+				try {
+					await options.platform.editMessage(ref, payload);
+				} catch (error) {
+					const code = (error as { code?: unknown } | null)?.code;
+					if (code === 10008 || code === 10003) {
+						options.rehydrate?.delete(ref.messageId).catch((deleteError: unknown) => {
+							reportDeathFailure(deleteError, `rehydrate row delete failed for gone message '${ref.messageId}'`);
+						});
+					}
+					throw error;
+				}
+			},
+		};
+	const commit = createCommit({ platform: bridge });
 	const store = createSessionStore({
 		...(options.now !== undefined ? { now: options.now } : {}),
 		onEnd: createOnEnd({
@@ -98,14 +124,14 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	});
 	// The call engine needs store, queue and commit; the toolkit needs the
 	// engine's exit seam. Order is fixed by those edges.
-	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken, ack: options.platform.ack });
+	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken, ack: bridge.ack });
 	const makeUi = createMakeUi({
 		exit: callEngine.exit,
 		// ui.open: the flow mounts on the clicker's own ephemeral reply, owned
 		// by them. `mount` is a hoisted declaration below, so the closure
 		// resolves it at click time.
 		open: async (flow, actorId, data) => {
-			const sender = options.platform.actorSender?.();
+			const sender = bridge.actorSender?.();
 			if (sender === undefined) {
 				throw new Error('ui.open: this host cannot open an ephemeral panel for the clicker (the bridge has no actorSender, or the click is outside a dispatch)');
 			}
@@ -119,7 +145,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	// the commit phase owns redraw and the parting edit. Compose them once;
 	// dispatch, mount and the toolkit all see this one port.
 	const platform: PlatformPort = {
-		...options.platform,
+		...bridge,
 		redraw: commit.redraw,
 		commitParting: commit.commitParting,
 	};
@@ -174,6 +200,10 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		}
 		const data = await token.definition.rehydrate?.(row.ref);
 		if (data === undefined) return undefined;
+		// The panel is in use again: the row's retention clock restarts.
+		store_.touch?.(row.messageId).catch((error: unknown) => {
+			reportDeathFailure(error, `rehydrate row touch failed for revived message '${row.messageId}'`);
+		});
 		return store.create({
 			id: sessionId,
 			flowId: row.flowId,
@@ -396,11 +426,39 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	}
 
 	let sweeperTimer: ReturnType<typeof setInterval> | undefined;
+	let purgeTimer: ReturnType<typeof setInterval> | undefined;
 
 	function stopSweeper(): void {
+		if (purgeTimer !== undefined) {
+			clearInterval(purgeTimer);
+			purgeTimer = undefined;
+		}
 		if (sweeperTimer !== undefined) {
 			clearInterval(sweeperTimer);
 			sweeperTimer = undefined;
+		}
+	}
+
+	/** How long each flow's rehydrate rows may sit unused: its own `rehydrateTtlMs`, else the default when the store can purge. */
+	const retention = new Map<string, number>();
+	for (const token of options.flows.tokens) {
+		const { rehydrate, rehydrateTtlMs } = token.definition;
+		if (rehydrate === undefined) continue;
+		if (rehydrateTtlMs !== undefined && Number.isFinite(rehydrateTtlMs) && options.rehydrate?.purge === undefined) {
+			throw new Error(`createUiRuntime: flow '${token.flowId}' sets a finite rehydrateTtlMs, but the rehydrate store has no purge method to delete old rows with`);
+		}
+		const ttl = rehydrateTtlMs ?? (options.rehydrate?.purge !== undefined ? DEFAULT_REHYDRATE_TTL_MS : Infinity);
+		if (Number.isFinite(ttl)) retention.set(token.flowId, ttl);
+	}
+
+	/** Deletes every flow's rows that sat unused past its retention. A failure is reported and the next tick tries again. */
+	function purgeRows(): void {
+		const store_ = options.rehydrate;
+		if (store_?.purge === undefined) return;
+		for (const [flowId, ttl] of retention) {
+			store_.purge(flowId, new Date(now() - ttl)).catch((error: unknown) => {
+				reportDeathFailure(error, `rehydrate purge failed for flow '${flowId}'`);
+			});
 		}
 	}
 
@@ -410,6 +468,13 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			store.sweep();
 		}, intervalMs);
 		sweeperTimer.unref?.();
+		// Rows age in days, so their purge runs hourly (and once now) beside
+		// the session sweep, started and stopped with it.
+		if (retention.size > 0) {
+			purgeRows();
+			purgeTimer = setInterval(purgeRows, PURGE_INTERVAL_MS);
+			purgeTimer.unref?.();
+		}
 	};
 
 	// The sweeper runs from create. A runtime whose host forgot to start

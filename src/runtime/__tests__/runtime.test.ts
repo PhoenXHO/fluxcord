@@ -23,7 +23,7 @@ import { button, row, text, view } from '../../tree/builders.js';
 import { flow } from '../../flow/token.js';
 import type { FlowMeta, Flow, SessionEnd } from '../../flow/token.js';
 import { buildFlowCatalog } from '../../boot/build.js';
-import { createUiRuntime, DEFAULT_SWEEP_INTERVAL_MS } from '../create.js';
+import { createUiRuntime, DEFAULT_SWEEP_INTERVAL_MS, PURGE_INTERVAL_MS } from '../create.js';
 import type { MountHandle, MountTarget, UiRuntime } from '../types.js';
 
 interface PanelData {
@@ -83,6 +83,10 @@ export interface World {
 	readonly replies: string[];
 	readonly partings: { ref: MessageRef; parting?: PartingOptions; hint?: string }[];
 	readonly rows: Map<string, RehydrateRow>;
+	/** Message ids the store was asked to touch, in order (needs `retention`). */
+	readonly touched: string[];
+	/** Every purge the store was asked for (needs `retention`). */
+	readonly purged: { flowId: string; olderThan: Date }[];
 	readonly sent: { channelId: string; payload: V2MessagePayload }[];
 	readonly handler: ReturnType<typeof vi.fn>;
 	readonly mount: (options?: MountArgs) => Promise<MountHandle<PanelData>>;
@@ -110,6 +114,12 @@ function world(options: {
 	parting?: PartingOptions;
 	/** The host's global parting bundle, wired into the runtime. */
 	defaultParting?: PartingOptions;
+	/** Gives the rehydrate store `touch` and `purge`, recorded in `touched` and `purged`. */
+	retention?: boolean;
+	/** The rehydratable flow's `rehydrateTtlMs`. */
+	rehydrateTtlMs?: number;
+	/** Makes every message edit reject with this Discord error code. */
+	failEditCode?: number;
 } = {}): World {
 	const clock = { now: 1_000_000, advance: (ms: number): number => (clock.now += ms) };
 	const handler = vi.fn(async (_event?: unknown): Promise<void> => undefined);
@@ -144,6 +154,7 @@ function world(options: {
 			ttlMs: 30 * MINUTE,
 			...(options.remount !== undefined ? { remount: options.remount } : {}),
 			// 'dead-ref' models a domain object that no longer exists: undefined = dead.
+			...(options.rehydrateTtlMs !== undefined ? { rehydrateTtlMs: options.rehydrateTtlMs } : {}),
 			...(options.rehydratable === true
 				? { rehydrate: (ref: string): PanelData | undefined => (ref === 'dead-ref' ? undefined : { count: 77 }) }
 				: {}),
@@ -151,6 +162,8 @@ function world(options: {
 
 	const { platform, edits, editPayloads, replies, partings } = fakeBridge();
 	const rows = new Map<string, RehydrateRow>();
+	const touched: string[] = [];
+	const purged: { flowId: string; olderThan: Date }[] = [];
 	const rehydrateStore: RehydrateStore = {
 		put: async (row): Promise<void> => {
 			if (options.failPut === true) throw new Error('db down');
@@ -160,7 +173,24 @@ function world(options: {
 		delete: async (messageId: string): Promise<void> => {
 			rows.delete(messageId);
 		},
+		...(options.retention === true
+			? {
+				touch: async (messageId: string): Promise<void> => {
+					touched.push(messageId);
+				},
+				purge: async (flowId: string, olderThan: Date): Promise<number> => {
+					purged.push({ flowId, olderThan });
+					return 0;
+				},
+			}
+			: {}),
 	};
+	if (options.failEditCode !== undefined) {
+		const code = options.failEditCode;
+		platform.editMessage = vi.fn(async (): Promise<void> => {
+			throw Object.assign(new Error('Discord says no'), { code });
+		});
+	}
 	const sent: { channelId: string; payload: V2MessagePayload }[] = [];
 	let sendCounter = 0;
 	const sendToChannel = vi.fn(async (channelId: string, payload: V2MessagePayload): Promise<MessageRef> => {
@@ -215,7 +245,7 @@ function world(options: {
 		await new Promise((resolve) => setImmediate(resolve));
 	}
 
-	return { clock, runtime, platform, edits, editPayloads, replies, partings, rows, sent, handler, mount, click };
+	return { clock, runtime, platform, edits, editPayloads, replies, partings, rows, touched, purged, sent, handler, mount, click };
 }
 
 afterEach(() => {
@@ -845,5 +875,124 @@ describe('the sweeper', () => {
 			w.runtime.stopSweeper();
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe('rehydrate retention', () => {
+	const DAY = 24 * 60 * MINUTE;
+
+	it('touches the row when its session dies by expiry, and says nothing to the message', async () => {
+		const w = world({ rehydratable: true, retention: true });
+		const handle = await w.mount({ to: { channel: 'ch-1' }, rehydrateRef: 'lotto:42' });
+		w.clock.advance(31 * MINUTE);
+
+		vi.useFakeTimers();
+		try {
+			w.runtime.startSweeper(DEFAULT_SWEEP_INTERVAL_MS);
+			await vi.advanceTimersByTimeAsync(DEFAULT_SWEEP_INTERVAL_MS);
+		} finally {
+			w.runtime.stopSweeper();
+			vi.useRealTimers();
+		}
+
+		expect(w.touched).toEqual([handle.messageId]);
+		expect(w.edits).toEqual([]);
+	});
+
+	it('touches the row when a late click revives the panel', async () => {
+		const w = world({ rehydratable: true, retention: true });
+		const handle = await w.mount({ to: { channel: 'ch-1' }, rehydrateRef: 'lotto:42' });
+		w.clock.advance(31 * MINUTE);
+
+		await w.click(handle.sessionId, handle.messageId);
+
+		expect(w.touched).toEqual([handle.messageId]);
+	});
+
+	it('purges each rehydratable flow\'s rows older than the default 7 days, once at start and then hourly', async () => {
+		const w = world({ rehydratable: true, retention: true });
+
+		vi.useFakeTimers();
+		try {
+			w.runtime.startSweeper(DEFAULT_SWEEP_INTERVAL_MS);
+			expect(w.purged).toEqual([{ flowId: 'panel/host', olderThan: new Date(w.clock.now - 7 * DAY) }]);
+
+			w.clock.advance(60 * MINUTE);
+			await vi.advanceTimersByTimeAsync(PURGE_INTERVAL_MS);
+			expect(w.purged).toHaveLength(2);
+			expect(w.purged[1]).toEqual({ flowId: 'panel/host', olderThan: new Date(w.clock.now - 7 * DAY) });
+		} finally {
+			w.runtime.stopSweeper();
+			vi.useRealTimers();
+		}
+	});
+
+	it('uses the flow\'s own rehydrateTtlMs, and never purges a flow that keeps its rows forever', async () => {
+		const short = world({ rehydratable: true, retention: true, rehydrateTtlMs: 2 * DAY });
+		const forever = world({ rehydratable: true, retention: true, rehydrateTtlMs: Infinity });
+
+		vi.useFakeTimers();
+		try {
+			short.runtime.startSweeper(DEFAULT_SWEEP_INTERVAL_MS);
+			forever.runtime.startSweeper(DEFAULT_SWEEP_INTERVAL_MS);
+			await vi.advanceTimersByTimeAsync(PURGE_INTERVAL_MS);
+		} finally {
+			short.runtime.stopSweeper();
+			forever.runtime.stopSweeper();
+			vi.useRealTimers();
+		}
+
+		expect(short.purged[0]).toEqual({ flowId: 'panel/host', olderThan: new Date(short.clock.now - 2 * DAY) });
+		expect(forever.purged).toEqual([]);
+	});
+
+	it('stops purging when the sweeper stops', async () => {
+		const w = world({ rehydratable: true, retention: true });
+
+		vi.useFakeTimers();
+		try {
+			w.runtime.startSweeper(DEFAULT_SWEEP_INTERVAL_MS);
+			w.runtime.stopSweeper();
+			await vi.advanceTimersByTimeAsync(3 * PURGE_INTERVAL_MS);
+		} finally {
+			vi.useRealTimers();
+		}
+
+		expect(w.purged).toHaveLength(1); // only the one at start
+	});
+
+	it('a store without purge keeps every row: the default is inert, an explicit finite ttl fails at boot', () => {
+		expect(() => world({ rehydratable: true })).not.toThrow();
+		expect(() => world({ rehydratable: true, rehydrateTtlMs: 2 * DAY })).toThrow(/no purge method/);
+		expect(() => world({ rehydratable: true, rehydrateTtlMs: Infinity })).not.toThrow();
+	});
+
+	it('rehydrateTtlMs needs rehydrate and a positive number', () => {
+		const screens = { main: { view: (): ReturnType<typeof view> => view({}, text('x')) } };
+		expect(() => flow('ttl-a', { screens, first: 'main', rehydrateTtlMs: DAY })).toThrow(/must declare rehydrate/);
+		const rehydrate = (): Record<string, never> => ({});
+		expect(() => flow('ttl-b', { screens, first: 'main', rehydrate, rehydrateTtlMs: 0 })).toThrow(/positive number/);
+		expect(() => flow('ttl-c', { screens, first: 'main', rehydrate, rehydrateTtlMs: Number.NaN })).toThrow(/positive number/);
+	});
+
+	it.each([10008, 10003])('deletes the row of a message whose edit fails with Discord code %i, and still fails the edit', async (code) => {
+		const w = world({ rehydratable: true, failEditCode: code });
+		const handle = await w.mount({ to: { channel: 'ch-1' }, rehydrateRef: 'lotto:42' });
+		expect(w.rows.has(handle.messageId)).toBe(true);
+
+		await expect(handle.redraw()).rejects.toThrow('Discord says no');
+		await new Promise((resolve) => setImmediate(resolve));
+
+		expect(w.rows.has(handle.messageId)).toBe(false);
+	});
+
+	it('keeps the row when an edit fails for any other reason', async () => {
+		const w = world({ rehydratable: true, failEditCode: 50013 });
+		const handle = await w.mount({ to: { channel: 'ch-1' }, rehydrateRef: 'lotto:42' });
+
+		await handle.redraw().catch(() => undefined);
+		await new Promise((resolve) => setImmediate(resolve));
+
+		expect(w.rows.has(handle.messageId)).toBe(true);
 	});
 });

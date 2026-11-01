@@ -164,6 +164,16 @@ export interface FlowOptions<TData, TScreens extends string = string> {
 	 */
 	readonly rehydrate?: (ref: string) => TData | undefined | Promise<TData | undefined>;
 	/**
+	 * How long a rehydrate row may sit unused before it is purged, in
+	 * milliseconds; only meaningful with `rehydrate`. A row counts as used
+	 * when it is written, when its session dies by expiry, and when a late
+	 * click revives it. Default: 7 days. A positive number, or `Infinity`
+	 * to keep the row until its session closes (for panels that stay
+	 * clickable for as long as their object lives). A finite value needs a
+	 * rehydrate store with `purge`.
+	 */
+	readonly rehydrateTtlMs?: number;
+	/**
 	 * Marks a display-only flow: a message with nothing to press. A mount
 	 * draws it (a new message or an edit of an existing one) and keeps no
 	 * session, so nothing is held in memory, nothing expires, and no
@@ -211,6 +221,8 @@ export interface FlowDefinition<TData = never> {
 	readonly onError?: (report: ErrorReport) => string | undefined;
 	/** Rehydration hook, carried from `FlowOptions`; absent means no revive. */
 	readonly rehydrate?: (ref: string) => unknown | Promise<unknown>;
+	/** The flow's own `rehydrateTtlMs`; absent when undeclared, which the runtime reads as the default. */
+	readonly rehydrateTtlMs?: number;
 	/** True for a display-only flow: mounts keep no session. */
 	readonly static: boolean;
 }

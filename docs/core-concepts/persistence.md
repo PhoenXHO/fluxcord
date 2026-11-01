@@ -8,21 +8,23 @@ In this chapter, we're adding the missing half. Once your flow declares how to r
 
 fluxcord never touches a database. What it keeps instead is a compact pointer record, a store row, that says which domain object a live message belongs to. The row carries the message ID, channel ID, flow ID, session owner ID, and a reference string (`ref`). The reference string acts as an application-defined key, such as `campfire:main`, pointing to your underlying storage record. The data itself never enters the row; the ref points into your storage, and your flow knows how to follow it.
 
-On the storage side, a single three-method interface serves as the only place where your database meets fluxcord:
+On the storage side, a single small interface serves as the only place where your database meets fluxcord:
 
 ```ts
 interface RehydrateStore {
     put(row: RehydrateRow): Promise<void>;
     get(messageId: string): Promise<RehydrateRow | undefined>;
     delete(messageId: string): Promise<void>;
+    touch?(messageId: string): Promise<void>;
+    purge?(flowId: string, olderThan: Date): Promise<number>;
 }
 ```
 
-fluxcord writes rows at mount time and removes them when a panel closes permanently. Rows persist through session expiration because a subsequent interaction can trigger state restoration. If no store is provided to `createBot`, mounting a flow that declares a `rehydrate` callback throws, and interactions on forgotten panels fall back to parting screens.
+fluxcord writes rows at mount time and removes them when a panel closes permanently. Rows persist through session expiration because a subsequent interaction can trigger state restoration. They do not persist forever; the retention section below covers how old rows leave. If no store is provided to `createBot`, mounting a flow that declares a `rehydrate` callback throws, and interactions on forgotten panels fall back to parting screens.
 
 ## Implementing a file-backed store
 
-Because `RehydrateStore` requires only three methods, implementing a store requires minimal code. Here is a local JSON file store implementation from the example repository:
+`put`, `get` and `delete` are required, so a minimal store takes little code. `touch` and `purge` are the two retention methods, and the example below implements them too. Here is a local JSON file store implementation from the example repository:
 
 ```ts
 // examples/src/rehydrate-store.ts
@@ -31,22 +33,24 @@ import type { RehydrateRow, RehydrateStore } from 'fluxcord';
 
 const ROWS_FILE = 'rehydrate-rows.json';
 
-async function readRows(): Promise<Record<string, RehydrateRow>> {
+type StoredRow = RehydrateRow & { usedAt: number };
+
+async function readRows(): Promise<Record<string, StoredRow>> {
     try {
-        return JSON.parse(await readFile(ROWS_FILE, 'utf8')) as Record<string, RehydrateRow>;
+        return JSON.parse(await readFile(ROWS_FILE, 'utf8')) as Record<string, StoredRow>;
     } catch {
         return {};
     }
 }
 
-async function writeRows(rows: Record<string, RehydrateRow>): Promise<void> {
+async function writeRows(rows: Record<string, StoredRow>): Promise<void> {
     await writeFile(ROWS_FILE, JSON.stringify(rows, null, '\t'));
 }
 
 export const rehydrateStore: RehydrateStore = {
     async put(row) {
         const rows = await readRows();
-        rows[row.messageId] = row;
+        rows[row.messageId] = { ...row, usedAt: Date.now() };
         await writeRows(rows);
     },
     async get(messageId) {
@@ -57,10 +61,43 @@ export const rehydrateStore: RehydrateStore = {
         delete rows[messageId];
         await writeRows(rows);
     },
+    async touch(messageId) {
+        const rows = await readRows();
+        if (rows[messageId] === undefined) return;
+        rows[messageId].usedAt = Date.now();
+        await writeRows(rows);
+    },
+    async purge(flowId, olderThan) {
+        const rows = await readRows();
+        let purged = 0;
+        for (const [messageId, row] of Object.entries(rows)) {
+            if (row.flowId === flowId && row.usedAt < olderThan.getTime()) {
+                delete rows[messageId];
+                purged += 1;
+            }
+        }
+        if (purged > 0) await writeRows(rows);
+        return purged;
+    },
 };
 ```
 
 While our demo relies on local disk, a production bot points that same interface at a real database, and nothing else changes.
+
+## How long rows are kept
+
+A row whose panel is never clicked again would sit in your database forever, so rows have a retention. A row counts as used when it is written, when its session dies by expiry, and when a late click revives the panel. Once a row has gone unused for its flow's `rehydrateTtlMs`, fluxcord asks the store to purge it. The default is seven days.
+
+```tsx
+const campfire = flow<CampfireData>('campfire', {
+    // ...screens, first, rehydrate
+    rehydrateTtlMs: 30 * 24 * 60 * 60 * 1000, // a month
+});
+```
+
+Set `rehydrateTtlMs: Infinity` for a panel that stays clickable for as long as the thing it shows exists; its row is then removed only when its session closes. A finite value needs a store with `purge`, and `createBot` throws at boot if a flow sets one and the store has none. A flow that leaves the default alone on a store without `purge` simply keeps its rows.
+
+fluxcord calls `purge(flowId, olderThan)` once when the sweeper starts and then hourly, once for each rehydratable flow with a finite retention. `touch` is optional: without it, rows age from the moment they were written. Separately, when an edit fails because Discord says the message or its channel is gone, fluxcord deletes that message's row at once, since nothing can click it any more.
 
 ## Defining a rehydratable flow
 

@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Rehydrate retention. A flow with `rehydrate` can set `rehydrateTtlMs`, how long its rows may sit unused before they are purged (default 7 days, `Infinity` keeps a row until its session closes). A row counts as used when it is written, when its session dies by expiry, and when a late click revives the panel. `RehydrateStore` gains two optional methods for this: `touch(messageId)` and `purge(flowId, olderThan)`. The runtime purges once when the sweeper starts and then hourly, and the timer stops with `stopSweeper`. When an edit fails because Discord says the message or its channel is gone (codes 10008 and 10003), the row of that message is deleted at once. A flow that sets a finite `rehydrateTtlMs` on a store without `purge` fails when the runtime is created.
 - Static flows: `flow(name, { static: true, ... })` declares a display-only message. A mount draws it (a new message or an edit of an existing one) and keeps no session, so nothing is held in memory, nothing expires, and no parting or freeze screen can touch the message. A static flow with a control on its screen, a `rehydrateRef`, or any of `ttlMs`, `remount`, `rehydrate`, `onSessionStart` or `onSessionEnd` is refused loudly, and `ui.open` and `event.call` refuse it. Its handle has an empty `sessionId` and a `redraw` and `go` that resolve `false`.
+
+### Changed
+
+- Rehydrate rows no longer live forever by default: a rehydratable flow's rows are purged after 7 days unused, on stores that implement `purge`. Stores without `purge` keep every row, as before. A flow whose panel must stay clickable longer than that sets `rehydrateTtlMs: Infinity`.
 
 ## [0.2.7] - 2026-11-01
 
