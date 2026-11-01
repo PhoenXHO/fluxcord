@@ -112,6 +112,9 @@ export function createCall(options: CallOptions): CallEngine {
 				definition: flow.definition,
 				...(flow.meta !== undefined ? { meta: flow.meta } : {}),
 			});
+			if (token.definition.static) {
+				throw new Error(`event.call: flow '${token.flowId}' is static and keeps no session, so it cannot be called`);
+			}
 			const slot = [...frame.slot, callOptions.as];
 			// The child's bag: the caller's args, else the child's own seed.
 			// Cloned either way, so parent and child never share mutable

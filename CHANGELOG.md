@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Static flows: `flow(name, { static: true, ... })` declares a display-only message. A mount draws it (a new message or an edit of an existing one) and keeps no session, so nothing is held in memory, nothing expires, and no parting or freeze screen can touch the message. A static flow with a control on its screen, a `rehydrateRef`, or any of `ttlMs`, `remount`, `rehydrate`, `onSessionStart` or `onSessionEnd` is refused loudly, and `ui.open` and `event.call` refuse it. Its handle has an empty `sessionId` and a `redraw` and `go` that resolve `false`.
+
 ## [0.2.7] - 2026-11-01
 
 ### Fixed

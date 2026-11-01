@@ -137,8 +137,9 @@ const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  *   session lifecycle hooks.
  * @returns The `Flow` to list in the module manifest's `flows`, or mount
  *   from a command leaf.
- * @throws When the name is not a bare kebab name, or the options fail
- *   {@link defineFlow}'s validation.
+ * @throws When the name is not a bare kebab name, the options fail
+ *   {@link defineFlow}'s validation, or a `static` flow declares session
+ *   hooks.
  */
 export function flow<TData = void, const TScreens extends string = string>(
 	id: string,
@@ -148,9 +149,13 @@ export function flow<TData = void, const TScreens extends string = string>(
 	if (!BARE_NAME.test(id)) {
 		throw new Error(`flow: flow name '${id}' must be a bare kebab name (no '/', ':', '#', '~' or '.'); the loader assembles '<module>/<name>'`);
 	}
+	const definition = defineFlow(options);
+	if (definition.static && (meta?.onSessionStart !== undefined || meta?.onSessionEnd !== undefined)) {
+		throw new Error(`flow: static flow '${id}' keeps no session, so it cannot declare onSessionStart or onSessionEnd`);
+	}
 	return Object.freeze({
 		id,
-		definition: defineFlow(options),
+		definition,
 		...(meta !== undefined ? { meta: Object.freeze({ ...meta }) } : {}),
 	});
 }

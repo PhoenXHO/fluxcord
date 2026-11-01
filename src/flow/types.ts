@@ -163,6 +163,17 @@ export interface FlowOptions<TData, TScreens extends string = string> {
 	 * underlying object is gone: the click gets the parting screen instead.
 	 */
 	readonly rehydrate?: (ref: string) => TData | undefined | Promise<TData | undefined>;
+	/**
+	 * Marks a display-only flow: a message with nothing to press. A mount
+	 * draws it (a new message or an edit of an existing one) and keeps no
+	 * session, so nothing is held in memory, nothing expires, and no
+	 * parting or freeze screen can ever touch the message. A static flow
+	 * has no controls (a mount that renders one throws), cannot be
+	 * rehydrated, and cannot be opened by `ui.open` or `event.call`, which
+	 * need a session. Cannot be combined with `ttlMs`, `remount`,
+	 * `rehydrate`, or the session hooks.
+	 */
+	readonly static?: boolean;
 }
 
 /**
@@ -200,4 +211,6 @@ export interface FlowDefinition<TData = never> {
 	readonly onError?: (report: ErrorReport) => string | undefined;
 	/** Rehydration hook, carried from `FlowOptions`; absent means no revive. */
 	readonly rehydrate?: (ref: string) => unknown | Promise<unknown>;
+	/** True for a display-only flow: mounts keep no session. */
+	readonly static: boolean;
 }

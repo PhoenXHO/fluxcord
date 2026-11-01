@@ -113,6 +113,22 @@ Your flows can also respond directly to termination through `onSessionEnd`, whic
 
 While sliding windows adjust based on user activity, ephemeral messages (`ephemeral: true`) are bound by platform-level interaction limits represented by an unextendable `expiresAt` timestamp. Activity clicks do not extend an ephemeral message's absolute cutoff, and fluxcord ensures all final parting edits complete before this platform limit arrives. This doesn't create any problems when trying to use the `<Expiry>` component, because `expiryEpoch` prioritizes `expiresAt` over the sliding window.
 
+## Messages with nothing to press
+
+Some messages are only announcements: a status line your service posts and later edits, with no buttons on it. A session buys such a message nothing, since there is no click to answer, and a session that never expires only fills memory. Mark the flow `static: true` and a mount draws the message (a new one, or an edit of an existing one through `to: { existing }`) and keeps no session at all.
+
+```tsx
+const announce = flow<{ text: string }>('announce', {
+    screens: { main: screen<{ text: string }>()((data) => <view><text>{data.text}</text></view>) },
+    first: 'main',
+    static: true,
+});
+
+await uiHost().mount(announce, { to: { channel }, ownerId: botId, data: { text: 'Deploy finished.' } });
+```
+
+Because there is no session, nothing sweeps the message and no parting or freeze screen can ever replace it. The flow gives up what only a session can offer. A mount whose screen renders a button or select throws before anything is sent, and so does one that passes a `rehydrateRef`. `ttlMs`, `remount`, `rehydrate`, `onSessionStart` and `onSessionEnd` are refused when the flow is declared, and `ui.open` and `event.call` refuse a static flow. The handle a mount returns has an empty `sessionId`, and its `redraw` and `go` resolve `false`. To change the message later, mount the flow again onto the same message.
+
 ## Running it again
 
 Our final lifetime setting controls what happens when someone invokes the command a second time. By default, fluxcord uses a `replace` policy that automatically closes an invoker's existing sessions whenever they remount the flow, operating on the assumption that someone asking for a fresh menu doesn't want their previous one lingering in the channel. That superseded panel simply freezes as if it were closed normally.

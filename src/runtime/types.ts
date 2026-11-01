@@ -84,6 +84,7 @@ export interface MountOptions {
  * inside-only: ui.exit from a handler.
  */
 export interface MountHandle<TData = unknown> {
+	/** The session's id; empty for a static flow, which keeps none (its `redraw` and `go` resolve false). */
 	readonly sessionId: string;
 	readonly messageId: string;
 	/**

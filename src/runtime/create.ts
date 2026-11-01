@@ -109,6 +109,9 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			if (sender === undefined) {
 				throw new Error('ui.open: this host cannot open an ephemeral panel for the clicker (the bridge has no actorSender, or the click is outside a dispatch)');
 			}
+			if (flow.definition.static) {
+				throw new Error(`ui.open: flow '${flow.id}' is static and keeps no session, so it cannot be opened for the clicker`);
+			}
 			await mount(flow, { to: { reply: sender }, ownerId: actorId, ...(data !== undefined ? { data } : {}) });
 		},
 	});
@@ -301,7 +304,25 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		const materialized = materializeTree(firstTree);
 		const payload = renderV2Message(firstTree, id, `${moduleId}/${first}`, materialized.stampOf);
 
+		// A static flow keeps no session, so a control on it would be dead on
+		// arrival: refuse before anything is sent.
+		if (def.static && Object.keys(materialized.actions).length > 0) {
+			throw new Error(`mount: flow '${flowId}' is static and keeps no session, but its screen '${first}' renders controls (a button or select would find no session to answer)`);
+		}
+
 		const ref = await send(mountOptions.to, payload); // throws -> no session, caller owns the failure
+
+		if (def.static) {
+			// Drawn and done: no store entry, no expiry, no rehydrate row, no
+			// parting or freeze can ever reach this message. The handle has
+			// no session behind it, so redraw and go report "gone".
+			return {
+				sessionId: '',
+				messageId: ref.messageId,
+				redraw: (): Promise<boolean> => Promise.resolve(false),
+				go: (): Promise<boolean> => Promise.resolve(false),
+			};
+		}
 
 		const session = store.create<TData>({
 			id,
