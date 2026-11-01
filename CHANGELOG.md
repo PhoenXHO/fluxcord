@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-11-01
+
+### Fixed
+
+- The command door now passes the actor's roles to the policy engine, so role-based gates (an app's admin privilege, `policy.role`) hold on slash commands. Before, they were evaluated with no roles and always denied; only gates on button clicks saw the roles.
+
 ## [0.2.6] - 2026-10-31
 
 ### Added
