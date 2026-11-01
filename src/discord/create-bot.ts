@@ -38,6 +38,7 @@ import type { RehydrateStore } from '../state/types.js';
 import { createUiRuntime } from '../runtime/create.js';
 import type { MountHandle, MountOptions } from '../runtime/types.js';
 import { deriveCommand } from './derive.js';
+import { memberRoleIds } from './flatten.js';
 import type { DerivedCommand } from './derive.js';
 import { createUiBridge } from './platform.js';
 import type { BridgeLogger } from './platform.js';
@@ -213,9 +214,12 @@ export function createBot(options: CreateBotOptions): Bot {
 		...(options.policy !== undefined ? {
 			// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 			checkDoor: async (flow, gate, interaction) => {
+				// Role-based gates (an app's admin privilege) read the actor's roles.
+				const roles = memberRoleIds(interaction);
 				const flowId = flows.byToken.get(flow)?.flowId ?? flow.id;
 				return policyPort.authorize({
 					actorId: interaction.user.id,
+					...(roles !== undefined ? { actorRoleIds: roles } : {}),
 					...(interaction.guildId !== null ? { guildId: interaction.guildId } : {}),
 					...(interaction.channelId !== null ? { channelId: interaction.channelId } : {}),
 					flowId,

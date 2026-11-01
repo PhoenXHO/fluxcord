@@ -59,20 +59,24 @@ function modalInputs(interaction: ModalSubmitInteraction): Record<string, string
 }
 
 /**
- * The clicker's role IDs, read defensively off the guild member. Plain
- * facts only: which IDs mean admin/mod is the app's snapshot knowledge,
- * never the bridge's. Absent outside guilds or on partial member payloads.
+ * The actor's role IDs, read defensively off the guild member of any
+ * interaction (a click or a slash command). Plain facts only: which IDs mean
+ * admin/mod is the app's snapshot knowledge, never the bridge's. Absent
+ * outside guilds or on member payloads that carry no roles.
  */
-function memberRoleIds(interaction: UiComponentInteraction): string[] | undefined {
-	// The member may be absent, partial (API shape), or fully hydrated:
-	// read defensively so partial payloads and test fakes pass through.
+export function memberRoleIds(interaction: { readonly member: unknown }): string[] | undefined {
+	// The member may be absent, partial (API shape: a plain array of IDs), or
+	// fully hydrated (a role manager with a cache): read defensively so
+	// partial payloads and test fakes pass through.
 	const member = interaction.member as
-		| { roles?: { cache?: { keys: () => Iterable<string> } } }
+		| { roles?: { cache?: { keys: () => Iterable<string> } } | readonly string[] }
 		| string
 		| null
 		| undefined;
 	if (member === null || member === undefined || typeof member === 'string') return undefined;
-	const cache = member.roles?.cache;
+	const roles = member.roles;
+	if (Array.isArray(roles)) return [...roles] as string[];
+	const cache = (roles as { cache?: { keys: () => Iterable<string> } } | undefined)?.cache;
 	// Method call on its receiver: extracting `keys` off the cache would
 	// detach it and lose `this` at call time.
 	return cache === undefined ? undefined : Array.from(cache.keys());
