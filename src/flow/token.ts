@@ -133,7 +133,7 @@ const NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  * registers it. Runs at module load.
  *
  * @param id The flow's kebab name, unique across the app. Prefix it with
- *   its feature when a bare word would collide (`'lotto-panel'`).
+ *   its feature when a bare word would collide (`'staff-tickets'`).
  * @param options Screens, `first`, `initialData` (omit for a stateless
  *   flow), and the optional pieces.
  * @param meta Registration facts: the default policy gate and the
