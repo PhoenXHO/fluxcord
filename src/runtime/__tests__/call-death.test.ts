@@ -21,7 +21,9 @@ import { RemountPolicy } from '../../state/types.js';
 import type { EventTools } from '../../pipeline/types.js';
 import type { Session } from '../../state/types.js';
 import type { FlowDefinition } from '../../flow/types.js';
+import { flow } from '../../flow/token.js';
 import type { Flow, MountToken } from '../../flow/token.js';
+import { text, view } from '../../tree/builders.js';
 
 interface ChildData {
 	n: number;
@@ -29,23 +31,16 @@ interface ChildData {
 
 const MINUTE = 60_000;
 
-/** The flow object handed to call(); only its identity matters here. */
-const CHILD_FLOW = { id: 'mod/child' } as unknown as Flow<unknown, unknown>;
-
-const CHILD_TOKEN: MountToken<ChildData> = {
-	flowId: 'mod/child',
-	moduleId: 'mod',
-	definition: {
-		first: 'child-main',
-		ttlMs: MINUTE,
-		remount: 'coexist',
-		screens: { 'child-main': {} as never },
-	} as unknown as FlowDefinition<ChildData>,
-};
+/** The flow handed to call(): a real flow() declaration, so the registry knows it. */
+const CHILD_FLOW = flow<ChildData>('death-child', {
+	first: 'child-main',
+	ttlMs: MINUTE,
+	remount: 'coexist',
+	screens: { 'child-main': { view: () => view({}, text('child')) } },
+}) as unknown as Flow<unknown, unknown>;
 
 const ROOT_TOKEN: MountToken = {
 	flowId: 'mod/root',
-	moduleId: 'mod',
 	definition: {
 		first: 'root',
 		ttlMs: MINUTE,
@@ -87,7 +82,6 @@ function deathWorld(): {
 	const store = createSessionStore({ now: () => t });
 	const session = store.create<Record<string, unknown>>({
 		flowId: 'mod/root',
-		moduleId: 'mod',
 		ownerId: 'u1',
 		messageRef: { channelId: 'c1', messageId: 'm1' },
 		data: {},
@@ -100,7 +94,6 @@ function deathWorld(): {
 		store,
 		queue: createSessionQueue(),
 		commit: { redraw: async () => undefined },
-		byToken: new Map([[CHILD_FLOW, CHILD_TOKEN as MountToken]]),
 	});
 	const tools: EventTools = {
 		ui: {
@@ -162,7 +155,6 @@ describe('death paths drop pending calls without settling', () => {
 
 		w.store.create({
 			flowId: 'mod/root',
-			moduleId: 'mod',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm2' },
 			data: {},
@@ -185,7 +177,6 @@ describe('death paths drop pending calls without settling', () => {
 		const revived = w.store.create({
 			id: w.session.id,
 			flowId: 'mod/root',
-			moduleId: 'mod',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: {},

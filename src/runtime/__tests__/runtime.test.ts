@@ -22,7 +22,7 @@ import type { MessageRef, RehydrateRow, RehydrateStore } from '../../state/types
 import { button, row, text, view } from '../../tree/builders.js';
 import { flow } from '../../flow/token.js';
 import type { FlowMeta, Flow, SessionEnd } from '../../flow/token.js';
-import { buildFlowCatalog } from '../../boot/build.js';
+import { resetFlowRegistry } from '../../flow/registry.js';
 import { createUiRuntime, DEFAULT_SWEEP_INTERVAL_MS, PURGE_INTERVAL_MS } from '../create.js';
 import type { MountHandle, MountTarget, UiRuntime } from '../types.js';
 
@@ -126,6 +126,7 @@ function world(options: {
 
 	// The stateless cast is the fixture's erase: the bare view reads no
 	// data, so nothing type-dependent runs under the PanelData label.
+	resetFlowRegistry();
 	const panelFlow: Flow<PanelData> = (options.stateless === true
 		? flow('bare', {
 			screens: { main: { view: () => view({}, text('bare panel')) } },
@@ -214,7 +215,6 @@ function world(options: {
 		platform,
 		sendToChannel,
 		policy,
-		flows: buildFlowCatalog([{ module: 'panel', flow: panelFlow }]),
 		...(options.noRehydrateStore === true ? {} : { rehydrate: rehydrateStore }),
 		...(options.defaultParting !== undefined ? { defaultParting: options.defaultParting } : {}),
 		now: () => clock.now,
@@ -234,7 +234,7 @@ function world(options: {
 	async function click(sessionId: string, messageId: string, overrides: Partial<IncomingEvent> = {}): Promise<void> {
 		await runtime.dispatch({
 			kind: EventKind.Button,
-			customId: encodeActionId({ sessionId, screenKey: `panel/${panelFlow.id}/main`, actionHash: actionHash(handler) }),
+			customId: encodeActionId({ sessionId, screenKey: `${panelFlow.id}/main`, actionHash: actionHash(handler) }),
 			actorId: OWNER_ID,
 			channelId: CHANNEL_ID,
 			messageId,
@@ -515,7 +515,7 @@ describe('mount - rehydrate pairing (loud in every direction)', () => {
 		expect(w.rows.get(handle.messageId)).toEqual({
 			messageId: handle.messageId,
 			channelId: 'ch-2',
-			flowId: 'panel/host',
+			flowId: 'host',
 			ref: 'lotto:42',
 			ownerId: OWNER_ID,
 		});
@@ -653,7 +653,7 @@ describe('session lifecycle hooks', () => {
 		expect(ends).toEqual([{
 			sessionId: first.sessionId,
 			messageId: first.messageId,
-			flowId: 'panel/host',
+			flowId: 'host',
 			reason: EndReason.Close,
 		}]);
 	});
@@ -678,7 +678,7 @@ describe('session lifecycle hooks', () => {
 			expect(ends).toEqual([{
 				sessionId: handle.sessionId,
 				messageId: handle.messageId,
-				flowId: 'panel/host',
+				flowId: 'host',
 				reason: EndReason.Expire,
 			}]);
 		} finally {
@@ -915,12 +915,12 @@ describe('rehydrate retention', () => {
 		vi.useFakeTimers();
 		try {
 			w.runtime.startSweeper(DEFAULT_SWEEP_INTERVAL_MS);
-			expect(w.purged).toEqual([{ flowId: 'panel/host', olderThan: new Date(w.clock.now - 7 * DAY) }]);
+			expect(w.purged).toEqual([{ flowId: 'host', olderThan: new Date(w.clock.now - 7 * DAY) }]);
 
 			w.clock.advance(60 * MINUTE);
 			await vi.advanceTimersByTimeAsync(PURGE_INTERVAL_MS);
 			expect(w.purged).toHaveLength(2);
-			expect(w.purged[1]).toEqual({ flowId: 'panel/host', olderThan: new Date(w.clock.now - 7 * DAY) });
+			expect(w.purged[1]).toEqual({ flowId: 'host', olderThan: new Date(w.clock.now - 7 * DAY) });
 		} finally {
 			w.runtime.stopSweeper();
 			vi.useRealTimers();
@@ -942,7 +942,7 @@ describe('rehydrate retention', () => {
 			vi.useRealTimers();
 		}
 
-		expect(short.purged[0]).toEqual({ flowId: 'panel/host', olderThan: new Date(short.clock.now - 2 * DAY) });
+		expect(short.purged[0]).toEqual({ flowId: 'host', olderThan: new Date(short.clock.now - 2 * DAY) });
 		expect(forever.purged).toEqual([]);
 	});
 

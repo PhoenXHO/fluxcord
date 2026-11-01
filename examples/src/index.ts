@@ -19,8 +19,6 @@ const bot = createBot({
 		{ name: 'counter', commands: [counterCommand] },
 		{ name: 'dice', commands: [diceCommand] },
 		{ name: 'order', commands: [orderCommand] },
-		// The campfire has no command: it mounts below, once, on boot.
-		{ name: 'campfire', flows: [campfireFlow] },
 		{ name: 'monitor', commands: [monitorCommand] },
 		{ name: 'staff', commands: [staffCommand] },
 		{ name: 'timer', commands: [timerCommand] },

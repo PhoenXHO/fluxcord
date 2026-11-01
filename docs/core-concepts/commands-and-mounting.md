@@ -161,16 +161,15 @@ export const pollCommand = command('poll', 'Start a poll in this channel', {
 
 Command specifications also support a `devOnly` flag to designate development utilities. The default host keeps these commands out of the public registration. When `createBot` is given a `devGuildId` (or the `DISCORD_DEV_GUILD_ID` environment variable is set), dev-only commands register only in that guild. Without a dev guild, they are dropped. A custom host reads the `devOnly` fact inside its `registerCommands` callback (see [Hosting and commands](../getting-started/hosting-and-commands.md) for details).
 
-## Flow catalog registration
+## Flows that no command mounts
 
-When you have flows that aren't mounted by any command, your module can register them directly using its optional `flows` field. Those flows connect to programmatic doors such as `bot.mount`, which opens a panel wherever your custom logic decides one should appear, as described in [Live panels](live-panels.md). The field is for doors only: a flow called from another flow of the same module needs no entry at all, because the call carries the module identity with it. The example bot's campfire is the door shape: the module lists the flow, and `main` opens the panel once on boot:
+Declaring a flow with `flow()` registers it, so a flow that no command mounts needs no listing anywhere. Such a flow connects to programmatic doors such as `bot.mount`, which opens a panel wherever your custom logic decides one should appear, as described in [Live panels](live-panels.md). A flow called from another flow needs no entry either. The example bot's campfire is the door shape: nothing lists it, and `main` opens the panel once on boot:
 
 ```tsx
 // examples/src/index.ts
 const bot = createBot({
     modules: [
         // ...the command-driven modules...
-        { name: 'campfire', flows: [campfireFlow] },
     ],
 });
 
@@ -191,13 +190,13 @@ async function main(): Promise<void> {
 }
 ```
 
-Regardless of whether a flow is mounted or listed, it must have exactly one home; declaring multiple doors to the same flow triggers a startup error:
+A flow's name is its identifier everywhere: on its buttons, in its rehydrate rows, in the policy engine's requests. That makes names global across the app, and a second flow with the same name fails at its declaration:
 
 ```text
-Module 'staff' registers flow 'tickets' twice: once in flows and once mounted by a command. Pick one home.
+flow: the name 'tickets' is already declared by another flow; flow names are global, so give one of them a distinct name
 ```
 
-Naming collisions get their own guard: fluxcord derives each flow's full identifier by joining the module name and authored id into paths like `staff/tickets`, and if two registrations attempt to share that identifier, boot terminates with `buildFlowCatalog: flow id 'staff/tickets' is declared twice`.
+When a bare word is likely to collide, prefix it with its feature, as in `staff-tickets`. If one flow is mounted by several commands, the first command declared supplies its default parting hint.
 
 ## Session ownership
 

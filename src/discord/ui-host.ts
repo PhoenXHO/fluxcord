@@ -25,8 +25,7 @@ export interface UiHost {
 	/**
 	 * The command door: answers whether this interaction may mount this
 	 * flow at all, from the invocation's identity and the leaf's gate.
-	 * Wired by the composition root from the policy port and the boot
-	 * catalog; absent when the host declared no policy option (nothing
+	 * Wired by the composition root from the policy port; absent when the host declared no policy option (nothing
 	 * gated, nothing asked).
 	 */
 	checkDoor?(flow: Flow<unknown>, gate: Policy, interaction: ChatInputCommandInteraction): Promise<PolicyDecision>;

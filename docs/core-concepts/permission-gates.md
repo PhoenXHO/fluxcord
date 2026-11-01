@@ -93,7 +93,7 @@ const seeKeepers = action<CampfireData>()(async e => {
 });
 ```
 
-`ui.reply` sends an ephemeral message with a static view. The view takes no buttons or selects, because nothing would listen for the click, and it throws a `RenderError` before anything is sent. `ui.open` mounts a flow as an ephemeral panel owned by the clicker, so `policy.owner()` inside that flow means them and not the member who started the shared panel. The new flow must be listed in its module's manifest flows, and it cannot rehydrate. Neither verb touches the shared message: the handler's own `mutate` still redraws it, and the clicker's answer arrives separately.
+`ui.reply` sends an ephemeral message with a static view. The view takes no buttons or selects, because nothing would listen for the click, and it throws a `RenderError` before anything is sent. `ui.open` mounts a flow as an ephemeral panel owned by the clicker, so `policy.owner()` inside that flow means them and not the member who started the shared panel. The new flow cannot rehydrate. Neither verb touches the shared message: the handler's own `mutate` still redraws it, and the clicker's answer arrives separately.
 
 Both ride the click's own interaction. An unanswered click is answered by the reply itself, and a click the framework already acknowledged (a slow handler, a parked call) takes a follow-up instead. A host with a custom bridge supplies `sendToActor` and `actorSender`; without them the verbs throw an error that says so.
 

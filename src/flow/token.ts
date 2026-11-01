@@ -2,11 +2,13 @@
  * Flows: a flow's id and registration facts, attached to its
  * declaration.
  *
- * `flow('<name>', options, meta?)` authors the id bare, right where the
- * flow lives: one declaration, at the thing it names. No registry entry,
- * no module prefix to keep honest. The loader owns module identity; it
- * assembles `'<module>/<name>'` into the runtime `MountToken` at boot,
- * so the prefix is derived, never hand-typed.
+ * `flow('<name>', options, meta?)` authors the id right where the flow
+ * lives: one declaration, at the thing it names. The call registers the
+ * flow, so there is no list to keep in step with it: a flow that exists is
+ * a flow the runtime can mount, call and revive. Names are global across
+ * the app, and a second flow with the same name throws at its declaration.
+ * `flow()` is the only way to make a `Flow`; the runtime refuses an object
+ * it did not register.
  *
  * The second argument is the plain `FlowOptions` shape (screens, first,
  * components). `flow` runs it through {@link defineFlow} and keeps the
@@ -29,6 +31,7 @@ import type { Policy } from '../pipeline/types.js';
 import type { EndReason } from '../state/types.js';
 import type { MountHandle } from '../runtime/types.js';
 import { defineFlow } from './define.js';
+import { registerFlow } from './registry.js';
 import type { FlowDefinition, FlowOptions } from './types.js';
 
 /** What a death hands the flow's `onSessionEnd` hook: identity plus cause. */
@@ -81,9 +84,9 @@ export interface FlowMeta<TData = unknown> {
 }
 
 /**
- * A flow as authored: its bare name plus its definition. Modules export
- * these as constants and list them in their manifest's `flows` field, or a
- * `command`'s leaf mounts one.
+ * A flow as authored: its name plus its definition. Modules export these
+ * as constants; a `command`'s leaf mounts one, or the host mounts it
+ * directly. Only `flow()` makes them.
  *
  * The second type parameter is the flow's exit value: what a caller's
  * `event.call(flow, ...)` resolves with. It defaults to void (a flow that
@@ -92,7 +95,9 @@ export interface FlowMeta<TData = unknown> {
  * annotates its constant with the pair.
  */
 export interface Flow<TData = never, TExit = void> {
-	/** The flow's name within its module: the only id the author writes. */
+	/** Marks the object as made by `flow()`; a literal that fakes it is still refused, since the runtime only mounts flows it registered. */
+	readonly flowMark: true;
+	/** The flow's name: the only id the author writes, and the id on its buttons and rehydrate rows. Unique across the app. */
 	readonly id: string;
 	/** The built definition: `screens`, `initialData`, ttl and the rest. */
 	readonly definition: FlowDefinition<TData>;
@@ -103,59 +108,64 @@ export interface Flow<TData = never, TExit = void> {
 }
 
 /**
- * A flow as registered: the loader-assembled runtime twin of a
- * `Flow`. `flowId` is `'<moduleId>/<name>'`; sessions, wire ids and
- * the revive path key off it.
+ * A flow as registered: the runtime twin of a `Flow`, made by `flow()`.
+ * `flowId` is the flow's name; sessions, wire ids and the revive path key
+ * off it.
  */
 export interface MountToken<TData = never> {
-	/** `'<moduleId>/<name>'`, assembled by the boot catalog; never authored. */
+	/** The flow's name, as authored. */
 	readonly flowId: string;
-	/** The `flowId`'s module prefix: the namespace its screens register under. */
-	readonly moduleId: string;
 	readonly definition: FlowDefinition<TData>;
 	/** The flow's registration facts (policy, session hooks), carried as-is. */
 	readonly meta?: FlowMeta;
 	/**
-	 * The mounting command's invocation path, when a command leaf
-	 * contributed this flow: the default parting hint. Absent for
-	 * manifest-registered flows.
+	 * The mounting command's invocation path, when a command leaf mounts
+	 * this flow: the default parting hint. Set once, by `command()`, when
+	 * the command is declared; absent for a flow the host mounts directly.
 	 */
-	readonly commandHint?: string;
+	commandHint?: string;
 }
 
-const BARE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+const NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 /**
- * Declares a flow: bare name, options, and optional registration facts.
- * Pure; runs at module load.
+ * Declares a flow: name, options, and optional registration facts, and
+ * registers it. Runs at module load.
  *
- * @param id The flow's bare kebab name within its module; the loader
- *   assembles `'<module>/<name>'` from it.
+ * @param id The flow's kebab name, unique across the app. Prefix it with
+ *   its feature when a bare word would collide (`'lotto-panel'`).
  * @param options Screens, `first`, `initialData` (omit for a stateless
  *   flow), and the optional pieces.
  * @param meta Registration facts: the default policy gate and the
  *   session lifecycle hooks.
- * @returns The `Flow` to list in the module manifest's `flows`, or mount
- *   from a command leaf.
- * @throws When the name is not a bare kebab name, the options fail
- *   {@link defineFlow}'s validation, or a `static` flow declares session
- *   hooks.
+ * @returns The `Flow`, to mount from a command leaf or from the host.
+ * @throws When the name is not a kebab name or is already declared, the
+ *   options fail {@link defineFlow}'s validation, or a `static` flow
+ *   declares session hooks.
  */
 export function flow<TData = void, const TScreens extends string = string>(
 	id: string,
 	options: FlowOptions<TData, TScreens>,
 	meta?: FlowMeta<TData>,
 ): Flow<TData> {
-	if (!BARE_NAME.test(id)) {
-		throw new Error(`flow: flow name '${id}' must be a bare kebab name (no '/', ':', '#', '~' or '.'); the loader assembles '<module>/<name>'`);
+	if (!NAME.test(id)) {
+		throw new Error(`flow: flow name '${id}' must be a kebab name (lowercase words joined by '-'; no '/', ':', '#', '~' or '.')`);
 	}
 	const definition = defineFlow(options);
 	if (definition.static && (meta?.onSessionStart !== undefined || meta?.onSessionEnd !== undefined)) {
 		throw new Error(`flow: static flow '${id}' keeps no session, so it cannot declare onSessionStart or onSessionEnd`);
 	}
-	return Object.freeze({
+	const frozenMeta = meta !== undefined ? Object.freeze({ ...meta }) : undefined;
+	const declared: Flow<TData> = Object.freeze({
+		flowMark: true as const,
 		id,
 		definition,
-		...(meta !== undefined ? { meta: Object.freeze({ ...meta }) } : {}),
+		...(frozenMeta !== undefined ? { meta: frozenMeta } : {}),
 	});
+	registerFlow(declared as Flow, {
+		flowId: id,
+		definition: definition as FlowDefinition,
+		...(frozenMeta !== undefined ? { meta: frozenMeta as FlowMeta } : {}),
+	});
+	return declared;
 }

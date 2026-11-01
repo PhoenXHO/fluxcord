@@ -16,6 +16,7 @@
  * @module command/declare
  */
 
+import { setCommandHint } from '../flow/registry.js';
 import type { Flow } from '../flow/token.js';
 import type { Policy } from '../pipeline/types.js';
 import type { MountHandle } from '../runtime/types.js';
@@ -155,8 +156,9 @@ export interface Command {
 
 /**
  * Declares a slash command that mounts flows. Pure; runs at module load.
- * The loader derives the platform BotCommand from the command and harvests
- * each leaf's flow into the boot catalog.
+ * The loader derives the platform BotCommand from the command, and each
+ * leaf's flow learns the command line that mounts it (its default parting
+ * hint).
  */
 export function command(name: string, description: string, spec: CommandSpec): Command {
 	if (!BARE_NAME.test(name)) {
@@ -187,6 +189,7 @@ export function command(name: string, description: string, spec: CommandSpec): C
 	for (const { leaf, commandHint } of commandLeaves({ name, description, spec })) {
 		if (leaf.args !== undefined) validateArgs(commandHint, leaf.args);
 		validateMountHooks(commandHint, leaf);
+		setCommandHint(leaf.flow, commandHint);
 	}
 	return Object.freeze({ name, description, spec: Object.freeze(spec) });
 }
@@ -211,8 +214,8 @@ export interface CommandLeaf {
 	readonly leaf: MountLeaf;
 	/**
 	 * How the command line invokes this leaf: the bare command name, or
-	 * '<command> <subcommand>'. The boot catalog carries it as the flow's
-	 * default parting hint.
+	 * '<command> <subcommand>'. The flow carries it as its default parting
+	 * hint.
 	 */
 	readonly commandHint: string;
 }

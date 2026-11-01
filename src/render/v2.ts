@@ -423,7 +423,7 @@ function countComponents(components: readonly { type: number; components?: reado
  *
  * @param view The validated view to render.
  * @param sessionId The live session this draw belongs to.
- * @param screenKey The registry key of the screen being drawn, `'<moduleId>/<screenId>'`.
+ * @param screenKey The registry key of the screen being drawn, `'<flowId>/<screenId>'`.
  * @param stampOf The stamp lookup `materializeTree` built for this draw.
  * @returns The message body: the V2 flag plus the component tree.
  * @throws `RenderError` when the root is not a view or any platform limit breaks.

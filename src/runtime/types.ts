@@ -11,7 +11,6 @@
 import type { V2MessagePayload } from '../render/v2.js';
 import type { MessageRef, RehydrateStore, Session } from '../state/types.js';
 import type { BridgePort, ErrorHandler, IncomingEvent, PartingOptions, PolicyPort } from '../pipeline/types.js';
-import type { FlowCatalog } from '../boot/build.js';
 import type { Flow } from '../flow/token.js';
 
 /**
@@ -112,8 +111,6 @@ export interface RuntimeOptions {
 	readonly sendToChannel: (channelId: string, payload: V2MessagePayload) => Promise<MessageRef>;
 	/** The injected permission seam: one authorize question per delivered event. */
 	readonly policy: PolicyPort;
-	/** The boot-built flow catalog (loader-side registration; immutable from here on). */
-	readonly flows: FlowCatalog;
 	/** Backs rehydration; omit and rehydratable flows fail loudly at mount. */
 	readonly rehydrate?: RehydrateStore;
 	/**
@@ -140,7 +137,7 @@ export interface UiRuntime {
 	/**
 	 * Opens a session: renders the flow's first screen, sends it to the
 	 * target, creates the session. Rejects when the send fails (no session
-	 * was born) or the flow is not in the boot catalog.
+	 * was born) or the object is not a flow made by `flow()`.
 	 */
 	mount<TData>(flow: Flow<TData>, options: MountOptions): Promise<MountHandle<TData>>;
 	/** The dispatch core: the bridge feeds it one IncomingEvent per interaction. */

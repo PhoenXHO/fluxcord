@@ -20,6 +20,7 @@
 
 import type { Flow } from '../flow/token.js';
 import { entryScreen } from '../flow/define.js';
+import { flowIndex, flowTokens, tokenOf } from '../flow/registry.js';
 import { viewOf } from '../commit/commit.js';
 import { createCommit } from '../commit/commit.js';
 import { createMakeUi } from '../commit/ui.js';
@@ -49,8 +50,8 @@ export const PURGE_INTERVAL_MS = 60 * 60 * 1000;
  * Assembles the runtime: store, queue, commit phase, dispatch, mount and
  * the sweeper, wired over the ports the host supplies.
  *
- * @param options The platform ports, the boot-built flow catalog and the
- *   optional rehydrate store, error unit and clock.
+ * @param options The platform ports and the optional rehydrate store,
+ *   error unit and clock.
  * @returns The runtime: mount, dispatch, startSweeper, stopSweeper.
  */
 export function createUiRuntime(options: RuntimeOptions): UiRuntime {
@@ -107,7 +108,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 			// allowed to break the death path it rides (store.end is sync).
 			onSessionEnd: (session, reason) => {
 				// The root frame carries the flow's token: the hook resolves from
-				// the dying session itself, no catalog lookup.
+				// the dying session itself, no registry lookup.
 				const hook = session.frames[0].token.meta?.onSessionEnd;
 				if (hook === undefined) return;
 				try {
@@ -124,7 +125,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	});
 	// The call engine needs store, queue and commit; the toolkit needs the
 	// engine's exit seam. Order is fixed by those edges.
-	const callEngine = createCall({ store, queue, commit, byToken: options.flows.byToken, ack: bridge.ack });
+	const callEngine = createCall({ store, queue, commit, ack: bridge.ack });
 	const makeUi = createMakeUi({
 		exit: callEngine.exit,
 		// ui.open: the flow mounts on the clicker's own ephemeral reply, owned
@@ -189,7 +190,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		if (store_ === undefined) return undefined;
 		const row = await store_.get(messageId);
 		if (row === undefined) return undefined;
-		const token = options.flows.byFlowId.get(row.flowId);
+		const token = flowIndex.get(row.flowId);
 		if (token === undefined) return undefined;
 		// The old message yields when a live successor of the same flow is
 		// owned by the row's owner. That is a replace-flow rule: a coexist
@@ -207,7 +208,6 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		return store.create({
 			id: sessionId,
 			flowId: row.flowId,
-			moduleId: token.moduleId,
 			ownerId: row.ownerId,
 			messageRef: { channelId: row.channelId, messageId: row.messageId },
 			data,
@@ -223,7 +223,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		store,
 		policy: options.policy,
 		platform,
-		reviveIndex: options.flows.byFlowId,
+		reviveIndex: flowIndex,
 		tryRevive,
 		makeUi,
 		call: callEngine,
@@ -235,14 +235,13 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 	});
 
 	async function mount<TData>(flow: Flow<TData>, mountOptions: MountOptions): Promise<MountHandle<TData>> {
-		// The authored flow resolves to its assembled twin; a flow the boot
-		// catalog doesn't know is a manifest gap, not a runtime state.
-		const registered = options.flows.byToken.get(flow);
+		// The authored flow resolves to its registered twin; an object that
+		// flow() did not make is refused.
+		const registered = tokenOf(flow);
 		if (registered === undefined) {
-			throw new Error(`mount: flow '${flow.id}' is not in the boot catalog, list it in its module's manifest flows`);
+			throw new Error(`mount: '${flow.id}' is not a flow made by flow()`);
 		}
 		const flowId = registered.flowId;
-		const moduleId = registered.moduleId;
 		const def = flow.definition;
 		// Rehydration pairing: loud in every miswired direction.
 		if (def.rehydrate !== undefined) {
@@ -300,7 +299,6 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		const draft: Session<TData> = {
 			id,
 			flowId,
-			moduleId,
 			ownerId: mountOptions.ownerId,
 			messageRef: { channelId: 'pending', messageId: 'pending' },
 			createdAt: at,
@@ -313,7 +311,6 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 				{
 					id: generateId(),
 					flowId,
-					moduleId,
 					screen: first,
 					history: [],
 					modalNonce: generateId(),
@@ -332,7 +329,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		};
 		const firstTree = viewOf(draft);
 		const materialized = materializeTree(firstTree);
-		const payload = renderV2Message(firstTree, id, `${moduleId}/${first}`, materialized.stampOf);
+		const payload = renderV2Message(firstTree, id, `${flowId}/${first}`, materialized.stampOf);
 
 		// A static flow keeps no session, so a control on it would be dead on
 		// arrival: refuse before anything is sent.
@@ -357,7 +354,6 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 		const session = store.create<TData>({
 			id,
 			flowId,
-			moduleId,
 			ownerId: mountOptions.ownerId,
 			messageRef: ref,
 			data,
@@ -441,7 +437,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 
 	/** How long each flow's rehydrate rows may sit unused: its own `rehydrateTtlMs`, else the default when the store can purge. */
 	const retention = new Map<string, number>();
-	for (const token of options.flows.tokens) {
+	for (const token of flowTokens()) {
 		const { rehydrate, rehydrateTtlMs } = token.definition;
 		if (rehydrate === undefined) continue;
 		if (rehydrateTtlMs !== undefined && Number.isFinite(rehydrateTtlMs) && options.rehydrate?.purge === undefined) {

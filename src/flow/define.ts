@@ -2,7 +2,7 @@
  * The flow definition.
  *
  * Pure: runs once at module load, returns a frozen `FlowDefinition`,
- * touches no registry (registration is the manifest loader's job). The
+ * touches no registry (`flow()` registers the flow around it). The
  * shape it builds:
  *
  * ```plaintext

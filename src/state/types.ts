@@ -78,7 +78,6 @@ export type EndReason = (typeof EndReason)[keyof typeof EndReason];
 export interface FlowFrame {
 	readonly id: string;
 	readonly flowId: string;
-	readonly moduleId: string;
 	/** The current screen (a view id). */
 	screen: string;
 	/** The back trail: screens stacked by `push`, oldest first. The current screen is not in it (it lives in `screen`), and `back` pops the newest entry. */
@@ -161,7 +160,6 @@ export function activeFrame(session: Session<unknown>): FlowFrame {
 export interface Session<TData> {
 	readonly id: string;
 	readonly flowId: string;
-	readonly moduleId: string;
 	/** Discord ID of the user who invoked the flow. */
 	readonly ownerId: string;
 	readonly messageRef: MessageRef;
@@ -220,7 +218,6 @@ export interface CreateSessionInput<TData> {
 	 */
 	readonly id?: string;
 	readonly flowId: string;
-	readonly moduleId: string;
 	readonly ownerId: string;
 	readonly messageRef: MessageRef;
 	/** Seeds the flow's shared data object. */

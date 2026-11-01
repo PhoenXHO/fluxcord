@@ -23,7 +23,7 @@ import { DEFAULT_ERROR_MESSAGE, createDispatch } from '../../pipeline/dispatch.j
 import { createSessionQueue } from '../../pipeline/queue.js';
 import { EventKind } from '../../pipeline/types.js';
 import { createCall } from '../../runtime/call.js';
-import { buildFlowCatalog } from '../../boot/build.js';
+import { flowIndex, resetFlowRegistry, tokenById } from '../../flow/registry.js';
 import { flow } from '../../flow/token.js';
 import type {
 	ActionEvent,
@@ -116,12 +116,12 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 			row({}, button({ onClick: handler, label: 'Join' }), button({ onClick: handler, label: 'Open modal' })),
 		);
 	};
-	const lotto = flow<LottoData>('lotto', {
+	resetFlowRegistry();
+	flow<LottoData>('lotto', {
 		first: 'main',
 		screens: { main: { view: mainView }, confirm: { view: confirmView } },
 	});
-	const catalog = buildFlowCatalog([{ module: 'lotto', flow: lotto }]);
-	const token = catalog.byFlowId.get('lotto/lotto')!;
+	const token = tokenById('lotto')!;
 
 	const rows = new Map<string, RehydrateRow>();
 	const rehydrateStore: RehydrateStore = {
@@ -161,14 +161,13 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		store,
 		queue,
 		commit: { redraw: commit.redraw },
-		byToken: new Map(),
 	});
 
 	const dispatch = createDispatch({
 		store,
 		policy,
 		platform,
-		reviveIndex: catalog.byFlowId,
+		reviveIndex: flowIndex,
 		tryRevive: async (): Promise<Session<unknown> | undefined> => undefined,
 		makeUi: createMakeUi({ exit: call.exit, open: async () => undefined }),
 		call,
@@ -184,8 +183,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 	});
 
 	const session = store.create<LottoData>({
-		flowId: 'lotto/lotto',
-		moduleId: 'lotto',
+		flowId: 'lotto',
 		ownerId: OWNER_ID,
 		messageRef: { channelId: CHANNEL_ID, messageId: MESSAGE_ID },
 		data: { tickets: 3 },
@@ -196,7 +194,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 		...(overrides.rehydrate !== undefined ? { rehydrate: overrides.rehydrate } : {}),
 	});
 	if (overrides.rehydrate !== undefined) {
-		rows.set(MESSAGE_ID, { messageId: MESSAGE_ID, channelId: CHANNEL_ID, ownerId: OWNER_ID, flowId: 'lotto/lotto', ref: overrides.rehydrate.ref });
+		rows.set(MESSAGE_ID, { messageId: MESSAGE_ID, channelId: CHANNEL_ID, ownerId: OWNER_ID, flowId: 'lotto', ref: overrides.rehydrate.ref });
 	}
 	// The action map a real draw of 'main' would have written: two
 	// buttons, one shared handler. Tests that change what the message
@@ -211,7 +209,7 @@ function world(overrides: { rehydrate?: { ref: string }; captureErrors?: boolean
 	function click(clickOverrides: Partial<IncomingEvent> = {}): Promise<void> {
 		return dispatch({
 			kind: EventKind.Button,
-			customId: encodeActionId({ sessionId: session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(handler) }),
+			customId: encodeActionId({ sessionId: session.id, screenKey: 'lotto/main', actionHash: actionHash(handler) }),
 			actorId: OWNER_ID,
 			channelId: CHANNEL_ID,
 			messageId: MESSAGE_ID,
@@ -447,7 +445,7 @@ describe('modals (event-based, E1)', () => {
 		await w.click();
 
 		expect(w.modals).toHaveLength(1);
-		const clickId = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(w.handler) });
+		const clickId = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(w.handler) });
 		expect(w.modals[0].custom_id).toBe(`${clickId}~${activeFrame(w.session).modalNonce}`);
 		// A modal-open still counts as an event: exactly one redraw.
 		expect(w.edits).toHaveLength(1);

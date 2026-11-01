@@ -170,12 +170,11 @@ const bot = createBot({
     rehydrate: rehydrateStore,
     modules: [
         // ...every module from earlier chapters...
-        { name: 'campfire', flows: [campfireFlow] },
     ],
 });
 ```
 
-The campfire is not something a user summons, so its module registers the flow without an attached command. Instead, we mount it once on boot via `bot.mount`, supplying the target channel and the ref it should track:
+The campfire is not something a user summons, so no command mounts it, and declaring the flow with `flow()` is all the registration it needs. Instead, we mount it once on boot via `bot.mount`, supplying the target channel and the ref it should track:
 
 ```ts
 async function main(): Promise<void> {

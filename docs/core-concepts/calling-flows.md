@@ -156,6 +156,6 @@ const openDelivery = action<OrderData>()(async e => {
 
 Uncaught, the rejection cascades one frame per level until the root reports it as an ordinary handler failure. If the session dies while a call is parked, the parked call is dropped without settling, so the parent's handler never resumes; a revived session restarts at the root's first screen. Restart dropping in-flight calls is the deliberate trade.
 
-## Listing called flows
+## Registering called flows
 
-A flow another flow calls needs no listing at all when the call stays inside one module: the caller's frame names the module, so the child's identity assembles at call time. The manifest's `flows` field is for doors only, meaning flows the host mounts itself or flows another module's flows call. The old advice of writing called flows with `defineFlow` is gone with the plug system, since a definition without a token is a definition nobody can call. You can read [Commands and mounting](commands-and-mounting.md) for how `command('order', ...)` delivers the flow with a mount.
+A flow another flow calls needs no listing at all: declaring a flow with `flow()` registers it, so any flow can call any other flow it imports. Write called flows with `flow()` and not `defineFlow`, since a bare definition is not registered and `event.call` refuses it. You can read [Commands and mounting](commands-and-mounting.md) for how `command('order', ...)` delivers the flow with a mount.

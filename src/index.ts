@@ -3,7 +3,7 @@
  *
  * Everything a bot needs except the platform itself: the authoring
  * factories (flow, screen, subview, action, command), the host
- * assembly API (buildFlowCatalog, createUiRuntime), and the seam
+ * assembly API (createUiRuntime, coverageScan), and the seam
  * vocabulary (events, policies, payloads). The Discord binding lives
  * behind the 'fluxcord/discord' entry; TSX compiles against
  * 'fluxcord/jsx-runtime'.
@@ -19,11 +19,10 @@ export * from './flow/types.js'; // Screen, FlowOptions, FlowDefinition
 export * from './pipeline/action.js'; // action
 export * from './command/args.js'; // arg, ArgValues, validateArgs
 export * from './command/declare.js'; // command, mounts, Command
-export * from './command/harvest.js'; // moduleFlowRegistrations, FlowSourceModule
+export { resetFlowRegistry } from './flow/registry.js'; // tests that declare flows of the same name in several cases
 export * from './flow/expiry.js'; // expiryEpoch, Expiry
 
 // Host assembly: what the composition root writes.
-export * from './boot/build.js'; // buildFlowCatalog, FlowCatalog, FlowRegistration
 export * from './boot/scan.js'; // coverageScan
 export * from './runtime/create.js'; // createUiRuntime
 export * from './runtime/types.js'; // UiRuntime, RuntimeOptions, MountTarget

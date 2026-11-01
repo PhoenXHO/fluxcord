@@ -193,7 +193,6 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 			const session: Session<TData> = {
 				id,
 				flowId: input.flowId,
-				moduleId: input.moduleId,
 				ownerId: input.ownerId,
 				messageRef: input.messageRef,
 				createdAt: at,
@@ -206,7 +205,6 @@ export function createSessionStore(options: SessionStoreOptions = {}): SessionSt
 					{
 						id: generateId(),
 						flowId: input.flowId,
-						moduleId: input.moduleId,
 						screen: input.screen,
 						history: [],
 						modalNonce: generateId(),

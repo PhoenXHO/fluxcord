@@ -2,7 +2,7 @@
  * createBot: the one-call host.
  *
  * The whole boot a Discord host writes by hand, collapsed into one
- * function: the client, the bridge, the flow catalog, the runtime, the
+ * function: the client, the bridge, the runtime, the
  * UI host wiring, command registration and the interaction listener.
  * What comes back is the small surface an app can still want afterwards:
  * `start` (login), the raw `client` (for listeners fluxcord does not
@@ -24,10 +24,7 @@
 
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import type { Interaction } from 'discord.js';
-import { buildFlowCatalog } from '../boot/build.js';
-import type { FlowCatalog } from '../boot/build.js';
-import { moduleFlowRegistrations } from '../command/harvest.js';
-import type { FlowSourceModule } from '../command/harvest.js';
+import type { Command } from '../command/declare.js';
 import type { Flow } from '../flow/token.js';
 import { defaultOnError } from '../pipeline/dispatch.js';
 import { createDefaultPolicyEngine, isPolicyPort } from '../pipeline/policy.js';
@@ -57,10 +54,16 @@ export interface CommandRegistration {
 	readonly command: DerivedCommand;
 }
 
+/** The module fields createBot reads: a name to pair commands with, and the commands. Structural, so a plain object works. */
+export interface CommandSourceModule {
+	readonly name: string;
+	readonly commands?: readonly Command[];
+}
+
 /** What createBot takes: the modules, the token, and any seam to override. */
 export interface CreateBotOptions {
-	/** The modules to harvest; each carries its commands (and any flows no command mounts). */
-	readonly modules: readonly FlowSourceModule[];
+	/** The modules whose commands to register. Flows need no listing: declaring one with `flow()` registers it. */
+	readonly modules: readonly CommandSourceModule[];
 	/**
 	 * The bot token; `start` logs in with it. Omit to read the
 	 * conventional `DISCORD_TOKEN` environment variable; one of the two
@@ -103,12 +106,6 @@ export interface CreateBotOptions {
 	 * styled reply, say). Omit to use the shipped port as is.
 	 */
 	readonly wrapBridge?: (port: BridgePort) => BridgePort;
-	/**
-	 * A prebuilt flow catalog, used as is. `modules` then only supply
-	 * commands; their flows are not harvested again. Omit and the catalog is
-	 * built from the modules.
-	 */
-	readonly flows?: FlowCatalog;
 	/**
 	 * Runs once the client is ready, awaited before commands register. A
 	 * rejection goes to `onError` and boot carries on to registration.
@@ -192,13 +189,11 @@ export function createBot(options: CreateBotOptions): Bot {
 		...(options.logger !== undefined ? { logger: options.logger } : {}),
 		...(options.ephemeralAsPublic !== undefined ? { ephemeralAsPublic: options.ephemeralAsPublic } : {}),
 	});
-	const flows = options.flows ?? buildFlowCatalog(options.modules.flatMap(moduleFlowRegistrations));
 	const policyPort = normalizePolicy(options.policy);
 	const runtime = createUiRuntime({
 		platform: options.wrapBridge !== undefined ? options.wrapBridge(bridge.platform) : bridge.platform,
 		sendToChannel: bridge.sendToChannel,
 		policy: policyPort,
-		flows,
 		...(options.rehydrate !== undefined ? { rehydrate: options.rehydrate } : {}),
 		...(options.defaultParting !== undefined ? { defaultParting: options.defaultParting } : {}),
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
@@ -209,20 +204,19 @@ export function createBot(options: CreateBotOptions): Bot {
 		mount: runtime.mount,
 		replySender: bridge.replySender,
 		// The command door: leaf gates evaluate here, where the policy port
-		// and the boot catalog live. Absent when no policy option exists:
+		// lives. Absent when no policy option exists:
 		// nothing gated, nothing asked.
 		...(options.policy !== undefined ? {
 			// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 			checkDoor: async (flow, gate, interaction) => {
 				// Role-based gates (an app's admin privilege) read the actor's roles.
 				const roles = memberRoleIds(interaction);
-				const flowId = flows.byToken.get(flow)?.flowId ?? flow.id;
 				return policyPort.authorize({
 					actorId: interaction.user.id,
 					...(roles !== undefined ? { actorRoleIds: roles } : {}),
 					...(interaction.guildId !== null ? { guildId: interaction.guildId } : {}),
 					...(interaction.channelId !== null ? { channelId: interaction.channelId } : {}),
-					flowId,
+					flowId: flow.id,
 					...(gate !== undefined ? { actionPolicy: gate } : {}),
 				});
 			},

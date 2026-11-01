@@ -16,7 +16,9 @@ import { activeFrame, DEFAULT_TTL_MS } from '../../state/types.js';
 import type { EventTools, PlatformPort } from '../../pipeline/types.js';
 import type { Session } from '../../state/types.js';
 import type { FlowDefinition } from '../../flow/types.js';
+import { flow } from '../../flow/token.js';
 import type { Flow, MountToken } from '../../flow/token.js';
+import { tokenById } from '../../flow/registry.js';
 import { text, view } from '../../tree/builders.js';
 import type { ComponentResult } from '../../tree/types.js';
 
@@ -27,23 +29,23 @@ interface ChildData {
 const MINUTE = 60_000;
 const PLATFORM = {} as PlatformPort;
 
-/** The flow object handed to call(); only its identity and id matter here. */
-const CHILD_FLOW = { id: 'mod/child' } as unknown as Flow<unknown, unknown>;
+/** The flows handed to call(): real flow() declarations, so the registry knows them. */
+const CHILD_FLOW = flow<ChildData>('mod-child', {
+	first: 'child-main',
+	ttlMs: MINUTE,
+	remount: 'coexist',
+	screens: { 'child-main': { view: () => view({}, text('child')) } },
+}) as unknown as Flow<unknown, unknown>;
+const SEEDED_FLOW = flow<ChildData>('mod-seeded', {
+	first: 'child-main',
+	initialData: { n: 7 },
+	screens: { 'child-main': { view: () => view({}, text('child')) } },
+}) as unknown as Flow<unknown, unknown>;
 
-const CHILD_TOKEN: MountToken<ChildData> = {
-	flowId: 'mod/child',
-	moduleId: 'mod',
-	definition: {
-		first: 'child-main',
-		ttlMs: MINUTE,
-		remount: 'coexist',
-		screens: { 'child-main': {} as never },
-	} as unknown as FlowDefinition<ChildData>,
-};
+const CHILD_TOKEN = tokenById('mod-child')!;
 
 const ROOT_TOKEN: MountToken = {
 	flowId: 'mod/root',
-	moduleId: 'mod',
 	definition: {
 		first: 'root',
 		ttlMs: DEFAULT_TTL_MS,
@@ -73,7 +75,6 @@ function world(commitOverride?: (session: Session<unknown>) => Promise<void>): {
 	const store = createSessionStore();
 	const session = store.create<Record<string, unknown>>({
 		flowId: 'mod/root',
-		moduleId: 'mod',
 		ownerId: 'u1',
 		messageRef: { channelId: 'c1', messageId: 'm1' },
 		data: {},
@@ -103,7 +104,6 @@ function world(commitOverride?: (session: Session<unknown>) => Promise<void>): {
 		store,
 		queue,
 		commit,
-		byToken: new Map([[CHILD_FLOW, CHILD_TOKEN as MountToken]]),
 		ack: async (): Promise<void> => {
 			acks += 1;
 		},
@@ -138,8 +138,7 @@ describe('call - parking', () => {
 
 		expect(w.session.frames).toHaveLength(2);
 		const top = activeFrame(w.session);
-		expect(top.flowId).toBe('mod/child');
-		expect(top.moduleId).toBe('mod');
+		expect(top.flowId).toBe('mod-child');
 		expect(top.slot).toEqual(['picker']);
 		// The child's bag is a structuredClone of the args: same shape, fresh object.
 		expect(w.session.data.picker).toEqual(args);
@@ -163,12 +162,8 @@ describe('call - parking', () => {
 
 	it('falls back to the definition seed when no args are given', async () => {
 		const w = world();
-		const tokenWithSeed: MountToken<ChildData> = {
-			...CHILD_TOKEN,
-			definition: { ...CHILD_TOKEN.definition, initialData: { n: 7 } } as unknown as FlowDefinition<ChildData>,
-		};
-		const call = createCall({ store: w.store, queue: w.queue, commit: { redraw: async () => undefined }, byToken: new Map([[CHILD_FLOW, tokenWithSeed as MountToken]]) });
-		const parked = call.call(w.session, w.session.frames[0], w.tools, CHILD_FLOW, { as: 'picker' });
+		const call = createCall({ store: w.store, queue: w.queue, commit: { redraw: async () => undefined } });
+		const parked = call.call(w.session, w.session.frames[0], w.tools, SEEDED_FLOW, { as: 'picker' });
 		await tick();
 
 		expect(w.session.data.picker).toEqual({ n: 7 });
@@ -176,22 +171,27 @@ describe('call - parking', () => {
 		await expect(parked).resolves.toBe('done');
 	});
 
-	it('an unlisted flow assembles its token from the calling frame, so same-module calls need no listing', async () => {
+	it('any declared flow can be called with no listing, and the child frame carries its registered token', async () => {
 		const w = world();
-		const engine = createCall({ store: w.store, queue: w.realQueue, commit: { redraw: async () => undefined }, byToken: new Map() });
-		const bare = { id: 'child', definition: CHILD_TOKEN.definition } as unknown as Flow<unknown, unknown>;
+		const engine = createCall({ store: w.store, queue: w.realQueue, commit: { redraw: async () => undefined } });
 
-		const parked = engine.call(w.session, w.session.frames[0], w.tools, bare, { as: 'picker', args: { n: 1 } });
+		const parked = engine.call(w.session, w.session.frames[0], w.tools, CHILD_FLOW, { as: 'picker', args: { n: 1 } });
 		await tick();
 
 		const child = w.session.frames[1];
-		expect(child.flowId).toBe('mod/child');
-		expect(child.token.flowId).toBe('mod/child');
-		expect(child.token.moduleId).toBe('mod');
-		expect(child.token.definition).toBe(CHILD_TOKEN.definition);
+		expect(child.flowId).toBe('mod-child');
+		expect(child.token).toBe(CHILD_TOKEN);
 
 		await engine.exit(w.session, 'done');
 		await expect(parked).resolves.toBe('done');
+	});
+
+	it('refuses an object that flow() did not make', async () => {
+		const w = world();
+		const engine = createCall({ store: w.store, queue: w.realQueue, commit: { redraw: async () => undefined } });
+		const forged = { id: 'mod-child', definition: CHILD_TOKEN.definition } as unknown as Flow<unknown, unknown>;
+
+		await expect(engine.call(w.session, w.session.frames[0], w.tools, forged, { as: 'picker' })).rejects.toThrow(/not a flow made by flow\(\)/);
 	});
 
 	it('throws when the calling frame already holds a pending call', async () => {

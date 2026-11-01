@@ -20,7 +20,7 @@ import type { MessageRef } from '../../state/types.js';
 import { button, row, text, view } from '../../tree/builders.js';
 import { flow } from '../../flow/token.js';
 import type { Flow } from '../../flow/token.js';
-import { buildFlowCatalog } from '../../boot/build.js';
+import { resetFlowRegistry } from '../../flow/registry.js';
 import { createUiRuntime } from '../create.js';
 import type { InteractionSender } from '../types.js';
 
@@ -73,6 +73,7 @@ function setup(options: { actorSender?: boolean } = {}): {
 		await verb(event);
 	});
 
+	resetFlowRegistry();
 	const panelFlow = flow<PanelData>('panel', {
 		screens: {
 			main: {
@@ -121,7 +122,6 @@ function setup(options: { actorSender?: boolean } = {}): {
 		platform,
 		sendToChannel: async (channelId: string): Promise<MessageRef> => ({ channelId, messageId: 'panel-msg' }),
 		policy: ownerOrAllowed,
-		flows: buildFlowCatalog([{ module: 'campfire', flow: panelFlow }, { module: 'campfire', flow: sideFlow }]),
 		sweeper: false,
 	});
 
@@ -131,7 +131,7 @@ function setup(options: { actorSender?: boolean } = {}): {
 		panel ??= await runtime.mount(panelFlow, { to: { channel: CHANNEL }, ownerId: HOST });
 		await runtime.dispatch({
 			kind: EventKind.Button,
-			customId: encodeActionId({ sessionId: panel.sessionId, screenKey: `campfire/${panelFlow.id}/main`, actionHash: actionHash(feedHandler) }),
+			customId: encodeActionId({ sessionId: panel.sessionId, screenKey: `${panelFlow.id}/main`, actionHash: actionHash(feedHandler) }),
 			actorId,
 			channelId: CHANNEL,
 			messageId: 'panel-msg',

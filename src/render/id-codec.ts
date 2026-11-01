@@ -14,7 +14,7 @@
  * encode is the single construction point, so a format change is one
  * string in this file. It rejects ':' and '#' inside any part, because
  * only those two are structural: a `screenKey` may contain '/', it is
- * `'<moduleId>/<screenId>'`. The stamp's occurrence suffix (`'-1'`, `'-2'`, ...)
+ * `'<flowId>/<screenId>'`. The stamp's occurrence suffix (`'-1'`, `'-2'`, ...)
  * rides in the same part as the hash and cannot collide with it, since
  * base36 never contains `'-'`. encode also throws past the platform's
  * 100-character `custom_id` cap.
@@ -41,7 +41,7 @@ const MAX_CUSTOM_ID = 100;
 export interface ActionAddress {
 	/** The live session the control was drawn in. */
 	readonly sessionId: string;
-	/** The registry key of the screen the control was drawn on, `'<moduleId>/<screenId>'`. */
+	/** The registry key of the screen the control was drawn on, `'<flowId>/<screenId>'`. */
 	readonly screenKey: string;
 	/** The control's stamp: the handler's source hash (`action-hash.ts`) plus an occurrence suffix ('-1', '-2', ...) when the same source appears more than once in a draw. */
 	readonly actionHash: string;

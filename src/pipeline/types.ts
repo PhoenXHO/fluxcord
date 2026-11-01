@@ -113,8 +113,8 @@ export interface UiToolkit<TKeys extends string = string> {
 	 * Open a separate panel for the clicker: the flow mounts as an ephemeral
 	 * message owned by them (not by the panel's owner), beside the current
 	 * panel, which stays as it is. `data` seeds the new flow's bag. The flow
-	 * must be listed in its module's manifest flows, and it cannot rehydrate
-	 * (an ephemeral message dies at Discord's interaction wall). Throws when
+	 * cannot rehydrate (an ephemeral message dies at Discord's interaction
+	 * wall) and cannot be static. Throws when
 	 * the host's bridge cannot reply to the click.
 	 */
 	open<TChild, TExit>(flow: Flow<TChild, TExit>, options?: { readonly data?: TChild }): Promise<void>;
@@ -145,8 +145,8 @@ export interface ActionEvent<TData = unknown, TKeys extends string = string> {
 	 * child hands `ui.exit` resolves here. `as` names the child's bag slot
 	 * in this flow's data (the child lives at that key, readable and
 	 * writable from the parent), and `args` seeds the child's bag when
-	 * given (its own initialData seeds otherwise). The child must be
-	 * listed in its module's manifest flows. A second `call` while one is
+	 * given (its own initialData seeds otherwise). The child cannot be
+	 * static. A second `call` while one is
 	 * still awaited from the same frame throws: one call per frame.
 	 *
 	 * A method on purpose: method parameters check bivariantly, which
@@ -307,7 +307,7 @@ export interface ErrorReport {
 	readonly dirtyKeys?: readonly string[];
 	/** The flow hook's chosen reply text, when the failing screen's flow decided on one. The default unit prefers it over generic copy. */
 	readonly suggestedReply?: string;
-	/** The screen key ('<moduleId>/<screenId>') the event was delivered to, when it got that far. */
+	/** The screen key ('<flowId>/<screenId>') the event was delivered to, when it got that far. */
 	readonly screen?: string;
 	/** The action's authored label, when the event got that far: diagnostics only. */
 	readonly action?: string;
@@ -344,7 +344,7 @@ export interface PolicyRequest {
 	readonly guildId?: string;
 	/** The channel the interaction fired in. */
 	readonly channelId?: string;
-	/** The owning flow's full id (`'<moduleId>/<name>'`). */
+	/** The owning flow's id: its name. */
 	readonly flowId: string;
 	/** '<flowId>/<screenId>' of the screen the event is delivered to; absent on door requests (a command run before any screen exists). */
 	readonly view?: string;
@@ -477,7 +477,7 @@ export interface ActionRecord<TData = unknown> {
 export interface PartingInfo {
 	/** Why the panel died: `'close'` (a handler exit or crash) or `'expire'` (the TTL ran out). */
 	readonly reason: EndReason;
-	/** The dying flow's full id (`'<moduleId>/<name>'`), when known. */
+	/** The dying flow's id (its name), when known. */
 	readonly flowId?: string;
 	/** The mounting command's invocation path, when known (the built-in restart hint's source). */
 	readonly commandHint?: string;

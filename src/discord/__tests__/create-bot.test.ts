@@ -14,7 +14,6 @@ import { command, mounts } from '../../command/declare.js';
 import { screen } from '../../flow/screen.js';
 import { flow } from '../../flow/token.js';
 import { text, view } from '../../tree/builders.js';
-import { buildFlowCatalog } from '../../boot/build.js';
 import { createBot } from '../create-bot.js';
 import type { CommandRegistration } from '../create-bot.js';
 
@@ -235,20 +234,6 @@ describe('createBot - the host seams', () => {
 		expect(typeof wrapBridge.mock.calls[0][0].replyToActor).toBe('function');
 	});
 
-	it('a prebuilt flow catalog is used as is: the modules are not harvested again', () => {
-		// The flow is both listed and mounted, which the harvest rejects; a
-		// prebuilt catalog means the harvest never runs.
-		const flows = buildFlowCatalog([{ module: 'about', flow: aboutFlow }]);
-		expect(() =>
-			createBot({
-				modules: [{ name: 'about', flows: [aboutFlow], commands: [aboutCommand] }],
-				token: 't',
-				client: fakeReadyClient(async () => []).client,
-				sweeper: false,
-				flows,
-			}),
-		).not.toThrow();
-	});
 
 	it('onReady runs and settles before commands register', async () => {
 		const order: string[] = [];

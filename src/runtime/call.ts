@@ -26,8 +26,9 @@
  */
 
 import { setPath } from '../flow/lens.js';
-import type { Flow, MountToken } from '../flow/token.js';
+import type { Flow } from '../flow/token.js';
 import { entryScreen } from '../flow/define.js';
+import { tokenOf } from '../flow/registry.js';
 import type { CommitPhase } from '../commit/commit.js';
 import type { SessionQueue } from '../pipeline/queue.js';
 import type { CallEngine, EventTools } from '../pipeline/types.js';
@@ -50,8 +51,6 @@ export interface CallOptions {
 	 * PlatformPort.ack. Omitted when the host's bridge has no ack.
 	 */
 	readonly ack?: () => Promise<void>;
-	/** The boot catalog's flow-to-token map: the flows `event.call` may open. */
-	readonly byToken: ReadonlyMap<object, MountToken>;
 }
 
 /** Resumes one parked call: legal phases again, then settle the await. */
@@ -67,7 +66,7 @@ function resume(pending: PendingCall, settle: (pending: PendingCall) => void): (
  * (which binds `call` into each event and consults `crash` on the
  * handler-throw path) and the toolkit (whose `ui.exit` delegates here).
  *
- * @param options The store, queue, draw arm and boot catalog.
+ * @param options The store, queue and draw arm.
  * @returns The engine: call, exit, crash.
  */
 export function createCall(options: CallOptions): CallEngine {
@@ -101,17 +100,12 @@ export function createCall(options: CallOptions): CallEngine {
 					throw new Error(`event.call: flow '${frame.flowId}' already awaits a call (one call per frame)`);
 				}
 			}
-			// Doors first: a listed flow (a cross-module door, or a host or
-			// command mount) carries the catalog's assembled identity. An
-			// unlisted flow is a same-module call: the caller's frame names
-			// the module, so the token assembles right here and no manifest
-			// entry is needed. Flows know the flows they call.
-			const token = options.byToken.get(flow) ?? Object.freeze({
-				flowId: `${frame.moduleId}/${flow.id}`,
-				moduleId: frame.moduleId,
-				definition: flow.definition,
-				...(flow.meta !== undefined ? { meta: flow.meta } : {}),
-			});
+			// Any flow made by flow() can be called: declaring it registered
+			// it. An object flow() did not make is refused.
+			const token = tokenOf(flow);
+			if (token === undefined) {
+				throw new Error(`event.call: '${flow.id}' is not a flow made by flow()`);
+			}
 			if (token.definition.static) {
 				throw new Error(`event.call: flow '${token.flowId}' is static and keeps no session, so it cannot be called`);
 			}
@@ -124,7 +118,6 @@ export function createCall(options: CallOptions): CallEngine {
 			const child: FlowFrame = {
 				id: generateId(),
 				flowId: token.flowId,
-				moduleId: token.moduleId,
 				screen: entryScreen(token.definition, bag),
 				history: [],
 				modalNonce: generateId(),

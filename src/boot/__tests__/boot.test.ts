@@ -1,18 +1,17 @@
 /**
- * Boot-layer tests: the authored flow, the catalog build, and the dev coverage
- * scan (the view-throw check; policy coverage is structural pairing at
- * load time). Everything here is pure: catalogs built by hand, no Discord
- * and no clock.
+ * Boot-layer tests: the authored flow and its registration, and the dev
+ * coverage scan (the view-throw check; policy coverage is structural
+ * pairing at load time). Everything here is pure: no Discord and no clock.
  *
  * @module boot/__tests__/boot
  */
 
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { button, optionSelect, row, text, view } from '../../tree/builders.js';
-import { defineFlow } from '../../flow/define.js';
+import { command, mounts } from '../../command/declare.js';
 import { flow } from '../../flow/token.js';
 import type { Flow } from '../../flow/token.js';
-import { buildFlowCatalog } from '../build.js';
+import { flowIndex, flowTokens, resetFlowRegistry, tokenById, tokenOf } from '../../flow/registry.js';
 import { coverageScan } from '../scan.js';
 
 interface PanelData {
@@ -26,10 +25,8 @@ const join = (): void => undefined;
 const bareScreens = { main: { view: () => view({}, text('m')) } } as const;
 const bareOptions = { screens: bareScreens, first: 'main', initialData: {} } as const;
 
-type FlowOverrides = Parameters<typeof defineFlow<PanelData>>[0];
-
-function makeFlow(overrides: Partial<FlowOverrides> = {}): Flow<PanelData> {
-	return flow<PanelData>('host', {
+function makeFlow(id = 'host'): Flow<PanelData> {
+	return flow<PanelData>(id, {
 		screens: {
 			main: {
 				view: (data) => view(
@@ -41,133 +38,123 @@ function makeFlow(overrides: Partial<FlowOverrides> = {}): Flow<PanelData> {
 		},
 		first: 'main',
 		initialData: { count: 0 },
-		...overrides,
 	});
 }
 
+beforeEach(() => {
+	resetFlowRegistry();
+});
+
 describe('flow', () => {
-	it('freezes the flow; the bare name is the only id on it', () => {
+	it('freezes the flow; its name is its id', () => {
 		const t = makeFlow();
 		expect(t.id).toBe('host');
 		expect(Object.isFrozen(t)).toBe(true);
 	});
 
-	it('rejects names that are not bare kebab', () => {
-		expect(() => flow('', bareOptions)).toThrow(/bare kebab/);
-		expect(() => flow('panel/host', bareOptions)).toThrow(/bare kebab/);
-		expect(() => flow('panel/', bareOptions)).toThrow(/bare kebab/);
-		expect(() => flow('/host', bareOptions)).toThrow(/bare kebab/);
-		expect(() => flow('pa~nel', bareOptions)).toThrow(/bare kebab/);
-		expect(() => flow('Host', bareOptions)).toThrow(/bare kebab/);
+	it('rejects names that are not kebab case', () => {
+		expect(() => flow('', bareOptions)).toThrow(/kebab/);
+		expect(() => flow('panel/host', bareOptions)).toThrow(/kebab/);
+		expect(() => flow('panel/', bareOptions)).toThrow(/kebab/);
+		expect(() => flow('/host', bareOptions)).toThrow(/kebab/);
+		expect(() => flow('pa~nel', bareOptions)).toThrow(/kebab/);
+		expect(() => flow('Host', bareOptions)).toThrow(/kebab/);
 	});
 });
 
-describe('buildFlowCatalog', () => {
-	it("assembles '<module>/<name>' and indexes both by flowId and authored flow", () => {
-		const t = makeFlow();
-		const catalog = buildFlowCatalog([{ module: 'panel', flow: t }]);
-		const token = catalog.byFlowId.get('panel/host');
-		expect(token?.definition.screens.main).toBeDefined();
-		expect(catalog.byToken.get(t)?.flowId).toBe('panel/host');
-		expect(catalog.tokens).toHaveLength(1);
+describe('the flow registry', () => {
+	it('registers a flow the moment it is declared, under its own name', () => {
+		const declared = makeFlow('lotto-panel');
+
+		const token = tokenOf(declared);
+		expect(token?.flowId).toBe('lotto-panel');
+		expect(token?.definition).toBe(declared.definition);
+		expect(tokenById('lotto-panel')).toBe(token);
+		expect(flowIndex.get('lotto-panel')).toBe(token);
+		expect(flowTokens()).toEqual([token]);
 	});
 
-	it('the same bare name in two modules coexists - the prefix disambiguates', () => {
-		const other = flow<PanelData>('host', {
-			screens: { extra: { view: () => view({}, text('e')) } },
-			first: 'extra',
-			initialData: { count: 0 },
-		});
-		const catalog = buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'other', flow: other }]);
-		expect([...catalog.byFlowId.keys()].sort()).toEqual(['other/host', 'panel/host']);
+	it('carries the flow\'s registration facts on its token', () => {
+		const onSessionEnd = (): void => undefined;
+		const withMeta = flow<PanelData>('with-meta', { ...bareOptions, initialData: { count: 0 } }, { onSessionEnd });
+
+		expect(tokenOf(withMeta)?.meta?.onSessionEnd).toBe(onSessionEnd);
 	});
 
-	it('merges flows across registrations and throws on a duplicate flowId', () => {
-		const other = flow<PanelData>('other', {
-			screens: { extra: { view: () => view({}, text('e')) } },
-			first: 'extra',
-			initialData: { count: 0 },
-		});
-		const catalog = buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: other }]);
-		expect([...catalog.byFlowId.keys()].sort()).toEqual(['panel/host', 'panel/other']);
+	it('refuses a second flow with the same name, loudly, at its declaration', () => {
+		makeFlow('lotto-panel');
 
-		// Same module + same name: the flowId guard fires.
-		const twin = flow<PanelData>('host', {
-			screens: { alt: { view: () => view({}, text('a')) } },
-			first: 'alt',
-			initialData: { count: 0 },
-		});
-		expect(() => buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: twin }])).toThrow(/declared twice/);
+		expect(() => makeFlow('lotto-panel')).toThrow(/'lotto-panel' is already declared/);
+		expect(flowTokens()).toHaveLength(1);
 	});
 
-	it('one flow constant under two modules throws: the token map would silently keep the last', () => {
-		const shared = makeFlow();
-		expect(() =>
-			buildFlowCatalog([{ module: 'panel', flow: shared }, { module: 'other', flow: shared }]),
-		).toThrow(/registered under two homes/);
+	it('knows nothing about an object flow() did not make', () => {
+		const declared = makeFlow('real');
+		const forged = { flowMark: true, id: 'real', definition: declared.definition } as unknown as Flow<PanelData>;
+
+		expect(tokenOf(forged)).toBeUndefined();
+		expect(tokenById('missing')).toBeUndefined();
 	});
 
-	it('screen ids are per-flow: two flows of one module may reuse them', () => {
-		const evil = flow<PanelData>('twin', {
-			screens: { main: { view: () => view({}, text('m')) } },
-			first: 'main',
-			initialData: { count: 0 },
-		});
-		const catalog = buildFlowCatalog([{ module: 'panel', flow: makeFlow() }, { module: 'panel', flow: evil }]);
-		expect(catalog.byFlowId.get('panel/host')?.definition.screens.main).toBeDefined();
-		expect(catalog.byFlowId.get('panel/twin')?.definition.screens.main).toBeDefined();
+	it('learns the command line that mounts a flow, keeping the first one declared', () => {
+		const declared = makeFlow('status-panel');
+		command('chain', 'Chain tools', { subcommands: { status: mounts(declared, { description: 'Show the chain' }) } });
+		command('other', 'Another way in', { mount: mounts(declared) });
+
+		expect(tokenOf(declared)?.commandHint).toBe('chain status');
+	});
+
+	it('a command cannot mount something flow() did not make', () => {
+		const forged = { flowMark: true, id: 'forged', definition: makeFlow('real').definition } as unknown as Flow<PanelData>;
+
+		expect(() => command('forged', 'Forged', { mount: mounts(forged) })).toThrow(/not a flow made by flow\(\)/);
 	});
 });
 
 describe('coverageScan', () => {
 	/** A view that trusts a field the declared initialData leaves null: the honest scan trap. */
 	it('reports a view that throws on the declared initialData', () => {
-		const catalog = buildFlowCatalog([{
-			module: 'panel', flow: flow<{ count: number; picked: string | null }>('host', {
-				screens: {
-					main: {
-						view: (data) => view({}, text(`picked ${data.picked!.toUpperCase()}`)),
-					},
+		flow<{ count: number; picked: string | null }>('host', {
+			screens: {
+				main: {
+					view: (data) => view({}, text(`picked ${data.picked!.toUpperCase()}`)),
 				},
-				first: 'main',
-				initialData: { count: 0, picked: null },
-			})
-		}]);
-		const findings = coverageScan(catalog);
+			},
+			first: 'main',
+			initialData: { count: 0, picked: null },
+		});
+		const findings = coverageScan();
 		expect(findings).toHaveLength(1);
+		expect(findings[0]).toContain('host/main');
 		expect(findings[0]).toContain('view threw on initialData');
 	});
 
 	it('reports a view that draws an illegal tree', () => {
-		const catalog = buildFlowCatalog([{
-			module: 'panel', flow: flow<PanelData>('host', {
-				screens: {
-					// A row mixing a select with a button is type-legal but breaks rule 22.
-					main: { view: () => row({}, optionSelect({ onSelect: join, options: [{ label: 'A', value: 'a' }] }), button({ onClick: join, label: 'Join' })) },
-				},
-				first: 'main',
-				initialData: { count: 0 },
-			})
-		}]);
-		const findings = coverageScan(catalog);
+		flow<PanelData>('host', {
+			screens: {
+				// A row mixing a select with a button is type-legal but breaks rule 22.
+				main: { view: () => row({}, optionSelect({ onSelect: join, options: [{ label: 'A', value: 'a' }] }), button({ onClick: join, label: 'Join' })) },
+			},
+			first: 'main',
+			initialData: { count: 0 },
+		});
+		const findings = coverageScan();
 		expect(findings).toHaveLength(1);
 		expect(findings[0]).toContain('illegal tree');
 		expect(findings[0]).toContain('rule 22');
 	});
 
 	it('ignores views that render clean off the declared initialData', () => {
-		const catalog = buildFlowCatalog([{ module: 'panel', flow: makeFlow() }]);
-		expect(coverageScan(catalog)).toEqual([]);
+		makeFlow();
+		expect(coverageScan()).toEqual([]);
 	});
 
 	it('ignores views with no actionable controls', () => {
-		const catalog = buildFlowCatalog([{
-			module: 'panel', flow: flow<PanelData>('host', {
-				screens: { main: { view: () => view({}, text('just words')) } },
-				first: 'main',
-				initialData: { count: 0 },
-			})
-		}]);
-		expect(coverageScan(catalog)).toEqual([]);
+		flow<PanelData>('host', {
+			screens: { main: { view: () => view({}, text('just words')) } },
+			first: 'main',
+			initialData: { count: 0 },
+		});
+		expect(coverageScan()).toEqual([]);
 	});
 });

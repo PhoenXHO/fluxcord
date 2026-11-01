@@ -3,8 +3,8 @@
  * initialData, report views that throw. Pure; the host calls it in dev
  * boots. Policy gates are not scanned here: they are inert values the
  * host's engine evaluates per click, so there is nothing to walk
- * statically — the one boot check that exists is the duplicate-flowId
- * throw in the catalog build.
+ * statically — the one boot check that exists is the duplicate-name
+ * throw when a flow is declared.
  *
  * @module boot/scan
  */
@@ -13,23 +13,23 @@ import type { ViewSession } from '../flow/types.js';
 import { kitFor } from '../tree/kit.js';
 import { normalizeViewRoot } from '../tree/normalize.js';
 import { validateTree } from '../tree/validate.js';
-import type { FlowCatalog } from './build.js';
+import { flowTokens } from '../flow/registry.js';
 
 /**
- * Renders every screen of every flow in the catalog against a clone of
- * its own initialData, reporting views that throw or fail tree
- * validation.
+ * Renders every screen of every declared flow against a clone of its own
+ * initialData, reporting views that throw or fail tree validation. Call it
+ * once the app's modules are loaded, so every flow exists.
  *
  * @returns One human-readable line per failing view; an empty array
  *   means every view rendered clean.
  */
-export function coverageScan(catalog: FlowCatalog): string[] {
+export function coverageScan(): string[] {
 	const lines: string[] = [];
-	for (const token of catalog.tokens) {
+	for (const token of flowTokens()) {
 		const def = token.definition;
 		for (const screenId of def.screenIds) {
 			const screen = def.screens[screenId];
-			const key = `${token.moduleId}/${screenId}`;
+			const key = `${token.flowId}/${screenId}`;
 			try {
 				// A clone, so a misbehaving view cannot touch the declared bag;
 				// the cast is safe here (the scan renders declared data, not a

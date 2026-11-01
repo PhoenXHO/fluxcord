@@ -48,10 +48,9 @@ function harness(options: { ttlMs?: number } = {}): Harness {
 	const errors: unknown[] = [];
 	const ttlMs = options.ttlMs ?? 30 * 60 * 1000;
 	const definition = { first: 'main', ttlMs, remount: 'coexist', screens: {} };
-	const token = { flowId: 'lot/lot', moduleId: 'lot', definition } as unknown as MountToken;
+	const token = { flowId: 'lot/lot', definition } as unknown as MountToken;
 	const input = {
 		flowId: 'lot/lot',
-		moduleId: 'lot',
 		ownerId: 'user-1',
 		messageRef: { channelId: CHANNEL_ID, messageId: MESSAGE_ID },
 		data: {},
@@ -96,7 +95,6 @@ function childFrame(token: MountToken, slot: readonly string[]): FlowFrame {
 	return {
 		id: `frame-${slot.join('-')}`,
 		flowId: 'other/other',
-		moduleId: 'other',
 		screen: 'main',
 		history: [],
 		modalNonce: 'nonce',

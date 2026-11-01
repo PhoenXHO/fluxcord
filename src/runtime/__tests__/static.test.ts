@@ -9,9 +9,7 @@ import type { V2MessagePayload } from '../../render/v2.js';
 import type { PlatformPort, PolicyDecision, PolicyPort } from '../../pipeline/types.js';
 import type { MessageRef } from '../../state/types.js';
 import { button, row, text, view } from '../../tree/builders.js';
-import { buildFlowCatalog } from '../../boot/build.js';
 import { flow } from '../../flow/token.js';
-import type { Flow } from '../../flow/token.js';
 import { createUiRuntime, DEFAULT_SWEEP_INTERVAL_MS } from '../create.js';
 
 const MINUTE = 60_000;
@@ -28,13 +26,15 @@ const buttonFlow = flow('note-with-button', {
 	static: true,
 });
 
-function setup(flows: Flow<never>[]): {
+interface World {
 	runtime: ReturnType<typeof createUiRuntime>;
 	edits: string[];
 	partings: MessageRef[];
 	sent: V2MessagePayload[];
 	clock: { now: number };
-} {
+}
+
+function setup(): World {
 	const clock = { now: 1_000_000 };
 	const edits: string[] = [];
 	const partings: MessageRef[] = [];
@@ -58,7 +58,6 @@ function setup(flows: Flow<never>[]): {
 			return { channelId, messageId: `sent-${sent.length}` };
 		},
 		policy,
-		flows: buildFlowCatalog(flows.map((entry) => ({ module: 'ops', flow: entry }))),
 		now: () => clock.now,
 		sweeper: false,
 	});
@@ -79,7 +78,7 @@ describe('a static flow', () => {
 	});
 
 	it('mounts to a channel and to an existing message, with no session behind the handle', async () => {
-		const world = setup([alertFlow as Flow<never>]);
+		const world = setup();
 
 		const posted = await world.runtime.mount(alertFlow, { to: { channel: 'ch-1' }, ownerId: 'bot' });
 		expect(world.sent).toHaveLength(1);
@@ -92,7 +91,7 @@ describe('a static flow', () => {
 	});
 
 	it('redraw and go resolve false: there is nothing to redraw', async () => {
-		const world = setup([alertFlow as Flow<never>]);
+		const world = setup();
 		const handle = await world.runtime.mount(alertFlow, { to: { channel: 'ch-1' }, ownerId: 'bot' });
 
 		await expect(handle.redraw()).resolves.toBe(false);
@@ -100,7 +99,7 @@ describe('a static flow', () => {
 	});
 
 	it('is never swept or parted, however long it sits', async () => {
-		const world = setup([alertFlow as Flow<never>]);
+		const world = setup();
 		await world.runtime.mount(alertFlow, { to: { channel: 'ch-1' }, ownerId: 'bot' });
 		await world.runtime.mount(alertFlow, { to: { channel: 'ch-1' }, ownerId: 'bot' });
 
@@ -117,14 +116,14 @@ describe('a static flow', () => {
 	});
 
 	it('refuses a screen with a control before anything is sent', async () => {
-		const world = setup([buttonFlow as Flow<never>]);
+		const world = setup();
 
 		await expect(world.runtime.mount(buttonFlow, { to: { channel: 'ch-1' }, ownerId: 'bot' })).rejects.toThrow(/static and keeps no session, but its screen 'main' renders controls/);
 		expect(world.sent).toEqual([]);
 	});
 
 	it('refuses a rehydrate ref', async () => {
-		const world = setup([alertFlow as Flow<never>]);
+		const world = setup();
 
 		await expect(world.runtime.mount(alertFlow, { to: { channel: 'ch-1' }, ownerId: 'bot', rehydrateRef: 'x:1' })).rejects.toThrow(/rehydrate/);
 		expect(world.sent).toEqual([]);

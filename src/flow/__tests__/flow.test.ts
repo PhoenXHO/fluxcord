@@ -41,7 +41,7 @@ import { kitFor } from '../../tree/kit.js';
 import { getPath, lensSession, setPath } from '../lens.js';
 import { flow } from '../token.js';
 import type { MountToken } from '../token.js';
-import { buildFlowCatalog } from '../../boot/build.js';
+import { flowIndex, resetFlowRegistry, tokenById } from '../registry.js';
 import type { FlowDefinition } from '../types.js';
 import type { ViewSession } from '../types.js';
 
@@ -52,12 +52,11 @@ interface LottoData {
 
 /** Hand-built token for a raw definition: the frame resolves its screens through it. */
 const tokenFor = <T,>(definition: FlowDefinition<T>, flowId: string): MountToken =>
-	({ flowId, moduleId: flowId.slice(0, flowId.indexOf('/')), definition }) as unknown as MountToken;
+	({ flowId, definition }) as unknown as MountToken;
 
 /** Minimal token for sessions that never draw: the store only files it on the root frame. */
 const BARE_TOKEN: MountToken = {
 	flowId: 'lotto/lotto',
-	moduleId: 'lotto',
 	definition: { first: 'main', ttlMs: DEFAULT_TTL_MS, remount: 'coexist', screens: {} },
 } as unknown as MountToken;
 
@@ -170,7 +169,6 @@ describe('the drawn session', () => {
 		});
 		const session = createSessionStore().create<LottoData>({
 			flowId: 'lotto/lotto',
-			moduleId: 'lotto',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: { count: 0, picker: { chosen: 'none' } },
@@ -205,7 +203,6 @@ describe('the drawn session', () => {
 		});
 		const session = createSessionStore().create<LottoData>({
 			flowId: 'lotto/lotto',
-			moduleId: 'lotto',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: { count: 0, picker: { chosen: 'none' } },
@@ -239,7 +236,6 @@ describe('the lens', () => {
 	it('lensSession redirects data to the slot and forwards everything else live', () => {
 		const session = createSessionStore().create<LottoData>({
 			flowId: 'lotto/lotto',
-			moduleId: 'lotto',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: { count: 0, picker: { chosen: 'none' } },
@@ -358,6 +354,7 @@ function world(options: WorldOptions = {}): World {
 		throw new Error('boom');
 	};
 
+	resetFlowRegistry();
 	const lotto = flow<LottoData>('lotto', {
 		screens: {
 			main: screen<LottoData>()((data) => view(
@@ -385,8 +382,8 @@ function world(options: WorldOptions = {}): World {
 		parting: { command: 'lotto', note: 'The lotto ended.' },
 		...(options.onError !== undefined ? { onError: options.onError } : {}),
 	});
-	const catalog = buildFlowCatalog([{ module: 'lotto', flow: lotto }]);
-	const token = catalog.byFlowId.get('lotto/lotto')!;
+	void lotto;
+	const token = tokenById('lotto')!;
 
 	const platform: PlatformPort = {
 		replyToActor: vi.fn(async (textValue: string): Promise<void> => {
@@ -410,8 +407,7 @@ function world(options: WorldOptions = {}): World {
 		onEnd: createOnEnd({ commit }),
 	});
 	const session = store.create<LottoData>({
-		flowId: 'lotto/lotto',
-		moduleId: 'lotto',
+		flowId: 'lotto',
 		ownerId: 'u1',
 		messageRef: { channelId: 'c1', messageId: 'm1' },
 		data: { count: 0, picker: { chosen: 'none' } },
@@ -427,9 +423,9 @@ function world(options: WorldOptions = {}): World {
 		store,
 		policy,
 		platform,
-		reviveIndex: catalog.byFlowId,
+		reviveIndex: flowIndex,
 		tryRevive: vi.fn(async () => undefined),
-		makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit, open: async () => undefined }),
+		makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw } }).exit, open: async () => undefined }),
 		call: {
 			call: async () => {
 				throw new Error('no call engine in test');
@@ -460,7 +456,7 @@ function world(options: WorldOptions = {}): World {
 	function click(label: string, overrides: Partial<IncomingEvent> = {}): Promise<void> {
 		return dispatch({
 			kind: EventKind.Button,
-			customId: encodeActionId({ sessionId: session.id, screenKey: `lotto/lotto/${session.screen}`, actionHash: hashOf(label) }),
+			customId: encodeActionId({ sessionId: session.id, screenKey: `lotto/${session.screen}`, actionHash: hashOf(label) }),
 			actorId: 'u1',
 			channelId: 'c1',
 			messageId: 'm1',
@@ -488,7 +484,7 @@ describe('dispatch - flow integration through the frame', () => {
 	it('a hash the frame does not carry is stale: one snap redraw, no error, no run', async () => {
 		const w = world();
 		await w.draw();
-		const stray = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/lotto/main', actionHash: actionHash(() => { }) });
+		const stray = encodeActionId({ sessionId: w.session.id, screenKey: 'lotto/main', actionHash: actionHash(() => { }) });
 
 		await w.click('bump', { customId: stray });
 
@@ -534,7 +530,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 		await w.click('boom');
 		expect(w.replies).toEqual(['flow copy']);
-		expect(seen[0].screen).toBe('lotto/lotto/main');
+		expect(seen[0].screen).toBe('lotto/main');
 		expect(seen[0].action).toBe('boom');
 
 		await w.click('boom'); // hook again: replies accumulate per failure
@@ -581,7 +577,7 @@ describe('dispatch - flow integration through the frame', () => {
 
 	it('a dead click edits the message into the flow\'s parting bundle', async () => {
 		const w = world();
-		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/lotto/main', actionHash: actionHash(() => { }) });
+		const id = encodeActionId({ sessionId: 'zzzzzzzz', screenKey: 'lotto/main', actionHash: actionHash(() => { }) });
 
 		await w.click('bump', { customId: id });
 
@@ -623,6 +619,7 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 		draw: () => Promise<void>;
 		clickStamp: (stamp: string) => Promise<void>;
 	} {
+		resetFlowRegistry();
 		const list = flow<ListData>('list', {
 			screens: {
 				main: screen<ListData>()((data) => view(
@@ -634,8 +631,8 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			first: 'main',
 			initialData: { picked: [] },
 		});
-		const catalog = buildFlowCatalog([{ module: 'list', flow: list }]);
-		const token = catalog.byFlowId.get('list/list')!;
+		void list;
+		const token = tokenById('list')!;
 		const platform: PlatformPort = {
 			replyToActor: vi.fn(async (): Promise<void> => undefined),
 			redraw: vi.fn(async (): Promise<void> => undefined),
@@ -646,8 +643,7 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 		const commit = createCommit({ platform });
 		const store = createSessionStore({ onEnd: createOnEnd({ commit }) });
 		const session = store.create<ListData>({
-			flowId: 'list/list',
-			moduleId: 'list',
+			flowId: 'list',
 			ownerId: 'u1',
 			messageRef: { channelId: 'c1', messageId: 'm1' },
 			data: { picked: [] },
@@ -661,9 +657,9 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 			store,
 			policy,
 			platform,
-			reviveIndex: catalog.byFlowId,
+			reviveIndex: flowIndex,
 			tryRevive: vi.fn(async () => undefined),
-			makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw }, byToken: new Map() }).exit, open: async () => undefined }),
+			makeUi: createMakeUi({ exit: createCall({ store, queue: createSessionQueue(), commit: { redraw: commit.redraw } }).exit, open: async () => undefined }),
 			call: {
 				call: async () => {
 					throw new Error('no call engine in test');
@@ -686,7 +682,7 @@ describe('dispatch - generated lists of inline closures (stamped ids)', () => {
 		function clickStamp(stamp: string): Promise<void> {
 			return dispatch({
 				kind: EventKind.Button,
-				customId: encodeActionId({ sessionId: session.id, screenKey: 'list/list/main', actionHash: stamp }),
+				customId: encodeActionId({ sessionId: session.id, screenKey: 'list/main', actionHash: stamp }),
 				actorId: 'u1',
 				channelId: 'c1',
 				messageId: 'm1',

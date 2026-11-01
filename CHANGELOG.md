@@ -13,7 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Breaking: flows register themselves. `flow(name, ...)` adds the flow to one registry the moment it is declared, so a flow the host mounts or another flow calls needs no listing, and mounting an unlisted flow no longer fails with "not in the boot catalog". A flow's id is now its name as written, with no `module/` prefix, and it is the id on the flow's buttons, in its rehydrate rows, and in the `flowId` the policy engine sees (an engine that matched on `module/name` must match the plain name). Names are global across the app: a second flow with the same name throws at its declaration. A flow's screen keys read `<name>/<screen>`, also on the first draw, which used to differ from later draws. To migrate, remove `flows` from module manifests and `createBot` options, rename any two flows that shared a name across modules, and rename rows stored under the old `module/name` flow id.
+- Breaking: `flow()` is the only way to make a `Flow`. The runtime refuses an object it did not register, `ui.open`, `event.call` and `mounts()` included.
+- `createBot` no longer takes `flows`, and `modules` entries are `{ name, commands }`. `coverageScan()` takes no argument and scans every declared flow; call it once the modules are loaded. A flow mounted by several commands takes its parting hint from the first command declared.
 - Rehydrate rows no longer live forever by default: a rehydratable flow's rows are purged after 7 days unused, on stores that implement `purge`. Stores without `purge` keep every row, as before. A flow whose panel must stay clickable longer than that sets `rehydrateTtlMs: Infinity`.
+
+### Removed
+
+- `buildFlowCatalog`, `FlowCatalog`, `FlowRegistration`, `moduleFlowRegistrations` and `FlowSourceModule`, and the `flows` field on module manifests and on `RuntimeOptions`. The `moduleId` on sessions, frames and tokens is gone with the module prefix. `resetFlowRegistry()` is new, for tests that declare flows of the same name in several cases.
 
 ## [0.2.7] - 2026-11-01
 

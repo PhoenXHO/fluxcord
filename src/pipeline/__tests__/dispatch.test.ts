@@ -103,11 +103,10 @@ function world(options: { omitErrorHandler?: boolean; throwInErrorHandler?: bool
 		remount: 'coexist',
 		screens: { main: { view: (): ViewNode => lottoView } },
 	};
-	const token = { flowId: 'lotto/lotto', moduleId: 'lotto', definition } as unknown as MountToken;
+	const token = { flowId: 'lotto/lotto', definition } as unknown as MountToken;
 	const store = createSessionStore({ now: () => clock.now });
 	const session = store.create<LottoData>({
 		flowId: 'lotto/lotto',
-		moduleId: 'lotto',
 		ownerId: OWNER_ID,
 		messageRef: { channelId: CHANNEL_ID, messageId: MESSAGE_ID },
 		data: { tickets: 3 },
@@ -649,7 +648,6 @@ describe('dispatch - the per-session line', () => {
 		const w = world();
 		const other = w.store.create<LottoData>({
 			flowId: 'lotto/lotto',
-			moduleId: 'lotto',
 			ownerId: 'user-2',
 			messageRef: { channelId: CHANNEL_ID, messageId: 'message-2' },
 			data: { tickets: 1 },

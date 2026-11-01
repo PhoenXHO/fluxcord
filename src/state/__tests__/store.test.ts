@@ -7,7 +7,7 @@ import type { CreateSessionInput, RehydrateRow, RehydrateStore } from '../types.
 const MINUTE = 60_000;
 
 // Minimal token: the store only files it on the root frame.
-const TOKEN = { flowId: 'lotto/host', moduleId: 'lotto' } as unknown as MountToken;
+const TOKEN = { flowId: 'lotto/host' } as unknown as MountToken;
 
 /** Injectable clock: deterministic time, advanced by hand. */
 function clock(): { now: () => number; advance: (ms: number) => void } {
@@ -28,7 +28,6 @@ interface LottoData {
 function input(overrides: Partial<CreateSessionInput<LottoData>> = {}): CreateSessionInput<LottoData> {
 	return {
 		flowId: 'lotto.host',
-		moduleId: 'lotto',
 		ownerId: 'user-1',
 		messageRef: { channelId: 'ch-1', messageId: 'msg-1' },
 		data: { tickets: 3, names: ['ada', 'bob'] },
@@ -52,7 +51,6 @@ describe('create', () => {
 
 		expect(session.id).toMatch(/^[0-9A-Za-z]{8}$/);
 		expect(session.flowId).toBe('lotto.host');
-		expect(session.moduleId).toBe('lotto');
 		expect(session.ownerId).toBe('user-1');
 		expect(session.messageRef).toEqual({ channelId: 'ch-1', messageId: 'msg-1' });
 		expect(session.createdAt).toBe(session.lastActivityAt);
