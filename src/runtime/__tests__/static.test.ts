@@ -96,6 +96,7 @@ describe('a static flow', () => {
 
 		await expect(handle.redraw()).resolves.toBe(false);
 		await expect(handle.go('main')).resolves.toBe(false);
+		await expect(handle.close()).resolves.toBe(false);
 	});
 
 	it('is never swept or parted, however long it sits', async () => {

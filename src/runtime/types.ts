@@ -79,8 +79,8 @@ export interface MountOptions {
  * What mount returns: identity for rehydration binding, redraw for
  * services that keep a panel updated over time, and go for the
  * post-load landing — an async-mounted panel can finish loading, then
- * land on the screen its data calls for. Close is deliberately
- * inside-only: ui.exit from a handler.
+ * land on the screen its data calls for. A handler ends its own session
+ * with ui.exit; the code that mounted a panel ends it with close.
  */
 export interface MountHandle<TData = unknown> {
 	/** The session's id; empty for a static flow, which keeps none (its `redraw` and `go` resolve false). */
@@ -102,6 +102,17 @@ export interface MountHandle<TData = unknown> {
 	 * nav verbs).
 	 */
 	go(screen: string): Promise<boolean>;
+	/**
+	 * End the session from outside, the way `ui.exit()` ends it from a
+	 * handler: the message freezes on its last screen with its controls
+	 * stripped, and the session goes at once instead of waiting out its
+	 * TTL. Serialized with clicks on the same session's queue. Resolves
+	 * true when this call ended it, false when the session was already
+	 * gone (closed, replaced, expired). The freeze edit goes out in the
+	 * background, and a failure of it reaches the error unit, like any
+	 * other death-path edit.
+	 */
+	close(): Promise<boolean>;
 }
 
 export interface RuntimeOptions {

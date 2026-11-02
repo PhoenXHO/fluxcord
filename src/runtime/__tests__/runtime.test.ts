@@ -617,6 +617,52 @@ describe('the handle - redraw', () => {
 	});
 });
 
+describe('the handle - close', () => {
+	it('ends the session at once and freezes the message with one edit', async () => {
+		const w = world();
+		const handle = await w.mount();
+		w.edits.length = 0;
+
+		await expect(handle.close()).resolves.toBe(true);
+
+		expect(w.edits).toEqual([handle.messageId]);
+		await expect(handle.redraw()).resolves.toBe(false);
+		await expect(handle.go('done')).resolves.toBe(false);
+	});
+
+	it('resolves false the second time, and for a session that already expired, editing nothing more', async () => {
+		const w = world();
+		const closed = await w.mount({ to: { channel: 'ch-1' } });
+		await closed.close();
+		w.edits.length = 0;
+		await expect(closed.close()).resolves.toBe(false);
+
+		const expired = await w.mount({ to: { channel: 'ch-2' }, ownerId: 'someone-else' });
+		w.clock.advance(31 * MINUTE);
+		w.edits.length = 0;
+		await expect(expired.close()).resolves.toBe(false);
+		expect(w.edits).toEqual([]);
+	});
+
+	it('leaves the other sessions alone', async () => {
+		const w = world();
+		const first = await w.mount({ to: { channel: 'ch-1' }, ownerId: 'a' });
+		const second = await w.mount({ to: { channel: 'ch-2' }, ownerId: 'b' });
+
+		await first.close();
+
+		await expect(second.redraw()).resolves.toBe(true);
+	});
+
+	it('does not reject the caller when the freeze edit fails: the session is already over', async () => {
+		const w = world();
+		const handle = await w.mount();
+		(w.platform.editMessage as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Unknown Message'));
+
+		await expect(handle.close()).resolves.toBe(true);
+	});
+});
+
 describe('session lifecycle hooks', () => {
 	it('onSessionStart fires once the session is born - the same handle object mount returns, plus the context', async () => {
 		let seenHandle: MountHandle<PanelData> | undefined;

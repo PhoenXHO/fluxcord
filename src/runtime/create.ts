@@ -348,6 +348,7 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 				messageId: ref.messageId,
 				redraw: (): Promise<boolean> => Promise.resolve(false),
 				go: (): Promise<boolean> => Promise.resolve(false),
+				close: (): Promise<boolean> => Promise.resolve(false),
 			};
 		}
 
@@ -411,6 +412,12 @@ export function createUiRuntime(options: RuntimeOptions): UiRuntime {
 					store.touch(live.id);
 					await commit.redraw(live);
 					return true;
+				}),
+			close: (): Promise<boolean> =>
+				queue.enqueue(session.id, async () => {
+					const live = store.get(session.id);
+					if (live === undefined || isExpired(live, now())) return false;
+					return store.close(live.id);
 				}),
 		};
 		// The flow's own bind moment: the session is fully born (screen
