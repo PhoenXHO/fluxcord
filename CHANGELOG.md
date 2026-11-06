@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-06
+
 ### Added
 
 - `handle.close()` on the handle `mount` returns. The code that mounted a panel can now end its session, as a handler does with `ui.exit()`: the message freezes on its last screen with its controls stripped, and the session goes at once instead of waiting out its TTL. It runs on the session's queue, resolves `true` when this call ended the session and `false` when it was already gone (closed, replaced, expired), and a failed freeze edit reaches the error unit like any other death-path edit. A static flow's handle resolves `false`.
