@@ -40,7 +40,7 @@ import type {
 	APITextDisplayComponent,
 	APIThumbnailComponent,
 } from 'discord-api-types/v10';
-import { NodeKind, SeparatorSpacing } from '../tree/vocab.js';
+import { NodeKind, REQUIRED_CHECKBOX_VALUE, SeparatorSpacing } from '../tree/vocab.js';
 import type { SelectEntity } from '../tree/vocab.js';
 import type {
 	ButtonStyle as TreeButtonStyle,
@@ -527,8 +527,9 @@ function renderModalSelect(node: SelectNode, path: string): APILabelComponent {
 /**
  * Renders a checkbox inside its Label. A required checkbox rides the wire
  * as a one-option checkbox group: the platform cannot require a bare
- * checkbox, so the requirement becomes "pick the one option". Either way
- * `required` is sent explicitly, like the input's.
+ * checkbox, so the requirement becomes "pick the one option", whose reserved
+ * value the submit reads back as `true`. Either way `required` is sent
+ * explicitly, like the input's.
  */
 function renderModalCheckbox(node: CheckboxNode): APILabelComponent {
 	const component: APIComponentInLabel = node.required === true
@@ -541,7 +542,7 @@ function renderModalCheckbox(node: CheckboxNode): APILabelComponent {
 			// A prefill survives the required rewrite: the authored tick
 			// becomes the replacement option's default, so the modal opens
 			// ticked exactly like the bare arm honors it.
-			options: [{ label: node.label, value: 'on', ...(node.checked === true ? { default: true } : {}) }],
+			options: [{ label: node.label, value: REQUIRED_CHECKBOX_VALUE, ...(node.checked === true ? { default: true } : {}) }],
 		}
 		: {
 			type: ComponentType.Checkbox,

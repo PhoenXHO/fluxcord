@@ -111,6 +111,32 @@ describe('flattenInteraction', () => {
 		expect(event?.inputs).not.toHaveProperty('broken');
 	});
 
+	it('reads a required checkbox, a one-option group on the wire, as true', () => {
+		const interaction = {
+			isButton: () => false,
+			isAnySelectMenu: () => false,
+			isModalSubmit: () => true,
+			customId: 'ui2:s1:lotto/main#submit~n1',
+			user: { id: 'u1' },
+			guildId: 'g1',
+			channelId: 'c1',
+			message: { id: 'm1' },
+			fields: {
+				fields: new Map([
+					['tos', { values: ['fluxcord:checkbox'] }],
+					['own', { values: ['on'] }],
+					['both', { values: ['fluxcord:checkbox', 'b'] }],
+				]),
+			},
+		} as unknown as ModalSubmitInteraction;
+
+		const event = flattenInteraction(interaction as UiComponentInteraction);
+
+		// Only a pick list that is exactly the reserved value is the checkbox;
+		// an author's own group keeps its array.
+		expect(event?.inputs).toEqual({ tos: true, own: ['on'], both: ['fluxcord:checkbox', 'b'] });
+	});
+
 	it('returns undefined for a modal submit with no backing message (command-fired)', () => {
 		const interaction = {
 			isButton: () => false,

@@ -14,7 +14,7 @@
  * @module tree/validate
  */
 
-import { NodeKind, SeparatorSpacing } from './vocab.js';
+import { NodeKind, REQUIRED_CHECKBOX_VALUE, SeparatorSpacing } from './vocab.js';
 import type {
 	AccessoryNode,
 	ButtonNode,
@@ -135,6 +135,8 @@ export enum Rules {
 	accessorySingleChild = 40,
 	/** A thumbnail carries an http(s) media URL. */
 	thumbnailMediaUrl = 41,
+	/** A checkbox group does not use the value reserved for the required checkbox. */
+	reservedCheckboxValue = 42,
 }
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set(Object.values(NodeKind));
@@ -827,6 +829,13 @@ function validateCheckboxGroup(node: CheckboxGroupNode, path: string, violations
 			});
 		}
 		checkOptionEntries(node.options, path, violations);
+		if (node.options.some((option) => option.value === REQUIRED_CHECKBOX_VALUE)) {
+			violations.push({
+				path,
+				rule: Rules.reservedCheckboxValue,
+				message: `checkbox group option value '${REQUIRED_CHECKBOX_VALUE}' is reserved for the required checkbox`,
+			});
+		}
 	}
 }
 

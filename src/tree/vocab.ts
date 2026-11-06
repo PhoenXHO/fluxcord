@@ -6,6 +6,13 @@
  */
 
 /**
+ * The option value of the one-option group a required checkbox is rendered
+ * as. The submit reads a pick list of exactly this value back as `true`, so
+ * a checkbox group of the author's own may not use it.
+ */
+export const REQUIRED_CHECKBOX_VALUE = 'fluxcord:checkbox';
+
+/**
  * Tree node kinds: which UI element a node renders as. String-valued so
  * logs and validation errors stay readable.
  */

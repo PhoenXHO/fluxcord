@@ -459,6 +459,10 @@ describe('validateTree - modal form controls', () => {
 		expect(rulesOf(modal({ title: 'T' }, checkbox({ id: '', label: 'T' })))).toEqual([33]);
 	});
 
+	it('rule 42: a checkbox group may not use the value reserved for the required checkbox', () => {
+		expect(rulesOf(modal({ title: 'T' }, checkboxGroup({ id: 'g', label: 'G', options: [{ label: 'A', value: 'fluxcord:checkbox' }] })))).toEqual([42]);
+	});
+
 	it('rule 34: checkbox group option count and bounds', () => {
 		const options = Array.from({ length: 11 }, (_, i) => ({ label: `O${i}`, value: `${i}` }));
 		expect(rulesOf(modal({ title: 'T' }, checkboxGroup({ id: 'g', label: 'G', options })))).toEqual([34]);

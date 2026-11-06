@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `createBot` no longer takes `flows`, and `modules` entries are `{ name, commands }`. `coverageScan()` takes no argument and scans every declared flow; call it once the modules are loaded. A flow mounted by several commands takes its parting hint from the first command declared.
 - Rehydrate rows no longer live forever by default: a rehydratable flow's rows are purged after 7 days unused, on stores that implement `purge`. Stores without `purge` keep every row, as before. A flow whose panel must stay clickable longer than that sets `rehydrateTtlMs: Infinity`.
 
+- Breaking: a required `<checkbox>` now submits as `true`, like an optional one, where it used to arrive as `['on']`. It still goes to Discord as a one-option group, whose option value is now the reserved `fluxcord:checkbox`; a submit whose pick list is exactly that value reads back as `true`. A `<checkbox-group>` option may not use that value (rule 42). To migrate, replace `Array.isArray(event.inputs?.id)` with `event.inputs?.id === true`.
+
 ### Removed
 
 - `buildFlowCatalog`, `FlowCatalog`, `FlowRegistration`, `moduleFlowRegistrations` and `FlowSourceModule`, and the `flows` field on module manifests and on `RuntimeOptions`. The `moduleId` on sessions, frames and tokens is gone with the module prefix. `resetFlowRegistry()` is new, for tests that declare flows of the same name in several cases.

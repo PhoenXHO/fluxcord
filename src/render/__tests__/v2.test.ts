@@ -442,7 +442,7 @@ describe('renderV2Modal - form controls', () => {
 		expect(renderModal(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T', required: true }))).components).toEqual([{
 			type: 18,
 			label: 'T',
-			component: { type: 22, custom_id: 'c', required: true, min_values: 1, max_values: 1, options: [{ label: 'T', value: 'on' }] },
+			component: { type: 22, custom_id: 'c', required: true, min_values: 1, max_values: 1, options: [{ label: 'T', value: 'fluxcord:checkbox' }] },
 		}]);
 	});
 
@@ -450,7 +450,7 @@ describe('renderV2Modal - form controls', () => {
 		expect(renderModal(modal({ title: 'T' }, checkbox({ id: 'c', label: 'T', required: true, checked: true }))).components).toEqual([{
 			type: 18,
 			label: 'T',
-			component: { type: 22, custom_id: 'c', required: true, min_values: 1, max_values: 1, options: [{ label: 'T', value: 'on', default: true }] },
+			component: { type: 22, custom_id: 'c', required: true, min_values: 1, max_values: 1, options: [{ label: 'T', value: 'fluxcord:checkbox', default: true }] },
 		}]);
 	});
 

@@ -85,7 +85,7 @@ For binary options, the `<checkbox>` tag provides a yes/no switch that accepts b
 
 ## Receiving the submit
 
-Once someone hits submit, fluxcord invokes your action a second time with `e.kind` set to `EventKind.ModalSubmit` and populates `e.inputs`. This payload maps your authored field identifiers to their submitted values, and each value keeps its field's natural shape: text inputs and radio answers arrive as strings, the checkbox arrives as a boolean, and the pick-list fields arrive as arrays of their picks. One wrinkle: a required checkbox rides the wire as a single-option checkbox group, since the platform cannot require a bare checkbox, so a required box's answer arrives as `['on']` rather than a plain `true` (will be fixed in a future version).
+Once someone hits submit, fluxcord invokes your action a second time with `e.kind` set to `EventKind.ModalSubmit` and populates `e.inputs`. This payload maps your authored field identifiers to their submitted values, and each value keeps its field's natural shape: text inputs and radio answers arrive as strings, the checkbox arrives as a boolean, and the pick-list fields arrive as arrays of their picks. A required checkbox is the same: the platform cannot require a bare checkbox, so fluxcord sends it as a single-option group behind the scenes and hands you back a plain `true`. For that reason the option value `fluxcord:checkbox` is reserved, and a `<checkbox-group>` of your own may not use it.
 
 Since the wager rides a text field, the submit branch parses it before trusting it:
 
@@ -113,7 +113,7 @@ Pick lists arrive as arrays of option values in pick order, so a handler reads i
 
 To catch malformed requests on your side, fluxcord validates modal constraints every time a panel draws, so a rule violation throws locally instead of coming back as an API rejection. A dialog holds at most five children, and field ids must be unique within it. Furthermore, field labels cannot exceed 45 characters, whereas descriptions top out at 100.
 
-Two platform behaviors are especially worth noting. First, Discord implements a `required` checkbox as a single-item checkbox group so that submission stays locked until checked; that makes `<checkbox required>` ideal whenever you need an explicit consent gate before a user continues. Note the shape wrinkle from the submit section: a consent check reads the `['on']` array rather than comparing against `true`. Second, fluxcord stamps a fresh internal ID every time a modal opens, so an abandoned half-typed draft can never bleed into your pre-filled values on the next open.
+Two platform behaviors are especially worth noting. First, Discord implements a `required` checkbox as a single-item checkbox group so that submission stays locked until checked; that makes `<checkbox required>` ideal whenever you need an explicit consent gate before a user continues. The submit hands it back as a plain `true`, so a consent check is `e.inputs?.consent === true`. Second, fluxcord stamps a fresh internal ID every time a modal opens, so an abandoned half-typed draft can never bleed into your pre-filled values on the next open.
 
 > [!NOTE]
 > Discord keeps a draft per modal id, so a half-typed dialog would normally reopen exactly as the user left it if they don't submit it. fluxcord opens every modal under a fresh id instead, which trades that implicit draft for flexibility. Keeping the draft becomes an explicit choice: the `value` prop prefills the field with whatever you pass, such as the last saved answer.

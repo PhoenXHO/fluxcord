@@ -23,6 +23,7 @@ import type {
 } from 'discord.js';
 import { EventKind } from '../pipeline/types.js';
 import type { IncomingEvent } from '../pipeline/types.js';
+import { REQUIRED_CHECKBOX_VALUE } from '../tree/vocab.js';
 
 /** Every component interaction kind the framework understands. */
 export type UiComponentInteraction =
@@ -37,7 +38,8 @@ export type UiComponentInteraction =
 /**
  * Modal field values keyed by input id, read defensively off the flat field
  * collection. The value shape rides the field kind: text inputs pass through
- * as strings, the bare checkbox arrives as a boolean, a radio group's answer
+ * as strings, a checkbox arrives as a boolean (a required one is a one-option
+ * group on the wire, and its pick reads back as `true`), a radio group's answer
  * is a string, and the pick-list fields (checkbox groups, modal selects)
  * arrive as arrays of their picks in pick order. A radio group's null answer
  * (nothing picked) is omitted entirely.
@@ -52,7 +54,8 @@ function modalInputs(interaction: ModalSubmitInteraction): Record<string, string
 			inputs[id] = f.value;
 		} else if (Array.isArray(f.values)) {
 			const picks = f.values.filter((entry): entry is string => typeof entry === 'string');
-			if (picks.length > 0) inputs[id] = picks;
+			if (picks.length === 1 && picks[0] === REQUIRED_CHECKBOX_VALUE) inputs[id] = true;
+			else if (picks.length > 0) inputs[id] = picks;
 		}
 	}
 	return inputs;
