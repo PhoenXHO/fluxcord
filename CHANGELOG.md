@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-07
+
 ### Fixed
 
 - A handler that failed while the session data held a `BigInt` was never reported. The dirty-key check that feeds the failure report compared keys through `JSON.stringify`, which throws on a `BigInt`, so the throw happened inside the failure path: the clicker got no error reply, the error socket was never called, and the only trace was a "framework failure" log pointing at the check. Keys are now compared by value (`isDeepStrictEqual`), which also tells a changed `Map`, `Set` or `Date` from an unchanged one, and a comparison that still throws now leaves `dirtyKeys` out of the report instead of losing the report.
