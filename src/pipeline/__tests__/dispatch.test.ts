@@ -572,6 +572,22 @@ describe('dispatch - the error socket', () => {
 		expect(w.errors[0].dirtyKeys).toEqual(['tickets']);
 	});
 
+	it('still reports a failure when the bag holds a BigInt, a value JSON cannot write', async () => {
+		const w = world();
+		const bag = w.session.data as unknown as Record<string, unknown>;
+		bag.balance = 5n;
+		w.handler.mockImplementationOnce(async (): Promise<void> => {
+			bag.tickets = 99;
+			bag.balance = 6n;
+			throw new Error('boom');
+		});
+		await w.click();
+
+		expect(w.errors).toHaveLength(1);
+		expect(w.errors[0].error).toEqual(new Error('boom'));
+		expect(w.errors[0].dirtyKeys).toEqual(['tickets', 'balance']);
+	});
+
 	it('routes pipeline failures as source framework, no session attached', async () => {
 		const w = world();
 		activeFrame(w.session).screen = 'ghost';

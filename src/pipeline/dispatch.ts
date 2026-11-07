@@ -38,6 +38,7 @@
  * @module pipeline/dispatch
  */
 
+import { isDeepStrictEqual } from 'node:util';
 import type { ActionAddress } from '../render/id-codec.js';
 import { decodeActionId } from '../render/id-codec.js';
 import { isExpired } from '../state/store.js';
@@ -213,19 +214,28 @@ function snapshotData(data: unknown): { readonly ok: true; readonly value: unkno
 	}
 }
 
-/** Top-level data keys whose JSON differs between the snapshot and the live bag. */
-function changedKeys(before: unknown, after: unknown): readonly string[] {
-	if (typeof before !== 'object' || before === null || typeof after !== 'object' || after === null) {
-		return JSON.stringify(before) === JSON.stringify(after) ? [] : ['<root>'];
-	}
-	const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-	const changed: string[] = [];
-	for (const key of keys) {
-		if (JSON.stringify((before as Record<string, unknown>)[key]) !== JSON.stringify((after as Record<string, unknown>)[key])) {
-			changed.push(key);
+/**
+ * Top-level data keys that differ between the snapshot and the live bag.
+ * Compared by value rather than through JSON, which throws on a BigInt and
+ * flattens a Map to `{}`. Like the snapshot, a failure here disables the
+ * diagnostic for that event and never the failure report it feeds.
+ */
+function changedKeys(before: unknown, after: unknown): readonly string[] | undefined {
+	try {
+		if (typeof before !== 'object' || before === null || typeof after !== 'object' || after === null) {
+			return isDeepStrictEqual(before, after) ? [] : ['<root>'];
 		}
+		const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+		const changed: string[] = [];
+		for (const key of keys) {
+			if (!isDeepStrictEqual((before as Record<string, unknown>)[key], (after as Record<string, unknown>)[key])) {
+				changed.push(key);
+			}
+		}
+		return changed;
+	} catch {
+		return undefined;
 	}
-	return changed;
 }
 
 /**
